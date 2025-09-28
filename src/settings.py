@@ -20,6 +20,9 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 SONAR_API_KEY: str | None = os.getenv("SONAR_API_KEY")
 SONAR_API_BASE: str = os.getenv("SONAR_API_BASE", "https://api.perplexity.ai")
 SONAR_DEFAULT_MODEL: str = os.getenv("SONAR_DEFAULT_MODEL", "sonar-pro")
+GROK_API_KEY: str | None = os.getenv("GROK_API_KEY")
+GROK_API_BASE: str = os.getenv("GROK_API_BASE", "https://api.x.ai/v1")
+GROK_DEFAULT_MODEL: str = os.getenv("GROK_DEFAULT_MODEL", "grok-beta")
 
 # Validações leves (opcionalmente tornar estritas em produção)
 REQUIRED_ON_RUNTIME = [

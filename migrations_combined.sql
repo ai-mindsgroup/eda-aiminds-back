@@ -1,3 +1,22 @@
+-- Arquivo combinado gerado em 2025-09-26T22:34:39.181792Z
+-- Ordem: 
+--   0000_enable_pgcrypto.sql
+--   0001_init_pgvector.sql
+--   0002_schema.sql
+
+-- >>> BEGIN 0000_enable_pgcrypto.sql >>>
+-- Habilita extensão pgcrypto para gen_random_uuid()
+create extension if not exists pgcrypto;
+
+-- <<< END 0000_enable_pgcrypto.sql <<<
+
+-- >>> BEGIN 0001_init_pgvector.sql >>>
+-- Habilita extensão pgvector
+create extension if not exists vector;
+
+-- <<< END 0001_init_pgvector.sql <<<
+
+-- >>> BEGIN 0002_schema.sql >>>
 -- Schema para embeddings, chunks e metadata
 
 -- Tabela de embeddings
@@ -28,9 +47,9 @@ create table if not exists public.metadata (
 );
 
 -- Índices para buscas vetoriais e JSONB
--- Índice HNSW exige a operator class explícita para o tipo vector
--- Opções: vector_l2_ops | vector_ip_ops | vector_cosine_ops
-create index if not exists idx_embeddings_embedding_hnsw on public.embeddings using hnsw (embedding vector_cosine_ops);
+create index if not exists idx_embeddings_embedding_hnsw on public.embeddings using hnsw (embedding);
 create index if not exists idx_embeddings_metadata_gin on public.embeddings using gin (metadata);
 create index if not exists idx_chunks_metadata_gin on public.chunks using gin (metadata);
 create index if not exists idx_metadata_value_gin on public.metadata using gin (value);
+
+-- <<< END 0002_schema.sql <<<

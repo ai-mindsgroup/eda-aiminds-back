@@ -55,10 +55,10 @@ As bibliotecas estão listadas em `requirements.txt`.
 pip install -r requirements.txt
 ```
 Principais pacotes instalados:
-- `langchain` (orquestração LLM)
+- `langchain` (reservado para suporte futuro a múltiplos provedores)
 - `pandas` (manipulação de dados)
 - `supabase` (cliente Supabase)
-- `openai` (acesso a modelos GPT)
+- `openai` (mantido apenas para compatibilidade futura; atualmente desativado)
 - `pytest` (testes)
 - `python-dotenv` (carregar variáveis de ambiente)
 - `psycopg[binary]` (conexão PostgreSQL)
@@ -96,6 +96,11 @@ SUPABASE_URL=...
 SUPABASE_KEY=...
 OPENAI_API_KEY=...
 SONAR_API_KEY=...        # opcional se for usar Sonar
+SONAR_API_BASE=https://api.perplexity.ai
+SONAR_DEFAULT_MODEL=sonar-pro
+GROK_API_KEY=...
+GROK_API_BASE=https://api.x.ai/v1
+GROK_DEFAULT_MODEL=grok-beta
 DB_HOST=...
 DB_PORT=5432
 DB_NAME=...
@@ -104,6 +109,8 @@ DB_PASSWORD=...
 LOG_LEVEL=INFO
 ```
 Nunca faça commit do arquivo `.env` (já está no `.gitignore`).
+
+> **Nota importante:** atualmente o backend usa apenas a API **Grok** através de `LLMClient`. O código de OpenAI/LangChain está desativado; mantenha `OPENAI_API_KEY` em branco até que o suporte seja reativado.
 
 ---
 ## 6. Verificar Carregamento de Configurações
