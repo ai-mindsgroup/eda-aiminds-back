@@ -1,8 +1,307 @@
-# Orientações gerais
-Se comunique sempre em português.
-Ao final de cada etapa de desenvolvimento, documente em ./docs o que foi feito, decisões tomadas e próximos passos, em um arquivo markdown com data no nome, ex: 2024-06-26-descricao-etapa.md
-Em C:\workstashion\eda-aiminds-i2a2\docs, crie arquivos markdown para documentar todo histórico de conversa a cada chat aberto.
-Em C:\workstashion\eda-aiminds-i2a2\docs, documente cada etapa do desenvolvimento, decisões tomadas e próximos passos.
+# GitHub Copilot Instructions - EDA AI Minds Backend
+
+*Sistema multiagente para análise inteligente de dados CSV com LangChain, Supabase e vetorização.*
+
+**Comunicação:** Sempre em português brasileiro.
+
+## Arquitetura Atual
+
+Este é um sistema backend multiagente para análise de dados CSV usando:
+- **LangChain 0.2.1** + modelos LLM (Google GenAI, Perplexity Sonar)  
+- **Supabase/PostgreSQL** com extensões pgvector para embeddings vetoriais
+- **Pandas 2.2.2** + matplotlib + seaborn para análise e visualização
+- **Estrutura modular** em `src/` com separação clara de responsabilidades
+
+## Configuração Essencial
+
+### 1. Ambiente Python
+```powershell
+# Sempre use Python 3.10+
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 2. Configuração de Credenciais
+**Copie `configs/.env.example` para `configs/.env`:**
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_anon_key
+SONAR_API_KEY=your_perplexity_key
+OPENAI_API_KEY=your_openai_key  # opcional
+DB_HOST=db.xyz.supabase.co
+DB_PASSWORD=your_db_password
+LOG_LEVEL=INFO
+```
+
+### 3. Banco de Dados
+**Executar migrations obrigatoriamente:**
+```powershell
+python scripts/run_migrations.py
+```
+
+**Testar conexão:**
+```python
+python check_db.py  # deve retornar "Conexão OK"
+```
+
+## Documentação e Histórico
+
+### **OBRIGATÓRIO: Manter Histórico Completo**
+
+**Toda sessão de desenvolvimento deve gerar documentação em `docs/`:**
+
+1. **Criar pasta docs se não existir:**
+```powershell
+mkdir docs -Force
+```
+
+2. **Para cada sessão, criar arquivo com timestamp:**
+```
+docs/2024-MM-DD_HHMM_sessao-desenvolvimento.md
+```
+
+3. **Estrutura obrigatória do documento:**
+```markdown
+# Sessão de Desenvolvimento - [Data/Hora]
+
+## Objetivos da Sessão
+- [X] Objetivo 1 concluído
+- [ ] Objetivo 2 em andamento
+
+## Decisões Técnicas
+- **Arquitetura**: Justificativa das escolhas
+- **Dependências**: Versões e motivos
+- **Padrões**: Convenções adotadas
+
+## Implementações
+### [Nome do Módulo]
+- **Arquivo**: `src/path/file.py`
+- **Funcionalidade**: Descrição
+- **Status**: ✅ Concluído / ⚠️ Parcial / ❌ Pendente
+
+## Testes Executados
+- [X] Teste 1: resultado
+- [X] Teste 2: resultado
+
+## Próximos Passos
+1. Item prioritário
+2. Item secundário
+
+## Problemas e Soluções
+### Problema: [Descrição]
+**Solução**: [Como foi resolvido]
+
+## Métricas
+- **Linhas de código**: X
+- **Módulos criados**: Y
+- **Testes passando**: Z
+
+## Screenshots/Logs
+[Incluir evidências quando relevante]
+```
+
+### **Relatório Final Consolidado**
+
+**Manter sempre atualizado: `docs/relatorio-final.md`**
+
+```markdown
+# Relatório Final - EDA AI Minds Backend
+
+## Status do Projeto: [% Concluído]
+
+### Módulos Implementados
+- [X] ✅ **BaseAgent** - Classe abstrata para agentes
+- [X] ✅ **CSVAnalysisAgent** - Análise inteligente de CSV
+- [X] ⚠️ **EmbeddingsAgent** - Sistema de vetorização
+- [ ] ❌ **OrchestratorAgent** - Coordenador central
+
+### Arquitetura Técnica
+[Diagrama/descrição da arquitetura atual]
+
+### Funcionalidades Disponíveis
+1. **Análise de CSV**: Carregamento, estatísticas, detecção de fraude
+2. **Sistema de Logging**: Centralizado e estruturado
+3. **Banco Vetorial**: PostgreSQL + pgvector configurado
+
+### Métricas Consolidadas
+- **Total linhas código**: X
+- **Cobertura testes**: Y%
+- **Agentes funcionais**: Z
+
+### Próximas Implementações
+[Lista priorizada]
+
+### Instruções de Deploy
+[Como executar em produção]
+```
+
+## Estrutura do Código
+
+### Padrões de Import
+```python
+# Settings centralizados
+from src.settings import SUPABASE_URL, SONAR_API_KEY
+from src.utils.logging_config import get_logger
+
+# Clientes prontos
+from src.vectorstore.supabase_client import supabase
+from src.api.sonar_client import send_sonar_query
+```
+
+### Logging Padronizado
+```python
+from src.utils.logging_config import get_logger
+logger = get_logger(__name__)  # Nome do módulo automaticamente
+logger.info("Conexão estabelecida")
+```
+
+### Conexões de Banco
+- **Supabase Client:** `src/vectorstore/supabase_client.py` (singleton configurado)
+- **PostgreSQL direto:** Use `src.settings.build_db_dsn()` com psycopg
+- **Schema vetorial:** Tabelas `embeddings`, `chunks`, `metadata` com índices HNSW
+
+## Desenvolvimento de Agentes
+
+### 1. Estrutura de Agente Esperada
+```python
+from langchain.schema import BaseMessage
+from src.api.sonar_client import send_sonar_query
+
+class DataAnalysisAgent:
+    def __init__(self, name: str):
+        self.name = name
+        self.logger = get_logger(f"agent.{name}")
+    
+    def process(self, query: str, context: dict = None) -> dict:
+        # Implementar lógica específica do agente
+        response = send_sonar_query(query, context, temperature=0.2)
+        return response
+```
+
+### 2. Conectar com LangChain
+```python
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_experimental.agents import create_pandas_dataframe_agent
+
+# Para análise de dados CSV
+def create_csv_agent(df):
+    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.1)
+    return create_pandas_dataframe_agent(llm, df, verbose=True)
+```
+
+## Convenções Específicas do Projeto
+
+### 1. Tratamento de Erros
+```python
+# Sempre use classes de exceção específicas
+class SonarAPIError(RuntimeError):
+    pass
+
+# Log erros sem expor credenciais
+logger.error("Falha na conexão Supabase: %s", str(e)[:100])
+```
+
+### 2. Configuração Defensive
+```python
+# Validação com warnings, não crashes em dev
+missing = [name for name, val in REQUIRED_ON_RUNTIME if not val]
+if missing:
+    import warnings
+    warnings.warn(f"Variáveis ausentes: {', '.join(missing)}")
+```
+
+### 3. Migrations Versionadas
+- Arquivos SQL numerados: `0000_`, `0001_`, `0002_`
+- Executar em ordem com `scripts/run_migrations.py`
+- Schema focado em vetorização: embeddings 1536D, índices HNSW
+
+## Fluxos de Trabalho
+
+### **Workflow de Desenvolvimento Obrigatório**
+
+1. **Início da Sessão:**
+```powershell
+# Criar documento da sessão
+$timestamp = Get-Date -Format "yyyy-MM-dd_HHmm"
+New-Item "docs/${timestamp}_sessao-desenvolvimento.md" -ItemType File
+```
+
+2. **Durante Desenvolvimento:**
+- Logar todas as decisões técnicas
+- Documentar problemas e soluções
+- Capturar screenshots de testes importantes
+
+3. **Fim da Sessão:**
+- Atualizar `docs/relatorio-final.md`
+- Fazer commit com mensagem descritiva
+- Fazer push para o repositório
+
+### Adicionar Novo Agente
+1. Criar módulo em `src/agent/`
+2. Implementar classe com método `process()`
+3. Registrar no orchestrador central
+4. Adicionar testes em `tests/agent/`
+5. **Documentar em sessão atual**
+
+### Trabalhar com Embeddings
+```python
+from src.vectorstore.supabase_client import supabase
+
+# Inserir embeddings
+supabase.table('embeddings').insert({
+    'chunk_text': texto,
+    'embedding': vetor_1536d,
+    'metadata': {'source': 'csv_upload'}
+}).execute()
+
+# Busca vetorial
+results = supabase.rpc('match_embeddings', {
+    'query_embedding': query_vector,
+    'match_threshold': 0.8,
+    'match_count': 5
+}).execute()
+```
+
+### Debug e Teste
+```python
+# Teste de conexão rápido
+python check_db.py
+
+# Ver logs estruturados
+LOG_LEVEL=DEBUG python sua_aplicacao.py
+
+# Pytest para testes automatizados
+pytest tests/ -v
+```
+
+## Diretrizes Técnicas
+
+- **Modularidade:** Cada componente em seu diretório (`api/`, `vectorstore/`, `agent/`)  
+- **Segurança:** Nunca hardcode credenciais; use `src.settings` sempre
+- **Performance:** Cache conexões Supabase; reutilize clients LLM
+- **Observabilidade:** Log eventos importantes com contexto estruturado
+- **Versionamento:** Não commitar `.env`; usar migrations para schema DB
+- **Documentação:** Todo desenvolvimento deve gerar documentação rastreável
+
+## Processo de Commit/Push
+
+```powershell
+# Sempre antes de commit
+git add docs/
+git add src/
+git commit -m "feat: [descrição clara do que foi implementado]
+
+- Módulos: [lista dos módulos alterados]
+- Funcionalidades: [resumo das features]
+- Testes: [status dos testes]
+
+Documentado em: docs/[nome-do-arquivo].md"
+
+git push origin [branch-atual]
+```
+
+Adapte estas instruções conforme evolução do sistema multiagente.
 
 # Instruções para Agente IA Backend Multiagente - GitHub Copilot VSCode (GPT-4.1)
 

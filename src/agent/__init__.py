@@ -1,0 +1,1 @@
+"""Módulo de agentes multiagente para análise de dados."""

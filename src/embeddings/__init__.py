@@ -1,0 +1,1 @@
+"""Módulo de embeddings para RAG (Retrieval Augmented Generation)."""

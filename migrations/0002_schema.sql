@@ -19,11 +19,16 @@ create table if not exists public.chunks (
     constraint fk_chunks_source foreign key (source_id) references public.embeddings(id) on delete cascade
 );
 
--- Tabela de metadados genéricos
+-- Tabela de metadados genéricos  
 create table if not exists public.metadata (
     id uuid primary key default gen_random_uuid(),
-    key text not null,
+    title text,
+    content text,
+    key text,
     value jsonb default '{}'::jsonb,
+    timestamp text,
+    source text,
+    metadata jsonb default '{}'::jsonb,
     created_at timestamp with time zone default now()
 );
 

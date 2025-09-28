@@ -1,0 +1,41 @@
+# EDA AI Minds Backend - Minimal Requirements
+# Dependências mínimas para funcionamento básico (sem AI/ML)
+
+# ============================================================================
+# CORE ONLY - Funcionalidade básica sem IA
+# ============================================================================
+
+# Configuration
+python-dotenv>=1.1.0
+pydantic>=2.11.0
+
+# Data processing
+pandas>=2.2.0
+numpy>=2.3.0
+
+# Database
+psycopg>=3.2.0
+psycopg-binary>=3.2.0
+
+# HTTP
+requests>=2.32.0
+
+# Logging
+coloredlogs>=15.0.0
+
+# ============================================================================
+# USAGE
+# ============================================================================
+# 
+# Este arquivo permite instalação mínima para:
+# - Processamento CSV básico
+# - Conexão com PostgreSQL
+# - Logging estruturado  
+# - Operações sem IA/LLM
+#
+# Para instalar:
+# pip install -r requirements-minimal.txt
+#
+# Para upgrade para versão completa:
+# pip install -r requirements.txt
+#

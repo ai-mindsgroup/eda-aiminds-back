@@ -1,8 +1,168 @@
-langchain
-pandas
-supabase
-openai
-pytest
-python-dotenv
-psycopg[binary]
-requests
+# EDA AI Minds Backend - Requirements
+# Sistema multiagente para análise inteligente de dados CSV
+# Versão Python: 3.10+
+
+# ============================================================================
+# CORE DEPENDENCIES - Essenciais para funcionamento básico
+# ============================================================================
+
+# Configuração e ambiente
+python-dotenv==1.1.1
+pydantic==2.11.7
+pydantic-settings==2.10.1
+
+# Manipulação de dados
+pandas==2.2.3
+numpy==2.3.2
+
+# Visualizações
+matplotlib==3.10.6
+seaborn==0.13.2
+
+# HTTP requests e APIs
+requests==2.32.5
+requests-toolbelt==1.0.0
+
+# Detecção de encoding
+chardet==5.2.0
+
+# ============================================================================
+# DATABASE & VECTOR STORE
+# ============================================================================
+
+# PostgreSQL
+psycopg==3.2.9
+psycopg-binary==3.2.9
+psycopg2-binary==2.9.10
+psycopg-pool==3.2.6
+
+# Supabase
+supabase==2.20.0
+
+# Vector database
+pgvector==0.3.6
+
+# ============================================================================
+# AI/ML STACK - Machine Learning e Embeddings
+# ============================================================================
+
+# Sentence Transformers para embeddings
+sentence-transformers==5.1.1
+torch==2.8.0
+transformers==4.56.2
+tokenizers==0.22.1
+safetensors==0.6.2
+
+# Científico
+scikit-learn==1.7.2
+scipy==1.16.2
+
+# ============================================================================
+# LANGCHAIN ECOSYSTEM - LLM Framework
+# ============================================================================
+
+# Core LangChain
+langchain==0.3.27
+langchain-core==0.3.76
+langchain-community==0.3.27
+langchain-text-splitters==0.3.9
+
+# LangChain Integrations
+langchain-google-genai==2.1.9
+langchain-openai==0.3.30
+langchain-experimental==0.0.60
+langsmith==0.4.20
+
+# ============================================================================
+# LLM PROVIDERS - APIs de modelos de linguagem
+# ============================================================================
+
+# OpenAI
+openai==1.102.0
+
+# Google AI
+google-ai-generativelanguage==0.6.18
+google-api-core==2.25.1
+google-auth==2.40.3
+
+# ============================================================================
+# UTILITIES & HELPERS
+# ============================================================================
+
+# Logging e debug
+coloredlogs==15.0.1
+colorama==0.4.6
+
+# Async support
+asyncio
+aiohttp==3.12.15
+anyio==4.10.0
+
+# Data processing
+tabulate==0.9.0
+tqdm==4.67.1
+
+# JSON handling
+orjson==3.11.3
+
+# ============================================================================
+# DEVELOPMENT & TESTING - Dependências de desenvolvimento
+# ============================================================================
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+
+# Code quality
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0
+
+# Jupyter support
+ipython==9.0.2
+jupyter>=1.0.0
+notebook>=7.0.0
+
+# ============================================================================
+# OPTIONAL DEPENDENCIES - Funcionalidades extras
+# ============================================================================
+
+# Document processing (PDF, DOCX, etc.)
+pypdf>=3.0.0
+python-docx>=0.8.11
+openpyxl>=3.1.0
+
+# Additional embeddings providers
+# huggingface-hub>=0.20.0  # Já incluído via sentence-transformers
+
+# Web scraping (se necessário)
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# ============================================================================
+# PLATFORM SPECIFIC
+# ============================================================================
+
+# Windows specific (uncomment if needed)
+# pywin32>=306  # Para Windows
+
+# ============================================================================
+# VERSION CONSTRAINTS & NOTES
+# ============================================================================
+# 
+# - Python 3.10+ requerido devido a type annotations (str | None)
+# - PyTorch instalado automaticamente com sentence-transformers
+# - LangChain versions mantidas compatíveis entre si
+# - Supabase client requer psycopg2 para PostgreSQL
+# - Matplotlib/seaborn para visualizações de dados
+# 
+# Para instalar:
+# pip install -r requirements.txt
+# 
+# Para instalar apenas core dependencies:
+# pip install pandas numpy matplotlib requests python-dotenv
+# 
+# Para instalar com AI/ML:
+# pip install sentence-transformers langchain openai
+#
