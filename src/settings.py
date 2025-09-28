@@ -16,6 +16,7 @@ if ENV_PATH.exists():
 SUPABASE_URL: str | None = os.getenv("SUPABASE_URL")
 SUPABASE_KEY: str | None = os.getenv("SUPABASE_KEY")
 OPENAI_API_KEY: str | None = os.getenv("OPENAI_API_KEY")
+GOOGLE_API_KEY: str | None = os.getenv("GOOGLE_API_KEY")
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 SONAR_API_KEY: str | None = os.getenv("SONAR_API_KEY")
 SONAR_API_BASE: str = os.getenv("SONAR_API_BASE", "https://api.perplexity.ai")
