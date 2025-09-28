@@ -2,7 +2,9 @@
 
 <div align="center">
 
-![Status](https://img.shields.io/badge/Status-Em_Desenvolvimento-yellow?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Em_Desenvolviment.venv\Scripts\python.exe scripts\run_utils_simple.py tests     # Testa funcionamento
+.venv\Scripts\python.exe scripts\run_utils_simple.py examples  # Executa demos
+.venv\Scripts\python.exe scripts\run_utils_simple.py list      # Lista arquivosellow?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Stars](https://img.shields.io/badge/⭐_Star-This_Repo-gold?style=for-the-badge)
@@ -236,7 +238,7 @@ for suggestion in suggestions:
 ### **Utilitário de Execução (Recomendado)**
 ```powershell
 # Menu interativo para testes e exemplos
-python run_utils.py
+python scripts\run_utils.py
 ```
 
 ### **Testes Principais** (`tests/`)
@@ -275,7 +277,9 @@ python run_utils.py
 ├── 📄 README.md              # Documentação principal
 ├── 📄 requirements.txt       # Dependências Python
 ├── 📄 check_db.py           # Verificação do banco
-├── 📄 run_utils.py          # 🆕 Utilitário para testes/exemplos
+├── � scripts/
+│   ├── �📄 run_utils.py          # 🆕 Utilitário para testes/exemplos
+│   └── 📄 run_utils_simple.py   # 🔧 Utilitário simplificado
 ├── 📁 src/                  # 🎯 Código fonte principal
 │   ├── 📁 agent/            # Agentes inteligentes
 │   │   ├── base_agent.py

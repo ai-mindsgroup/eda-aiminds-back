@@ -24,7 +24,7 @@
 - **Status**: ✅ Concluído - Funcionando perfeitamente
 
 ### Guia de Configuração
-- **Arquivo**: `GUIA_CONFIGURACAO_COMPLETA.md`
+- **Arquivo**: `docs/GUIA_CONFIGURACAO_COMPLETA.md`
 - **Funcionalidade**: Documentação completa para configuração e uso do sistema
 - **Status**: ✅ Concluído
 
@@ -96,4 +96,4 @@
 ## Instruções para Próxima Sessão
 1. Para usar LLM avançado: configurar GOOGLE_API_KEY no arquivo `.env`
 2. Para testes: executar `python examples/exemplo_csv_interativo.py`
-3. Para desenvolvimento: seguir arquitetura documentada em `GUIA_CONFIGURACAO_COMPLETA.md`
+3. Para desenvolvimento: seguir arquitetura documentada em `docs/GUIA_CONFIGURACAO_COMPLETA.md`

@@ -123,10 +123,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI  # Gemini
 pip install -r requirements.txt
 
 # Instalação mínima (só CSV)
-pip install -r requirements-minimal.txt  
+pip install -r configs\requirements-minimal.txt  
 
 # Instalação para desenvolvimento
-pip install -r requirements-dev.txt
+pip install -r configs\requirements-dev.txt
 
 # Validar instalação
 python validate_dependencies.py
