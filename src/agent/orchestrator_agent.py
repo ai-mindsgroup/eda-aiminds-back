@@ -269,9 +269,15 @@ class OrchestratorAgent(BaseAgent):
         ]
         
         llm_keywords = [
-            'explicar', 'interpretar', 'insight', 'conclusão', 'recomendação',
-            'sugestão', 'opinião', 'análise detalhada', 'relatório', 'sumário',
-            'padrão', 'tendência', 'previsão', 'hipótese', 'teoria'
+            'explicar', 'explique', 'interpretar', 'interprete', 'insight', 'insights', 
+            'conclusão', 'conclusões', 'recomendação', 'recomendações', 'recomende',
+            'sugestão', 'sugestões', 'sugira', 'opinião', 'análise detalhada', 
+            'relatório', 'sumário', 'resume', 'resumo detalhado', 'padrão', 'padrões', 
+            'tendência', 'tendências', 'previsão', 'hipótese', 'teoria', 'tire', 'conclua',
+            'analise', 'avalie', 'considere', 'entenda', 'compreenda', 'descoberta',
+            'descobrimentos', 'comportamento', 'anomalia', 'anômalo', 'suspeito',
+            'detalhado', 'profundo', 'aprofunde', 'discuta', 'comente', 'o que',
+            'quais', 'como', 'por que', 'porque'
         ]
         
         general_keywords = [
@@ -286,17 +292,21 @@ class OrchestratorAgent(BaseAgent):
         csv_score = sum(1 for kw in csv_keywords if kw in query_lower)
         rag_score = sum(1 for kw in rag_keywords if kw in query_lower)
         data_score = sum(1 for kw in data_keywords if kw in query_lower)
-        llm_score = sum(1 for kw in llm_keywords if kw in query_lower)
+        llm_score = sum(3 for kw in llm_keywords if kw in query_lower)  # Peso triplicado para LLM
         general_score = sum(1 for kw in general_keywords if kw in query_lower)
         
         # Adicionar peso do contexto
         if has_file_context:
             if any(ext in str(context.get('file_path', '')).lower() for ext in ['.csv', '.xlsx', '.json']):
-                csv_score += 2
+                csv_score += 1  # Reduzido para não sobrepor LLM
         
         # Verificar se precisa de múltiplos agentes
         scores = [csv_score, rag_score, data_score, llm_score]
         high_scores = [s for s in scores if s >= 2]
+        
+        # Se LLM tem score alto, priorizar sobre hybrid
+        if llm_score >= 3:
+            return QueryType.LLM_ANALYSIS
         
         if len(high_scores) >= 2:
             return QueryType.HYBRID

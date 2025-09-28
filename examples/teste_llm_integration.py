@@ -61,17 +61,26 @@ def test_llm_integration():
         try:
             result = orchestrator.process(query)
             
-            # Verificar se LLM foi usado
-            agents_used = result.get("metadata", {}).get("agents_used", [])
-            query_type = result.get("metadata", {}).get("query_type", "unknown")
+            # Debug: ver toda a estrutura da resposta
+            print(f"📋 Estrutura resposta: {result.keys() if isinstance(result, dict) else type(result)}")
             
-            print(f"📝 Tipo identificado: {query_type}")
+            # Verificar se LLM foi usado  
+            metadata = result.get("metadata", {})
+            orchestrator_meta = metadata.get("orchestrator", {})
+            agents_used = orchestrator_meta.get("agents_used", metadata.get("agents_used", []))
+            llm_used = metadata.get("llm_used", False)
+            
+            print(f"📝 Tipo identificado: {metadata.get('query_type', 'unknown')}")
             print(f"🤖 Agentes usados: {agents_used}")
+            print(f"🧠 LLM usado: {llm_used}")
             
-            if "llm" in agents_used:
+            if "llm" in agents_used or llm_used:
                 print("✅ LLM Agent foi utilizado!")
-                content = result.get("content", "")[:100]
-                print(f"💬 Resposta: {content}...")
+                content = result.get("content", "")
+                if content:
+                    print(f"💬 Resposta: {content[:100]}...")
+                else:
+                    print("⚠️ Resposta vazia")
             else:
                 print("⚠️ LLM Agent NÃO foi utilizado")
                 
@@ -108,12 +117,21 @@ def test_with_data_context():
             print(f"\n❓ Consulta com contexto: '{query}'")
             
             result = orchestrator.process(query, context=context)
-            agents_used = result.get("metadata", {}).get("agents_used", [])
+            
+            # Debug: ver estrutura completa
+            metadata = result.get("metadata", {})
+            orchestrator_meta = metadata.get("orchestrator", {})
+            agents_used = orchestrator_meta.get("agents_used", metadata.get("agents_used", []))
+            llm_used = metadata.get("llm_used", False)
             
             print(f"🤖 Agentes usados: {agents_used}")
+            print(f"🧠 LLM usado: {llm_used}")
             
-            if "llm" in agents_used:
+            if "llm" in agents_used or llm_used:
                 print("✅ LLM processou consulta com contexto!")
+                content = result.get("content", "")
+                if content:
+                    print(f"💬 Resposta: {content[:200]}...")
             else:
                 print("⚠️ LLM não foi utilizado")
                 

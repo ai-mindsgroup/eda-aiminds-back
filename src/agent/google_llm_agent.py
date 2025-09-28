@@ -56,7 +56,7 @@ class LLMResponse:
 class GoogleLLMAgent(BaseAgent):
     """Agente que utiliza Google Generative AI (Gemini) para análises inteligentes."""
     
-    def __init__(self, model: str = "gemini-pro"):
+    def __init__(self, model: str = "gemini-2.0-flash"):
         super().__init__(
             name="google_llm",
             description="Agente LLM usando Google Gemini para análises inteligentes e insights"
