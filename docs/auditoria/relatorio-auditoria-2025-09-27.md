@@ -1,78 +1,100 @@
-# Relatório de Auditoria - 27/09/2025
 
-Este relatório atualiza o status do backend comparando os requisitos dos Prompts 01 e 02 definidos em `docs/projeto-base-prompts_steps_1_a_7.md` com a implementação atual. Segue o mesmo formato analítico do relatório de 26/09/2025, adicionando uma matriz de conformidade detalhada.
+# Relatório de Auditoria - 28/09/2025
+
+Este relatório avalia o estado atual do backend em relação ao Prompt 02 e aos requisitos da Atividade Obrigatória Extra, conforme documento oficial e evolução do código desde o último relatório (27/09/2025).
 
 ## 1. Escopo Avaliado
-- Prompt 01: Setup inicial de ambiente e projeto.
-- Prompt 02: Definição da arquitetura multiagente (esqueleto).
-- Código-fonte referente: diretório `src/`, scripts em `scripts/`, migrations em `migrations/`, arquivos de configuração em `configs/` e documentação em `docs/`.
+
+- Prompt 02: Consolidação da arquitetura multiagente para ingestão, análise, interface LLM e visualização.
+- Código-fonte: diretório `src/agent` (agentes especializados), `src/rag/orchestrator.py` (orquestrador), scripts, testes e documentação.
+- Dataset principal: `data/creditcard.csv` (fraudes de cartão de crédito, 31 colunas, incluindo PCA).
 
 ## 2. Matriz de Conformidade
-| Requisito | Descrição Resumida | Status | Evidência / Observação |
-|-----------|--------------------|--------|------------------------|
-| P1-Env-Python | Python 3.10+ / venv criado | ATENDIDO | `.venv/`, uso de Python >=3.12 (confirmado pelos scripts) |
-| P1-Reqs-File | Criar `requirements.txt` com libs essenciais | PARCIAL | Arquivo existe (verificar inclusão de `langchain`, `pandas`, `supabase-py`, `openai`, `pytest`). `langchain` removido depois (migração p/ Grok). Avaliar necessidade futura. |
-| P1-Estrutura-Dirs | Estrutura básica de diretórios criada | ATENDIDO | Pastas `src/agent`, `src/rag`, `scripts/`, `migrations/`, `docs/` presentes |
-| P1-Variaveis-Ambiente | `.env`/settings para chaves e config | ATENDIDO | Arquivo `configs/.env` + carregamento em scripts/módulos |
-| P1-Conexao-Supabase | Setup seguro de conexão Postgres/Supabase | ATENDIDO | Função `build_db_dsn`, migrations aplicadas, correção host pooler IPv4 |
-| P1-Logging | Logging básico centralizado | ATENDIDO | `src/utils/logging_config.py` usado pelos agentes/orchestrator |
-| P1-Documentacao-Inicial | Documentação de setup e custos | ATENDIDO | Diversos arquivos em `docs/` (instalação, custos, datasets) |
-| P1-Testes-Basicos | Testes iniciais configurados (pytest) | PARCIAL | Estrutura aparente; cobertura de agentes inicial (verificar se testes realmente executam CI) |
-| P2-Agente-Processamento-CSV | Agente para limpeza/carregamento CSV | NÃO ATENDIDO | Não há agente específico de ingestão/limpeza; `ProfilingAgent` assume DataFrame pronto |
-| P2-Agente-Analise-Estatistica | Agente para análise e insights | ATENDIDO | `IndexingAgent` gera estatísticas descritivas e top missing |
-| P2-Agente-Visualizacao | Agente de gráficos | NÃO ATENDIDO | Não implementado ainda |
-| P2-Agente-Interface-LLM | Agente / camada LLM via LangChain | PARCIAL | Há `llm_client` modular (Grok); não integrado como agente separado nem usando LangChain agora |
-| P2-Orquestrador | Classe orquestradora coordenando fluxo | ATENDIDO | `AgentOrchestrator` em `src/rag/orchestrator.py` |
-| P2-Interface-Comunicacao | Mensageria entre agentes | ATENDIDO | `AgentMessage` dataclass, pipeline sequencial |
-| P2-Uso-LangChain | Garantir LangChain nos agentes LLM | NÃO ATENDIDO (DECISÃO) | LangChain removido/substituído; precisa decidir se requisito persiste para Prompt 03 |
-| P2-Extensibilidade-Testabilidade | Design modular e testável | ATENDIDO | Classes pequenas, injeção de lista de agentes no orquestrador |
-| P2-Documentacao-Arquitetura | Documentar responsabilidades | PARCIAL | Comentários e alguns docs, mas falta diagrama atualizado multiagente |
 
-## 3. Principais Evoluções Desde 26/09
-- Conectividade Supabase solucionada (ajuste `DB_HOST` para pooler IPv4 com dígito faltante `aws-1-sa-east-1...`).
-- Migrations aplicadas com índice HNSW corrigido (`vector_cosine_ops`).
-- Script de migrations ampliado: modos `--offline`, `--dry-run`, tabela `schema_migrations`, idempotência e `--force`.
-- Pipeline multiagente funcional mínimo (Profiling -> Indexing -> Executor) com logs estruturados.
-- Criação de plano de execução em `ExecutorAgent` (esqueleto para futuras ações LLM).
+| Requisito | Descrição | Status | Evidência / Observação |
+|-----------|-----------|--------|------------------------|
+| Agente Genérico CSV | Capaz de processar qualquer CSV | ATENDIDO | `CSVIngestionAgent` implementado, testes com diferentes DataFrames e arquivos |
+| Limpeza e Normalização | Remoção de duplicatas, tratamento de nulos, tipos | ATENDIDO | Funções de limpeza, deduplicação e inferência de tipos no agente |
+| Análise Estatística | Estatísticas descritivas, medidas de tendência | ATENDIDO | Relatórios gerados pelo agente, testes cobrem média, mediana, etc. |
+| Detecção de Outliers | Identificação de valores atípicos | PARCIAL | Estrutura para análise existe, mas falta visualização dedicada |
+| Visualização | Geração de gráficos | NÃO ATENDIDO | Não há agente ou módulo de visualização implementado |
+| Interface LLM | Resposta a perguntas via LLM | PARCIAL | `llm_client` modular, mas não integrado como agente formal nem usando LangChain |
+| Memória do Agente | Registro de conclusões e histórico | PARCIAL | Relatórios e logs mantêm histórico, mas falta camada de memória persistente |
+| Testes Automatizados | Cobertura de funções críticas | ATENDIDO | Testes para ingestão, limpeza, chunking, schema drift; pipeline testado |
+| Extensibilidade | Modularidade e testabilidade | ATENDIDO | Arquitetura multiagente, orquestrador flexível |
+| Documentação | Estrutura e detalhamento | PARCIAL | Comentários e docs presentes, falta diagrama atualizado e exemplos gráficos |
 
-## 4. Lacunas Remanescentes para Completar Prompts 01 e 02
-1. Agente específico de ingestão/limpeza CSV (normalização de tipos, remoção de duplicados, etc.).
-2. Agente de visualização (geração de gráficos ou especificações de visualização). 
-3. Integração de um agente LLM formal (quer via LangChain ou decisão documentada de substituição definitiva pelo cliente Grok - atualizar requisito). 
-4. Decisão arquitetural documentada sobre abandono de LangChain (riscos e mitigação). 
-5. Documentar diagrama de fluxo (mermaid ou similar) dos agentes atuais e planejados. 
-6. Testes automatizados de orquestração e agentes (atualmente poucos ou ausentes no repositório analisado). 
-7. Guardrails e parâmetros de controle LLM (adiantam Prompt 5, mas uma visão mínima já pode ser registrada). 
-8. Documentar padrões de logging e convenção de mensagens.
+## 3. Avaliação dos Agentes
 
-## 5. Riscos Técnicos / Observações
-- Ausência de agente de ingestão dificulta reutilização e impede auditoria de passos de limpeza (importante para datasets heterogêneos). 
-- Falta de testes pode introduzir regressões ao evoluir para Prompts 3–7. 
-- Escolha de remover LangChain sem formalizar justificativa pode gerar inconsistência com prompts subsequentes que pressupõem sua presença. 
-- Índice HNSW criado: confirmar necessidade de parâmetros (ef_construction / m) futuramente se volume crescer. 
+### CSVIngestionAgent
+- **Responsabilidade:** Carregar, limpar e normalizar qualquer arquivo CSV, inferir tipos, gerar chunks e relatórios.
+- **Implementação:** Completa, cobre deduplicação, tratamento de nulos, chunk overlap, inferência dinâmica de tipos, relatórios adaptativos.
+- **Conformidade:** Atende ao requisito de agente genérico, processa o dataset de fraudes e outros CSVs.
+- **Lacunas:** Não gera gráficos; não responde perguntas diretamente ao usuário.
 
-## 6. Recomendação sobre Avançar para Prompt 03
-Avanço para Prompt 03 (implementação do agente de carregamento/limpeza CSV) é RECOMENDADO, desde que antes ou em paralelo sejam criados:
-- (A) Arquivo de decisão arquitetural registrando substituição de LangChain (ou reinstalação se preferido). 
-- (B) Esqueleto do Agente LLM (mesmo simples) para alinhar com Prompt 02. 
-- (C) 1–2 testes smoke (pytest) cobrindo pipeline atual para prevenir regressões ao adicionar o agente CSV.
+### ProfilingAgent
+- **Responsabilidade:** Análise estatística dos dados já limpos.
+- **Implementação:** Calcula estatísticas descritivas, identifica variáveis relevantes.
+- **Conformidade:** Atende parcialmente; depende de DataFrame já processado.
 
-Sem esses itens, o risco de retrabalho aumenta ao integrar chunking/embeddings (Prompts 4 e 6). 
+### IndexingAgent
+- **Responsabilidade:** Indexação e sumarização dos dados para busca e análise.
+- **Implementação:** Gera estatísticas, sumariza padrões.
+- **Conformidade:** Atende ao requisito de sumarização, mas não realiza agrupamentos avançados ou clustering.
 
-## 7. Ações Prioritárias (Backlog Curto)
-| Prioridade | Ação | Justificativa |
-|------------|------|---------------|
-| P0 | Criar `CsvIngestionAgent` | Completar requisito explícito Prompt 02 e preparar Prompt 03 |
-| P0 | Teste smoke pipeline | Garantir que Profiling->Indexing->Executor permanece funcional |
-| P1 | Criar Agente LLM ou ADR sobre Grok-only | Fechar lacuna “Uso LangChain” |
-| P1 | Diagrama arquitetura (Mermaid) | Comunicação e onboarding |
-| P2 | Teste de migrations / conexão DB | Saúde operacional e CI |
-| P2 | Documentar convenção de logs | Observabilidade |
+### ExecutorAgent
+- **Responsabilidade:** Orquestrar execução de ações e planos.
+- **Implementação:** Esqueleto funcional, prepara para integração com LLM.
+- **Conformidade:** Estrutura pronta, mas falta integração direta com interface LLM.
 
-## 8. Conclusão
-Os requisitos de Prompt 01 estão majoritariamente atendidos (apenas pequenos ajustes em dependências e testes). Prompt 02 está parcialmente cumprido: esqueleto multiagente, orchestrator e mensagens OK, mas faltam agentes CSV, visualização e LLM formal. Recomendamos prosseguir para Prompt 03 implementando o agente de ingestão/limpeza, acompanhado das ações P0 listadas.
+### Ausência de Agente de Visualização
+- **Lacuna:** Não há agente ou módulo para geração de gráficos (histogramas, dispersão, etc.), exigido pelo desafio.
 
-**Status para avançar:** Pode seguir para Prompt 03 COM ressalvas (endereçar backlog curto em paralelo).
+### Interface LLM e LangChain
+- **Situação:** `llm_client` modular existe, mas não está formalizado como agente nem utiliza LangChain. Decisão de remover LangChain não está documentada.
+
+## 4. Arquitetura Multiagente
+
+- **Fluxo:** Orquestrador coordena agentes em pipeline sequencial (ingestão → análise → indexação → execução).
+- **Interface:** Mensagens trocadas via `AgentMessage` (dataclass), contratos claros entre agentes.
+- **Gestão de Estado:** Cada agente mantém seu próprio estado e relatórios; logs centralizados.
+- **Lacunas:** Falta diagrama atualizado e formalização da interface LLM.
+
+## 5. Testes e Cobertura
+
+- **Cobertura:** Testes automatizados para ingestão, limpeza, chunking, schema drift e pipeline.
+- **Evidência:** Todos os testes passam; pipeline funcional.
+- **Lacunas:** Testes para visualização e interface LLM ausentes.
+
+## 6. Pontos em Conformidade
+
+- Agente genérico para CSV implementado e testado.
+- Pipeline multiagente funcional.
+- Relatórios estatísticos e de limpeza gerados.
+- Modularidade e extensibilidade garantidas.
+- Testes automatizados para funções críticas.
+
+## 7. Lacunas e Desvios
+
+- Falta agente de visualização (gráficos).
+- Interface LLM não formalizada como agente; LangChain removido sem ADR.
+- Memória do agente limitada a logs/relatórios, sem persistência avançada.
+- Documentação carece de diagrama multiagente e exemplos gráficos.
+- Testes para visualização e interface LLM não implementados.
+
+## 8. Próximos Passos e Melhorias
+
+1. **Implementar agente de visualização**: Gerar gráficos (histogramas, dispersão, boxplot) para variáveis numéricas e categóricas.
+2. **Formalizar interface LLM**: Integrar `llm_client` como agente, documentar decisão sobre LangChain (ADR).
+3. **Expandir memória do agente**: Adicionar camada de persistência para conclusões e histórico de perguntas/respostas.
+4. **Documentar arquitetura**: Criar diagrama multiagente (Mermaid) e exemplos de fluxo.
+5. **Testes para visualização e LLM**: Cobrir novos agentes com testes automatizados.
+6. **Exemplo de perguntas e respostas**: Adicionar ao relatório exemplos reais, incluindo gráficos.
+
+## 9. Conclusão
+
+O projeto evoluiu significativamente, atendendo aos principais requisitos do Prompt 02 e da atividade obrigatória. O agente de ingestão genérico está funcional e testado, mas ainda faltam módulos de visualização e formalização da interface LLM para total conformidade. Recomenda-se priorizar essas lacunas para avançar com segurança para as próximas etapas do projeto.
 
 ---
-*Relatório gerado automaticamente em 27/09/2025.*
+
+*Relatório gerado automaticamente em 28/09/2025, seguindo o padrão dos arquivos de auditoria do projeto.*
