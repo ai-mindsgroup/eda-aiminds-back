@@ -39,12 +39,26 @@ except RuntimeError as e:
     RAGAgent = None
     print(f"⚠️ RAGAgent não disponível: {str(e)[:100]}...")
 
+# Import condicional do GoogleLLMAgent
+try:
+    from src.agent.google_llm_agent import GoogleLLMAgent
+    GOOGLE_LLM_AGENT_AVAILABLE = True
+except ImportError as e:
+    GOOGLE_LLM_AGENT_AVAILABLE = False
+    GoogleLLMAgent = None
+    print(f"⚠️ GoogleLLMAgent não disponível: {str(e)[:100]}...")
+except RuntimeError as e:
+    GOOGLE_LLM_AGENT_AVAILABLE = False
+    GoogleLLMAgent = None
+    print(f"⚠️ GoogleLLMAgent não disponível: {str(e)[:100]}...")
+
 
 class QueryType(Enum):
     """Tipos de consultas que o orquestrador pode processar."""
     CSV_ANALYSIS = "csv_analysis"      # Análise de dados CSV
     RAG_SEARCH = "rag_search"          # Busca semântica/contextual
     DATA_LOADING = "data_loading"      # Carregamento de dados
+    LLM_ANALYSIS = "llm_analysis"      # Análise via LLM (Google Gemini)
     HYBRID = "hybrid"                  # Múltiplos agentes necessários
     GENERAL = "general"                # Consulta geral/conversacional
     UNKNOWN = "unknown"                # Tipo não identificado
@@ -76,12 +90,14 @@ class OrchestratorAgent(BaseAgent):
     def __init__(self, 
                  enable_csv_agent: bool = True,
                  enable_rag_agent: bool = True,
+                 enable_google_llm_agent: bool = True,
                  enable_data_processor: bool = True):
         """Inicializa o orquestrador com agentes especializados.
         
         Args:
             enable_csv_agent: Habilitar agente de análise CSV
             enable_rag_agent: Habilitar agente RAG
+            enable_google_llm_agent: Habilitar agente Google LLM
             enable_data_processor: Habilitar processador de dados
         """
         super().__init__(
@@ -118,6 +134,20 @@ class OrchestratorAgent(BaseAgent):
                 self.logger.warning(f"⚠️ {error_msg}")
         elif enable_rag_agent and not RAG_AGENT_AVAILABLE:
             error_msg = "RAG Agent: Dependências não disponíveis (Supabase não configurado)"
+            initialization_errors.append(error_msg)
+            self.logger.warning(f"⚠️ {error_msg}")
+
+        # Google LLM Agent (requer Google API Key configurada)
+        if enable_google_llm_agent and GOOGLE_LLM_AGENT_AVAILABLE:
+            try:
+                self.agents["llm"] = GoogleLLMAgent()
+                self.logger.info("✅ Agente Google LLM inicializado")
+            except Exception as e:
+                error_msg = f"Google LLM Agent: {str(e)}"
+                initialization_errors.append(error_msg)
+                self.logger.warning(f"⚠️ {error_msg}")
+        elif enable_google_llm_agent and not GOOGLE_LLM_AGENT_AVAILABLE:
+            error_msg = "Google LLM Agent: Dependências não disponíveis (Google AI não instalado)"
             initialization_errors.append(error_msg)
             self.logger.warning(f"⚠️ {error_msg}")
         
@@ -179,6 +209,8 @@ class OrchestratorAgent(BaseAgent):
                 result = self._handle_rag_search(query, context)
             elif query_type == QueryType.DATA_LOADING:
                 result = self._handle_data_loading(query, context)
+            elif query_type == QueryType.LLM_ANALYSIS:
+                result = self._handle_llm_analysis(query, context)
             elif query_type == QueryType.HYBRID:
                 result = self._handle_hybrid_query(query, context)
             elif query_type == QueryType.GENERAL:
@@ -236,9 +268,15 @@ class OrchestratorAgent(BaseAgent):
             'dados sintéticos', 'gerar dados', 'criar dados', 'load'
         ]
         
+        llm_keywords = [
+            'explicar', 'interpretar', 'insight', 'conclusão', 'recomendação',
+            'sugestão', 'opinião', 'análise detalhada', 'relatório', 'sumário',
+            'padrão', 'tendência', 'previsão', 'hipótese', 'teoria'
+        ]
+        
         general_keywords = [
             'olá', 'oi', 'ajuda', 'como', 'o que', 'qual', 'quando',
-            'onde', 'por que', 'explicar', 'definir', 'status', 'sistema'
+            'onde', 'por que', 'definir', 'status', 'sistema'
         ]
         
         # Verificar contexto de arquivo
@@ -248,6 +286,7 @@ class OrchestratorAgent(BaseAgent):
         csv_score = sum(1 for kw in csv_keywords if kw in query_lower)
         rag_score = sum(1 for kw in rag_keywords if kw in query_lower)
         data_score = sum(1 for kw in data_keywords if kw in query_lower)
+        llm_score = sum(1 for kw in llm_keywords if kw in query_lower)
         general_score = sum(1 for kw in general_keywords if kw in query_lower)
         
         # Adicionar peso do contexto
@@ -256,14 +295,14 @@ class OrchestratorAgent(BaseAgent):
                 csv_score += 2
         
         # Verificar se precisa de múltiplos agentes
-        scores = [csv_score, rag_score, data_score]
+        scores = [csv_score, rag_score, data_score, llm_score]
         high_scores = [s for s in scores if s >= 2]
         
         if len(high_scores) >= 2:
             return QueryType.HYBRID
         
         # Determinar tipo baseado na maior pontuação
-        max_score = max(csv_score, rag_score, data_score, general_score)
+        max_score = max(csv_score, rag_score, data_score, llm_score, general_score)
         
         if max_score == 0:
             return QueryType.UNKNOWN
@@ -273,6 +312,8 @@ class OrchestratorAgent(BaseAgent):
             return QueryType.RAG_SEARCH
         elif max_score == data_score:
             return QueryType.DATA_LOADING
+        elif max_score == llm_score:
+            return QueryType.LLM_ANALYSIS
         else:
             return QueryType.GENERAL
     
@@ -405,6 +446,33 @@ context = {"file_path": "caminho/para/seu/arquivo.csv"}
                 f"❌ Erro no carregamento de dados: {str(e)}",
                 metadata={"error": True, "agents_used": ["data_processor"]}
             )
+
+    def _handle_llm_analysis(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa análises via Google LLM."""
+        if "llm" not in self.agents:
+            return self._build_response(
+                "❌ Agente Google LLM não está disponível",
+                metadata={"error": True, "agents_used": []}
+            )
+        
+        self.logger.info("🤖 Delegando para agente Google LLM")
+        
+        # Preparar contexto para o LLM
+        llm_context = context or {}
+        
+        # Se há dados carregados, incluir informações básicas
+        if hasattr(self, 'current_data_context') and self.current_data_context:
+            llm_context.update(self.current_data_context)
+        
+        try:
+            result = self.agents["llm"].process(query, llm_context)
+            return self._enhance_response(result, ["llm"])
+        except Exception as e:
+            self.logger.error(f"Erro no agente LLM: {str(e)}")
+            return self._build_response(
+                f"❌ Erro na análise LLM: {str(e)}",
+                metadata={"error": True, "agents_used": ["llm"]}
+            )
     
     def _handle_hybrid_query(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa consultas que requerem múltiplos agentes."""
@@ -478,21 +546,35 @@ Sou o coordenador central que pode te ajudar com:
         elif 'ajuda' in query_lower or 'help' in query_lower:
             return self._get_help_response()
         
-        # Usar LLM para resposta geral
+        # Usar LLM para resposta geral se disponível
+        elif "llm" in self.agents:
+            try:
+                result = self.agents["llm"].process(query, context)
+                return self._enhance_response(result, ["llm"])
+            except Exception as e:
+                self.logger.warning(f"Erro ao usar LLM para consulta geral: {str(e)}")
+                # Fallback para resposta padrão
+                response = "Desculpe, não consegui processar sua consulta com o LLM. Tente ser mais específico ou pergunte sobre análise de dados CSV."
+                return self._build_response(response, metadata={"agents_used": [], "fallback": True})
+        
+        # Resposta padrão quando LLM não está disponível
         else:
-            llm_response = self._call_llm(
-                f"Você é um assistente de IA especializado em análise de dados. "
-                f"Responda de forma útil e direta à seguinte pergunta: {query}",
-                context,
-                temperature=0.3
-            )
-            
-            if llm_response.get("error"):
-                response = "Desculpe, não consegui processar sua consulta. Tente ser mais específico ou pergunte sobre análise de dados CSV ou busca semântica."
-            else:
-                response = llm_response.get("choices", [{}])[0].get("message", {}).get("content", "Sem resposta disponível.")
-            
-            return self._build_response(response, metadata={"agents_used": ["llm"], "general_query": True})
+            response = """💭 **Consulta Geral Recebida**
+
+Como não tenho acesso ao LLM no momento, posso te ajudar especificamente com:
+
+📊 **Análise de Dados CSV:**
+• "analise o arquivo dados.csv"
+• "mostre correlações"
+• "detecte fraudes"
+
+🔍 **Carregamento de Dados:**  
+• "carregue o arquivo X"
+• "valide os dados"
+
+**Tente ser mais específico sobre dados ou análises!**
+"""
+            return self._build_response(response, metadata={"agents_used": [], "general_query": True})
     
     def _handle_unknown_query(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa consultas de tipo desconhecido."""
