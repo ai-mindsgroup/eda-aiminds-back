@@ -12,11 +12,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Adiciona o diretório raiz do projeto ao PYTHONPATH
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 import psycopg
 from dotenv import load_dotenv
 
 # Carrega .env do projeto
-ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = ROOT / "configs" / ".env"
 if ENV_PATH.exists():
     load_dotenv(dotenv_path=ENV_PATH)

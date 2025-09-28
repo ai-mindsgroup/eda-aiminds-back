@@ -181,7 +181,7 @@ class CSVAnalysisAgent(BaseAgent):
             if len(categorical_cols) > 0:
                 suggestions.append("📊 Gráfico de barras para variáveis categóricas")
                 
-            if 'is_fraud' in self.current_df.columns or 'eh_fraude' in self.current_df.columns:
+            if 'is_fraud' in self.current_df.columns or 'eh_fraude' in self.current_df.columns or 'Class' in self.current_df.columns:
                 suggestions.append("🚨 Gráfico de distribuição de fraudes")
                 
             response = "🎨 Sugestões de Visualização:\n" + "\n".join(f"• {s}" for s in suggestions)
@@ -304,7 +304,7 @@ class CSVAnalysisAgent(BaseAgent):
     def _analyze_fraud_basic(self) -> Dict[str, Any]:
         """Análise básica de fraude sem LLM."""
         # Tentar diferentes nomes de coluna de fraude
-        fraud_cols = ['is_fraud', 'eh_fraude', 'fraud', 'fraude']
+        fraud_cols = ['is_fraud', 'eh_fraude', 'fraud', 'fraude', 'Class', 'class', 'target', 'label']
         fraud_col = None
         
         for col in fraud_cols:
