@@ -113,6 +113,52 @@ class VectorStore:
             self.logger.error(f"Erro ao armazenar embeddings: {str(e)}")
             raise
     
+    def store_embedding(self, 
+                       query: str, 
+                       response: str, 
+                       embedding: List[float], 
+                       source_type: str = "llm_cache") -> Optional[str]:
+        """Armazena um embedding individual para cache de LLM.
+        
+        Args:
+            query: Consulta original
+            response: Resposta gerada
+            embedding: Embedding da consulta
+            source_type: Tipo da fonte
+            
+        Returns:
+            ID do embedding inserido ou None se falhou
+        """
+        try:
+            metadata = {
+                "source_type": source_type,
+                "query": query,
+                "response": response,  # Resposta do LLM salva aqui
+                "created_at": datetime.now().isoformat(),
+                "provider": "sentence-transformers",
+                "model": "all-MiniLM-L6-v2"
+            }
+            
+            insert_data = {
+                "chunk_text": query,  # Usar query como chunk_text para busca
+                "embedding": embedding,
+                "metadata": metadata
+            }
+            
+            response = self.supabase.table('embeddings').insert([insert_data]).execute()
+            
+            if response.data:
+                embedding_id = response.data[0]['id']
+                self.logger.info(f"✅ Embedding salvo no cache: {embedding_id}")
+                return embedding_id
+            else:
+                self.logger.error("Falha ao salvar embedding no cache")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao salvar embedding no cache: {str(e)}")
+            return None
+    
     def search_similar(self, 
                       query_embedding: List[float],
                       similarity_threshold: float = 0.7,

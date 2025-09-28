@@ -22,6 +22,16 @@ from src.agent.base_agent import BaseAgent, AgentError
 from src.settings import GOOGLE_API_KEY
 from src.utils.logging_config import get_logger
 
+# Import condicional do sistema RAG
+try:
+    from src.embeddings.vector_store import VectorStore
+    from src.embeddings.generator import EmbeddingGenerator, EmbeddingProvider
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    VectorStore = None
+    EmbeddingGenerator = None
+
 # Import condicional do Google Generative AI
 try:
     import google.generativeai as genai
@@ -78,7 +88,21 @@ class GoogleLLMAgent(BaseAgent):
                 "GOOGLE_API_KEY não configurado. Configure em configs/.env"
             )
         
-        # Configurar e inicializar
+        # Inicializar sistema RAG se disponível
+        self.rag_enabled = False
+        self.vector_store = None
+        self.embedding_generator = None
+        
+        if RAG_AVAILABLE:
+            try:
+                self.vector_store = VectorStore()
+                self.embedding_generator = EmbeddingGenerator(EmbeddingProvider.SENTENCE_TRANSFORMER)
+                self.rag_enabled = True
+                self.logger.info("RAG integrado ao Google LLM Agent")
+            except Exception as e:
+                self.logger.warning(f"RAG não disponível: {e}")
+        
+        # Configurar e inicializar Google Gemini
         try:
             genai.configure(api_key=GOOGLE_API_KEY)
             self.model = genai.GenerativeModel(model)
@@ -88,21 +112,50 @@ class GoogleLLMAgent(BaseAgent):
             raise AgentError(self.name, f"Erro na inicialização do Google LLM: {e}")
     
     def process(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Processa consulta usando Google Gemini.
+        """Processa consulta usando busca RAG + Google Gemini (sistema híbrido).
+        
+        Fluxo:
+        1. Se RAG disponível, busca consultas similares no banco vetorial
+        2. Se encontrar resposta relevante, usa ela (cache inteligente)  
+        3. Se não encontrar, chama Google Gemini
+        4. Salva consulta + resposta LLM no banco vetorial
         
         Args:
             query: Consulta/prompt para o LLM
             context: Contexto adicional (dados, configurações, etc.)
             
         Returns:
-            Resposta estruturada do LLM
+            Resposta estruturada do LLM ou cache
         """
         try:
+            # 1. BUSCAR NO CACHE VETORIAL (se disponível)
+            if self.rag_enabled:
+                cached_response = self._search_cached_response(query)
+                if cached_response:
+                    self.logger.info("💾 Usando resposta em cache (RAG)")
+                    return self._build_response(
+                        cached_response["content"],
+                        metadata={
+                            "model": "cache_rag", 
+                            "llm_used": False,
+                            "cache_used": True,
+                            "similarity_score": cached_response.get("similarity", 0.0),
+                            "success": True
+                        }
+                    )
+            
+            # 2. GERAR NOVA RESPOSTA COM LLM
+            self.logger.info("🤖 Gerando nova resposta com Google Gemini")
+            
             # Preparar request
             llm_request = self._prepare_request(query, context)
             
             # Enviar para Google Gemini
             response = self._call_gemini(llm_request)
+            
+            # 3. SALVAR NO BANCO VETORIAL (se disponível)
+            if self.rag_enabled and response.success:
+                self._save_to_vector_store(query, response.content, context)
             
             # Processar resposta
             return self._build_response(
@@ -111,15 +164,16 @@ class GoogleLLMAgent(BaseAgent):
                     "model": response.model,
                     "usage": response.usage,
                     "llm_used": True,
+                    "cache_used": False,
                     "success": response.success
                 }
             )
             
         except Exception as e:
-            self.logger.error(f"Erro no processamento LLM: {e}")
+            self.logger.error(f"Erro no processamento LLM híbrido: {e}")
             return self._build_response(
                 f"Erro no processamento: {str(e)}",
-                metadata={"error": True, "llm_used": False}
+                metadata={"error": True, "llm_used": False, "cache_used": False}
             )
     
     def _prepare_request(self, query: str, context: Optional[Dict[str, Any]]) -> LLMRequest:
@@ -280,3 +334,93 @@ Use linguagem acessível e evite jargão estatístico excessivo."""
         context = {"analysis_type": "correlation_analysis", "correlation_data": correlation_data}
         
         return self.process(prompt, context)
+
+    def _search_cached_response(self, query: str, similarity_threshold: float = 0.8) -> Optional[Dict[str, Any]]:
+        """Busca respostas similares no cache vetorial.
+        
+        Args:
+            query: Consulta para buscar
+            similarity_threshold: Limite mínimo de similaridade (0-1)
+            
+        Returns:
+            Resposta em cache se encontrada, senão None
+        """
+        if not self.rag_enabled:
+            return None
+            
+        try:
+            # Gerar embedding da consulta
+            query_result = self.embedding_generator.generate_embedding(query)
+            query_embedding = query_result.embedding  # Extrair lista de floats
+            
+            # Buscar consultas similares
+            results = self.vector_store.search_similar(
+                query_embedding=query_embedding,
+                limit=1,
+                similarity_threshold=similarity_threshold
+            )
+            
+            if results and len(results) > 0:
+                best_match = results[0]
+                self.logger.info(f"🎯 Cache hit! Similaridade: {best_match.similarity_score:.3f}")
+                
+                return {
+                    "content": best_match.metadata.get("response", ""),
+                    "similarity": best_match.similarity_score,
+                    "original_query": best_match.chunk_text
+                }
+                
+        except Exception as e:
+            self.logger.warning(f"Erro na busca de cache: {e}")
+            
+        return None
+    
+    def _save_to_vector_store(self, query: str, response: str, context: Optional[Dict[str, Any]] = None) -> bool:
+        """Salva consulta e resposta no banco vetorial para cache futuro.
+        
+        Args:
+            query: Consulta original
+            response: Resposta do LLM
+            context: Contexto adicional
+            
+        Returns:
+            True se salvou com sucesso, False caso contrário
+        """
+        if not self.rag_enabled:
+            return False
+            
+        try:
+            # Preparar metadados
+            metadata = {
+                "agent": self.name,
+                "model": self.model_name,
+                "response_content": response,
+                "timestamp": self._get_timestamp(),
+                "context_keys": list(context.keys()) if context else [],
+                "query_type": "llm_analysis"
+            }
+            
+            # Se há contexto de arquivo, incluir  
+            if context and "file_path" in context:
+                metadata["source_file"] = context["file_path"]
+            
+            # Gerar e salvar embedding
+            query_result = self.embedding_generator.generate_embedding(query)
+            query_embedding = query_result.embedding  # Extrair lista de floats
+            
+            result = self.vector_store.store_embedding(
+                query=query,
+                response=response,
+                embedding=query_embedding
+            )
+            
+            if result:
+                self.logger.info(f"💾 Consulta salva no cache vetorial: {query[:50]}...")
+                return True
+            else:
+                self.logger.warning("Falha ao salvar no cache vetorial")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao salvar no cache: {e}")
+            return False
