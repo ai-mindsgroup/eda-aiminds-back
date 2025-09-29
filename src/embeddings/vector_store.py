@@ -17,6 +17,8 @@ from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+VECTOR_DIMENSIONS = 384
+
 
 @dataclass
 class VectorSearchResult:
@@ -74,6 +76,22 @@ class VectorStore:
         
         self.logger.info(f"Armazenando {len(embedding_results)} embeddings")
         
+        # Validar dimensões antes de preparar dados para inserção
+        for result in embedding_results:
+            actual_dims = len(result.embedding)
+            if actual_dims != VECTOR_DIMENSIONS:
+                chunk_idx = None
+                if result.chunk_metadata:
+                    chunk_idx = result.chunk_metadata.get("chunk_index")
+                message = (
+                    f"Dimensão do embedding incompatível: {actual_dims}D"
+                    f" (esperado {VECTOR_DIMENSIONS}D)"
+                    f" no chunk {chunk_idx if chunk_idx is not None else 'desconhecido'}. "
+                    "Ajuste o provedor de embeddings ou atualize o schema do Supabase."
+                )
+                self.logger.error(message)
+                raise ValueError(message)
+
         # Preparar dados para inserção
         insert_data = []
         for result in embedding_results:
@@ -97,20 +115,56 @@ class VectorStore:
                 "metadata": metadata
             })
         
+        total = len(insert_data)
+        batch_size = 200
+        inserted_ids: List[str] = []
+        total_batches = (total + batch_size - 1) // batch_size
+        
         try:
-            # Inserir em batch
-            response = self.supabase.table('embeddings').insert(insert_data).execute()
-            
-            if response.data:
-                inserted_ids = [row['id'] for row in response.data]
-                self.logger.info(f"✅ {len(inserted_ids)} embeddings armazenados com sucesso")
-                return inserted_ids
-            else:
-                self.logger.error("Inserção falhou: resposta vazia")
-                return []
-                
+            for batch_index in range(total_batches):
+                start = batch_index * batch_size
+                end = min(start + batch_size, total)
+                batch_payload = insert_data[start:end]
+                response = self.supabase.table('embeddings').insert(batch_payload).execute()
+
+                if getattr(response, 'error', None):
+                    self.logger.error(
+                        "Erro retornado pelo Supabase no batch %d/%d: %s",
+                        batch_index + 1,
+                        total_batches,
+                        response.error
+                    )
+                    raise RuntimeError(response.error)
+
+                if response.data:
+                    current_ids = [row['id'] for row in response.data]
+                    inserted_ids.extend(current_ids)
+                    self.logger.info(
+                        "✅ Batch %d/%d armazenado (%d registros)",
+                        batch_index + 1,
+                        total_batches,
+                        len(current_ids)
+                    )
+                else:
+                    self.logger.error(
+                        "Inserção falhou: resposta vazia para batch %d/%d (%d registros)",
+                        batch_index + 1,
+                        total_batches,
+                        len(batch_payload)
+                    )
+                    raise RuntimeError("Resposta vazia ao inserir embeddings")
+
+            self.logger.info("✅ %d embeddings armazenados com sucesso", len(inserted_ids))
+            return inserted_ids
         except Exception as e:
-            self.logger.error(f"Erro ao armazenar embeddings: {str(e)}")
+            error_details = getattr(e, 'args', None)
+            self.logger.error(
+                "Erro ao armazenar embeddings (batch %d/%d): %s | detalhes: %s",
+                batch_index + 1 if 'batch_index' in locals() else 0,
+                total_batches,
+                str(e) or repr(e),
+                error_details
+            )
             raise
     
     def store_embedding(self, 
@@ -357,9 +411,9 @@ class VectorStore:
         
         Esta função deve ser executada uma vez para configurar a busca vetorial.
         """
-        rpc_function_sql = """
+        rpc_function_sql = f"""
         CREATE OR REPLACE FUNCTION match_embeddings(
-            query_embedding vector(1536),
+            query_embedding vector({VECTOR_DIMENSIONS}),
             similarity_threshold float DEFAULT 0.5,
             match_count int DEFAULT 10
         )

@@ -29,6 +29,9 @@ from src.embeddings.chunker import TextChunk
 from src.utils.logging_config import get_logger
 from src.settings import OPENAI_API_KEY
 
+
+MOCK_EMBEDDING_DIMENSION = 384
+
 logger = get_logger(__name__)
 
 
@@ -181,8 +184,7 @@ class EmbeddingGenerator:
         """Gera embedding mock para desenvolvimento."""
         # Criar embedding determinístico baseado no hash do texto
         np.random.seed(hash(text) % (2**32))
-        # OpenAI ada-002 tem 1536 dimensões
-        embedding = np.random.normal(0, 1, 1536).tolist()
+        embedding = np.random.normal(0, 1, MOCK_EMBEDDING_DIMENSION).tolist()
         return embedding
     
     def generate_embeddings_batch(self, 

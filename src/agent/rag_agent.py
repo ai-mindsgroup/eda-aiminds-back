@@ -9,6 +9,7 @@ Este agente combina:
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Union, Tuple
 import time
+from pathlib import Path
 
 from src.agent.base_agent import BaseAgent, AgentError
 from src.embeddings.chunker import TextChunker, ChunkStrategy, TextChunk
@@ -23,7 +24,9 @@ class RAGAgent(BaseAgent):
     def __init__(self, 
                  embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMER,
                  chunk_size: int = 512,
-                 chunk_overlap: int = 50):
+                 chunk_overlap: int = 50,
+                 csv_chunk_size_rows: int = 20,
+                 csv_overlap_rows: int = 4):
         """Inicializa o agente RAG.
         
         Args:
@@ -41,7 +44,9 @@ class RAGAgent(BaseAgent):
             self.chunker = TextChunker(
                 chunk_size=chunk_size,
                 overlap_size=chunk_overlap,
-                min_chunk_size=50
+                min_chunk_size=50,
+                csv_chunk_size_rows=csv_chunk_size_rows,
+                csv_overlap_rows=csv_overlap_rows
             )
             
             self.embedding_generator = EmbeddingGenerator(
@@ -141,13 +146,53 @@ class RAGAgent(BaseAgent):
                        csv_text: str, 
                        source_id: str,
                        include_headers: bool = True) -> Dict[str, Any]:
-        """Ingesta dados CSV usando estratégia especializada."""
+        """Ingesta dados CSV (conteúdo bruto) usando estratégia especializada."""
         return self.ingest_text(
             text=csv_text,
             source_id=source_id,
             source_type="csv",
             chunk_strategy=ChunkStrategy.CSV_ROW
         )
+
+    def ingest_csv_file(self,
+                        file_path: str,
+                        source_id: Optional[str] = None,
+                        encoding: str = "utf-8",
+                        errors: str = "ignore") -> Dict[str, Any]:
+        """Lê um arquivo CSV do disco e ingesta utilizando a estratégia CSV_ROW.
+
+        Args:
+            file_path: Caminho absoluto ou relativo para o arquivo CSV.
+            source_id: Identificador opcional para a fonte; usa o nome do arquivo se não fornecido.
+            encoding: Codificação utilizada para leitura do arquivo.
+            errors: Política de tratamento de erros de decodificação.
+
+        Returns:
+            Resposta padrão do agente com estatísticas do processamento.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            message = f"Arquivo CSV não encontrado: {file_path}"
+            self.logger.error(message)
+            return self._build_response(message, metadata={"error": True, "file_path": file_path})
+
+        try:
+            csv_text = path.read_text(encoding=encoding, errors=errors)
+        except Exception as exc:
+            message = f"Falha ao ler arquivo CSV '{file_path}': {exc}"
+            self.logger.error(message)
+            return self._build_response(
+                message,
+                metadata={"error": True, "file_path": file_path, "exception": str(exc)}
+            )
+
+        resolved_source_id = source_id or path.stem
+        self.logger.info(
+            "Iniciando ingestão do arquivo CSV",
+            extra={"file_path": str(path.resolve()), "source_id": resolved_source_id}
+        )
+
+        return self.ingest_csv_data(csv_text=csv_text, source_id=resolved_source_id)
     
     def process(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Processa consulta RAG com busca vetorial e geração contextualizada.

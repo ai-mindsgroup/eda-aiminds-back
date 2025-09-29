@@ -56,7 +56,9 @@ class TextChunker:
     def __init__(self, 
                  chunk_size: int = 512,
                  overlap_size: int = 50,
-                 min_chunk_size: int = 50):
+                 min_chunk_size: int = 50,
+                 csv_chunk_size_rows: int = 20,
+                 csv_overlap_rows: int = 4):
         """Inicializa o sistema de chunking.
         
         Args:
@@ -67,6 +69,15 @@ class TextChunker:
         self.chunk_size = chunk_size
         self.overlap_size = overlap_size
         self.min_chunk_size = min_chunk_size
+        self.csv_chunk_size_rows = max(1, csv_chunk_size_rows)
+        # Garantir que o overlap não exceda o tamanho do chunk em linhas
+        if csv_overlap_rows >= csv_chunk_size_rows:
+            logger.warning(
+                "CSV overlap (%s) maior/igual ao chunk_size_rows (%s). Ajustando para chunk_size_rows - 1.",
+                csv_overlap_rows,
+                csv_chunk_size_rows
+            )
+        self.csv_overlap_rows = max(0, min(csv_overlap_rows, self.csv_chunk_size_rows - 1))
         self.logger = logger
         
     def chunk_text(self, 
@@ -258,72 +269,72 @@ class TextChunker:
         return chunks
     
     def _chunk_csv_data(self, csv_text: str, source_id: str) -> List[TextChunk]:
-        """Chunking especializado para dados CSV."""
-        lines = csv_text.split('\n')
-        
-        if not lines:
+        """Chunking especializado para dados CSV baseado em linhas com overlap."""
+        raw_lines = csv_text.splitlines()
+
+        if not raw_lines:
+            logger.warning("Arquivo CSV vazio para source_id: %s", source_id)
             return []
-        
-        # Primeira linha são os headers
-        headers = lines[0] if lines else ""
-        chunks = []
+
+        header = raw_lines[0].strip()
+        if not header:
+            logger.warning("CSV sem header detectado para source_id: %s", source_id)
+
+        data_lines = [line.strip() for line in raw_lines[1:] if line.strip()]
+        total_rows = len(data_lines)
+
+        if total_rows == 0:
+            logger.warning("CSV sem linhas de dados para source_id: %s", source_id)
+            return []
+
+        chunk_size_rows = max(1, self.csv_chunk_size_rows)
+        overlap_rows = max(0, min(self.csv_overlap_rows, chunk_size_rows - 1))
+        step = chunk_size_rows - overlap_rows if chunk_size_rows > overlap_rows else chunk_size_rows
+
+        chunks: List[TextChunk] = []
         chunk_index = 0
-        
-        # Agrupar linhas para formar chunks
-        current_chunk_lines = [headers]  # Sempre incluir header
-        current_size = len(headers)
-        
-        for line_idx, line in enumerate(lines[1:], 1):  # Skip header
-            line = line.strip()
-            if not line:
-                continue
-            
-            line_with_header = f"{headers}\n{line}"
-            
-            # Se adicionar esta linha ultrapassaria o limite
-            if current_size + len(line) + 1 > self.chunk_size and len(current_chunk_lines) > 1:
-                # Criar chunk com linhas atuais
-                chunk_content = '\n'.join(current_chunk_lines)
-                
-                metadata = ChunkMetadata(
-                    source=source_id,
-                    chunk_index=chunk_index,
-                    strategy=ChunkStrategy.CSV_ROW,
-                    char_count=len(chunk_content),
-                    word_count=len(chunk_content.split()),
-                    start_position=0,  # Para CSV, posição não é tão relevante
-                    end_position=len(chunk_content),
-                    additional_info={"csv_rows": len(current_chunk_lines) - 1}  # -1 para excluir header
-                )
-                
-                chunks.append(TextChunk(content=chunk_content, metadata=metadata))
-                chunk_index += 1
-                
-                # Reiniciar chunk
-                current_chunk_lines = [headers, line]
-                current_size = len(headers) + len(line) + 1
-            else:
-                current_chunk_lines.append(line)
-                current_size += len(line) + 1
-        
-        # Último chunk
-        if len(current_chunk_lines) > 1:  # Mais que só o header
-            chunk_content = '\n'.join(current_chunk_lines)
-            
-            metadata = ChunkMetadata(
+        start_row = 0
+
+        while start_row < total_rows:
+            end_row = min(start_row + chunk_size_rows, total_rows)
+            chunk_lines = data_lines[start_row:end_row]
+
+            if not chunk_lines:
+                break
+
+            chunk_content_lines = [header] + chunk_lines
+            chunk_content = '\n'.join(chunk_content_lines)
+
+            overlap_with_previous = overlap_rows if chunk_index > 0 else 0
+            chunk_metadata = ChunkMetadata(
                 source=source_id,
                 chunk_index=chunk_index,
                 strategy=ChunkStrategy.CSV_ROW,
                 char_count=len(chunk_content),
                 word_count=len(chunk_content.split()),
-                start_position=0,
-                end_position=len(chunk_content),
-                additional_info={"csv_rows": len(current_chunk_lines) - 1}
+                start_position=start_row,
+                end_position=end_row,
+                overlap_with_previous=overlap_with_previous,
+                additional_info={
+                    "csv_rows": len(chunk_lines),
+                    "overlap_rows": overlap_with_previous,
+                    "start_row": start_row + 1,  # human-friendly (1-based)
+                    "end_row": end_row,
+                },
             )
-            
-            chunks.append(TextChunk(content=chunk_content, metadata=metadata))
-        
-        logger.info(f"Criados {len(chunks)} chunks CSV com {sum(c.metadata.additional_info.get('csv_rows', 0) for c in chunks)} linhas de dados")
+
+            chunks.append(TextChunk(content=chunk_content, metadata=chunk_metadata))
+            chunk_index += 1
+            start_row += step
+
+        total_chunk_rows = sum(c.metadata.additional_info.get("csv_rows", 0) for c in chunks if c.metadata.additional_info)
+        logger.info(
+            "Criados %s chunks CSV (linhas por chunk=%s, overlap=%s) totalizando %s linhas", 
+            len(chunks),
+            chunk_size_rows,
+            overlap_rows,
+            total_chunk_rows,
+        )
         return chunks
     
     def get_stats(self, chunks: List[TextChunk]) -> Dict[str, Any]:
@@ -341,5 +352,23 @@ class TextChunker:
             "strategy": chunks[0].metadata.strategy.value,
             "overlap_total": sum(c.metadata.overlap_with_previous for c in chunks)
         }
+
+        csv_rows_values = [
+            c.metadata.additional_info.get("csv_rows")
+            for c in chunks
+            if c.metadata.additional_info and c.metadata.additional_info.get("csv_rows") is not None
+        ]
+        if csv_rows_values:
+            total_csv_rows = sum(csv_rows_values)
+            total_overlap_rows = sum(
+                c.metadata.additional_info.get("overlap_rows", 0)
+                for c in chunks
+                if c.metadata.additional_info
+            )
+            stats["total_csv_rows"] = total_csv_rows
+            stats["avg_csv_rows"] = total_csv_rows / len(csv_rows_values)
+            stats["total_csv_overlap_rows"] = total_overlap_rows
+            if len(csv_rows_values) > 1:
+                stats["avg_csv_overlap_rows"] = total_overlap_rows / (len(csv_rows_values) - 1)
         
         return stats
