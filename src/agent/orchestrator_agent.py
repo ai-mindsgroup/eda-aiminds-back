@@ -39,18 +39,40 @@ except RuntimeError as e:
     RAGAgent = None
     print(f"⚠️ RAGAgent não disponível: {str(e)[:100]}...")
 
-# Import condicional do GoogleLLMAgent
+# Import do cliente Supabase para verificação de dados
 try:
-    from src.agent.google_llm_agent import GoogleLLMAgent
-    GOOGLE_LLM_AGENT_AVAILABLE = True
+    from src.vectorstore.supabase_client import supabase
+    SUPABASE_CLIENT_AVAILABLE = True
 except ImportError as e:
-    GOOGLE_LLM_AGENT_AVAILABLE = False
-    GoogleLLMAgent = None
-    print(f"⚠️ GoogleLLMAgent não disponível: {str(e)[:100]}...")
+    SUPABASE_CLIENT_AVAILABLE = False
+    supabase = None
+    print(f"⚠️ Cliente Supabase não disponível: {str(e)[:100]}...")
 except RuntimeError as e:
-    GOOGLE_LLM_AGENT_AVAILABLE = False
-    GoogleLLMAgent = None
-    print(f"⚠️ GoogleLLMAgent não disponível: {str(e)[:100]}...")
+    SUPABASE_CLIENT_AVAILABLE = False
+    supabase = None
+    print(f"⚠️ Cliente Supabase não disponível: {str(e)[:100]}...")
+
+# Import do LLM Manager (camada de abstração para múltiplos provedores)
+try:
+    from src.llm.manager import get_llm_manager, LLMManager, LLMConfig
+    LLM_MANAGER_AVAILABLE = True
+except ImportError as e:
+    LLM_MANAGER_AVAILABLE = False
+    print(f"⚠️ LLM Manager não disponível: {str(e)[:100]}...")
+except RuntimeError as e:
+    LLM_MANAGER_AVAILABLE = False
+    print(f"⚠️ LLM Manager não disponível: {str(e)[:100]}...")
+
+# Import do sistema de prompts
+try:
+    from src.prompts.manager import get_prompt_manager, AgentRole
+    PROMPT_MANAGER_AVAILABLE = True
+except ImportError as e:
+    PROMPT_MANAGER_AVAILABLE = False
+    print(f"⚠️ Prompt Manager não disponível: {str(e)[:100]}...")
+except RuntimeError as e:
+    PROMPT_MANAGER_AVAILABLE = False
+    print(f"⚠️ Prompt Manager não disponível: {str(e)[:100]}...")
 
 
 class QueryType(Enum):
@@ -90,14 +112,14 @@ class OrchestratorAgent(BaseAgent):
     def __init__(self, 
                  enable_csv_agent: bool = True,
                  enable_rag_agent: bool = True,
-                 enable_google_llm_agent: bool = True,
+                 enable_llm_manager: bool = True,
                  enable_data_processor: bool = True):
         """Inicializa o orquestrador com agentes especializados.
         
         Args:
             enable_csv_agent: Habilitar agente de análise CSV
             enable_rag_agent: Habilitar agente RAG
-            enable_google_llm_agent: Habilitar agente Google LLM
+            enable_llm_manager: Habilitar LLM Manager (camada de abstração para múltiplos LLMs)
             enable_data_processor: Habilitar processador de dados
         """
         super().__init__(
@@ -109,6 +131,18 @@ class OrchestratorAgent(BaseAgent):
         self.agents = {}
         self.conversation_history = []
         self.current_data_context = {}
+        
+        # Inicializar LLM Manager (camada de abstração)
+        self.llm_manager = None
+        
+        # Inicializar Prompt Manager
+        self.prompt_manager = None
+        if PROMPT_MANAGER_AVAILABLE:
+            try:
+                self.prompt_manager = get_prompt_manager()
+                self.logger.info("✅ Prompt Manager inicializado")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Falha ao inicializar Prompt Manager: {str(e)}")
         
         # Inicializar agentes com tratamento de erro gracioso
         initialization_errors = []
@@ -137,17 +171,23 @@ class OrchestratorAgent(BaseAgent):
             initialization_errors.append(error_msg)
             self.logger.warning(f"⚠️ {error_msg}")
 
-        # Google LLM Agent (requer Google API Key configurada)
-        if enable_google_llm_agent and GOOGLE_LLM_AGENT_AVAILABLE:
+        # LLM Manager (camada de abstração para múltiplos provedores)
+        if enable_llm_manager and LLM_MANAGER_AVAILABLE:
             try:
-                self.agents["llm"] = GoogleLLMAgent()
-                self.logger.info("✅ Agente Google LLM inicializado")
+                self.llm_manager = get_llm_manager()
+                self.logger.info("✅ LLM Manager inicializado")
+                
+                # Adicionar informações do provedor ativo
+                status = self.llm_manager.get_status()
+                active_provider = status.get("active_provider", "unknown")
+                self.logger.info(f"🤖 Provedor LLM ativo: {active_provider}")
+                
             except Exception as e:
-                error_msg = f"Google LLM Agent: {str(e)}"
+                error_msg = f"LLM Manager: {str(e)}"
                 initialization_errors.append(error_msg)
                 self.logger.warning(f"⚠️ {error_msg}")
-        elif enable_google_llm_agent and not GOOGLE_LLM_AGENT_AVAILABLE:
-            error_msg = "Google LLM Agent: Dependências não disponíveis (Google AI não instalado)"
+        elif enable_llm_manager and not LLM_MANAGER_AVAILABLE:
+            error_msg = "LLM Manager: Dependências não disponíveis"
             initialization_errors.append(error_msg)
             self.logger.warning(f"⚠️ {error_msg}")
         
@@ -237,6 +277,48 @@ class OrchestratorAgent(BaseAgent):
                     "agents_used": []
                 }
             )
+    
+    def _check_data_availability(self) -> bool:
+        """Verifica se há dados disponíveis na base de dados.
+        
+        Returns:
+            True se há dados carregados, False caso contrário
+        """
+        # 1. Verificar contexto em memória primeiro (mais rápido)
+        if self.current_data_context.get("csv_loaded", False):
+            self.logger.debug("✅ Dados encontrados no contexto em memória")
+            return True
+        
+        # 2. Verificar dados na base de dados Supabase
+        if SUPABASE_CLIENT_AVAILABLE and supabase:
+            try:
+                # Verificar se há dados na tabela embeddings
+                result = supabase.table('embeddings').select('id').limit(1).execute()
+                if result.data and len(result.data) > 0:
+                    self.logger.debug("✅ Dados encontrados na tabela embeddings")
+                    # Atualizar contexto em memória para próximas consultas
+                    self.current_data_context["csv_loaded"] = True
+                    self.current_data_context["data_source"] = "database_embeddings"
+                    return True
+                
+                # Verificar se há dados na tabela chunks
+                result = supabase.table('chunks').select('id').limit(1).execute()
+                if result.data and len(result.data) > 0:
+                    self.logger.debug("✅ Dados encontrados na tabela chunks")
+                    # Atualizar contexto em memória para próximas consultas
+                    self.current_data_context["csv_loaded"] = True
+                    self.current_data_context["data_source"] = "database_chunks"
+                    return True
+                
+                self.logger.debug("❌ Nenhum dado encontrado nas tabelas da base de dados")
+                return False
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ Erro ao verificar dados na base: {str(e)}")
+                return False
+        else:
+            self.logger.debug("⚠️ Cliente Supabase não disponível")
+            return False
     
     def _classify_query(self, query: str, context: Optional[Dict[str, Any]]) -> QueryType:
         """Classifica o tipo de consulta para roteamento adequado.
@@ -458,30 +540,130 @@ context = {"file_path": "caminho/para/seu/arquivo.csv"}
             )
 
     def _handle_llm_analysis(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Processa análises via Google LLM."""
-        if "llm" not in self.agents:
+        """Processa consultas através do LLM Manager com verificação de base de dados."""
+        if not self.llm_manager:
             return self._build_response(
-                "❌ Agente Google LLM não está disponível",
+                "❌ LLM Manager não está disponível",
                 metadata={"error": True, "agents_used": []}
             )
         
-        self.logger.info("🤖 Delegando para agente Google LLM")
+        self.logger.info("🤖 Delegando para LLM Manager")
         
-        # Preparar contexto para o LLM
-        llm_context = context or {}
+        # 1. VERIFICAÇÃO OBRIGATÓRIA: Identificar se consulta requer dados específicos
+        data_specific_keywords = [
+            'tipos de dados', 'colunas', 'variáveis', 'estatísticas', 'resumo',
+            'distribuição', 'correlação', 'missing', 'nulos', 'formato',
+            'csv', 'arquivo', 'dataset', 'base de dados', 'planilha'
+        ]
         
-        # Se há dados carregados, incluir informações básicas
-        if hasattr(self, 'current_data_context') and self.current_data_context:
+        needs_data_analysis = any(keyword in query.lower() for keyword in data_specific_keywords)
+        
+        # 2. VERIFICAR ESTADO DOS DADOS
+        has_loaded_data = self._check_data_availability()
+        has_file_context = bool(context and context.get("file_path"))
+        
+        self.logger.info(f"📊 Análise necessária: {needs_data_analysis}, Dados carregados: {has_loaded_data}, Arquivo no contexto: {has_file_context}")
+        
+        # 3. LÓGICA DE DECISÃO BASEADA NO ESTADO
+        if needs_data_analysis and not has_loaded_data and not has_file_context:
+            # Caso 1: Precisa de dados específicos mas não há nada carregado
+            return self._build_response(
+                """❓ **Base de Dados Necessária**
+                
+Sua pergunta requer análise de dados específicos, mas não há nenhuma base de dados carregada no momento.
+
+**Opções disponíveis:**
+
+🔸 **Análise específica**: Carregue um arquivo CSV primeiro:
+   • "carregar arquivo dados.csv"
+   • "analisar arquivo /caminho/para/arquivo.csv"
+
+🔸 **Resposta genérica**: Se deseja uma explicação geral sobre o conceito, reformule sua pergunta:
+   • "o que são tipos de dados em geral?"
+   • "explique conceitos básicos de análise de dados"
+
+**Como posso te ajudar?**""",
+                metadata={
+                    "error": False, 
+                    "agents_used": ["llm_manager"],
+                    "requires_data": True,
+                    "data_available": False
+                }
+            )
+        
+        elif needs_data_analysis and not has_loaded_data and has_file_context:
+            # Caso 2: Precisa de dados, tem arquivo no contexto, mas não carregou ainda
+            self.logger.info("🔄 Carregando dados automaticamente para análise específica...")
+            
+            # Tentar carregar dados usando agente CSV
+            if "csv" in self.agents:
+                try:
+                    load_query = f"carregar e analisar estrutura básica"
+                    csv_result = self.agents["csv"].process(load_query, context)
+                    
+                    if csv_result and not csv_result.get("metadata", {}).get("error", False):
+                        # Extrair informações do CSV e atualizar contexto
+                        self._update_data_context_from_csv_result(csv_result, context)
+                        self.logger.info("✅ Dados carregados automaticamente")
+                    else:
+                        return self._build_response(
+                            f"❌ Não foi possível carregar o arquivo: {csv_result.get('content', 'Erro desconhecido')}",
+                            metadata={"error": True, "agents_used": ["csv"]}
+                        )
+                except Exception as e:
+                    return self._build_response(
+                        f"❌ Erro ao carregar arquivo: {str(e)}",
+                        metadata={"error": True, "agents_used": ["csv"]}
+                    )
+            else:
+                return self._build_response(
+                    "❌ Agente CSV não disponível para carregar dados",
+                    metadata={"error": True, "agents_used": []}
+                )
+        
+        # 4. PREPARAR CONTEXTO PARA LLM
+        llm_context = context.copy() if context else {}
+        
+        # Adicionar dados carregados se disponíveis
+        if self.current_data_context:
             llm_context.update(self.current_data_context)
         
+        # 5. CONSTRUIR PROMPT CONTEXTUALIZADO
+        prompt = self._build_llm_prompt(query, llm_context, needs_data_analysis)
+        
         try:
-            result = self.agents["llm"].process(query, llm_context)
-            return self._enhance_response(result, ["llm"])
+            # 6. CHAMAR LLM MANAGER
+            config = LLMConfig(temperature=0.2, max_tokens=1024)
+            response = self.llm_manager.chat(prompt, config)
+            
+            if not response.success:
+                raise RuntimeError(response.error)
+            
+            # 7. CONSTRUIR RESPOSTA COM METADADOS CORRETOS
+            result = {
+                "content": response.content,
+                "metadata": {
+                    "provider": response.provider.value,
+                    "model": response.model,
+                    "processing_time": response.processing_time,
+                    "tokens_used": response.tokens_used,
+                    "data_analysis": needs_data_analysis,
+                    "data_loaded": bool(self.current_data_context.get("csv_loaded", False))
+                }
+            }
+            
+            # 8. REGISTRAR AGENTES USADOS CORRETAMENTE
+            agents_used = ["llm_manager"]
+            if needs_data_analysis and self.current_data_context.get("csv_loaded"):
+                agents_used.append("csv")  # CSV foi usado para carregar dados
+            
+            return self._enhance_response(result, agents_used)
+            
         except Exception as e:
-            self.logger.error(f"Erro no agente LLM: {str(e)}")
+            self.logger.error(f"Erro no LLM Manager: {str(e)}")
             return self._build_response(
                 f"❌ Erro na análise LLM: {str(e)}",
-                metadata={"error": True, "agents_used": ["llm"]}
+                metadata={"error": True, "agents_used": ["llm_manager"]}
             )
     
     def _handle_hybrid_query(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -556,13 +738,21 @@ Sou o coordenador central que pode te ajudar com:
         elif 'ajuda' in query_lower or 'help' in query_lower:
             return self._get_help_response()
         
-        # Usar LLM para resposta geral se disponível
-        elif "llm" in self.agents:
+        # Usar LLM Manager para resposta geral se disponível
+        elif self.llm_manager:
             try:
-                result = self.agents["llm"].process(query, context)
-                return self._enhance_response(result, ["llm"])
+                prompt = self._build_llm_prompt(query, context)
+                config = LLMConfig(temperature=0.3, max_tokens=512)  # Mais criativo para consultas gerais
+                response = self.llm_manager.chat(prompt, config)
+                
+                if response.success:
+                    result = {"content": response.content}
+                    return self._enhance_response(result, ["llm_manager"])
+                else:
+                    raise RuntimeError(response.error)
+                    
             except Exception as e:
-                self.logger.warning(f"Erro ao usar LLM para consulta geral: {str(e)}")
+                self.logger.warning(f"Erro ao usar LLM Manager para consulta geral: {str(e)}")
                 # Fallback para resposta padrão
                 response = "Desculpe, não consegui processar sua consulta com o LLM. Tente ser mais específico ou pergunte sobre análise de dados CSV."
                 return self._build_response(response, metadata={"agents_used": [], "fallback": True})
@@ -635,8 +825,9 @@ Como não tenho acesso ao LLM no momento, posso te ajudar especificamente com:
         if "metadata" not in enhanced:
             enhanced["metadata"] = {}
         
+        # CORREÇÃO: Registrar agentes usados no nível principal da metadata
+        enhanced["metadata"]["agents_used"] = agents_used
         enhanced["metadata"]["orchestrator"] = {
-            "agents_used": agents_used,
             "conversation_length": len(self.conversation_history),
             "has_data_context": bool(self.current_data_context)
         }
@@ -769,6 +960,45 @@ context = {"file_path": "fraude.csv"}
                 metadata={"no_data_context": True}
             )
     
+    def _update_data_context_from_csv_result(self, csv_result: Dict[str, Any], context: Dict[str, Any]) -> None:
+        """Atualiza contexto de dados com resultado da análise CSV."""
+        try:
+            csv_content = csv_result.get("content", "")
+            
+            # Extrair informações básicas do resultado CSV
+            data_info = {
+                "file_path": context.get("file_path", ""),
+                "csv_loaded": True,
+                "structure_analyzed": True,
+                "csv_analysis": csv_content
+            }
+            
+            # Tentar extrair informações específicas do conteúdo
+            if "Colunas:" in csv_content:
+                # Extrair lista de colunas se disponível
+                lines = csv_content.split('\n')
+                for i, line in enumerate(lines):
+                    if "Colunas:" in line and i + 1 < len(lines):
+                        columns_info = lines[i + 1].strip()
+                        data_info["columns_summary"] = columns_info
+                        break
+            
+            if "Shape:" in csv_content:
+                # Extrair informações de shape
+                lines = csv_content.split('\n')
+                for line in lines:
+                    if "Shape:" in line:
+                        shape_info = line.replace("Shape:", "").strip()
+                        data_info["shape"] = shape_info
+                        break
+            
+            # Atualizar contexto global
+            self.current_data_context.update(data_info)
+            self.logger.info(f"✅ Contexto de dados atualizado: {data_info['file_path']}")
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao atualizar contexto de dados: {e}")
+
     def get_available_agents(self) -> Dict[str, Any]:
         """Retorna informações sobre agentes disponíveis."""
         agents_info = {}
@@ -785,3 +1015,54 @@ context = {"file_path": "fraude.csv"}
             response += f"• **{name.upper()}**: {info['description']}\n"
         
         return self._build_response(response, metadata={"agents": agents_info})
+
+    def _build_llm_prompt(self, query: str, context: Optional[Dict[str, Any]] = None, needs_data_analysis: bool = False) -> Tuple[str, Optional[str]]:
+        """Constrói prompt contextualizado para o LLM Manager.
+        
+        Args:
+            query: Consulta do usuário
+            context: Contexto adicional (dados, histórico, etc.)
+            needs_data_analysis: Se a consulta requer análise de dados específicos
+            
+        Returns:
+            Tuple[str, Optional[str]]: (user_prompt, system_prompt)
+        """
+        prompt_parts = []
+        
+        # Instrução base diferenciada
+        if needs_data_analysis and context and context.get("csv_loaded"):
+            prompt_parts.append("""Você é um assistente especializado em análise de dados CSV.
+Responda com base ESPECIFICAMENTE nos dados carregados fornecidos no contexto.
+Use português brasileiro e seja preciso e detalhado sobre os dados reais.""")
+        else:
+            prompt_parts.append("""Você é um assistente de análise de dados especializado em CSV e análise estatística.
+Responda de forma clara, precisa e útil. Use português brasileiro.""")
+        
+        # Adicionar contexto de dados se disponível
+        if context:
+            if 'file_path' in context:
+                prompt_parts.append(f"\n📊 ARQUIVO CARREGADO: {context['file_path']}")
+            
+            if 'csv_analysis' in context:
+                prompt_parts.append(f"\n📈 ANÁLISE DOS DADOS:\n{context['csv_analysis']}")
+                
+            if 'columns_summary' in context:
+                prompt_parts.append(f"\n📋 COLUNAS: {context['columns_summary']}")
+                
+            if 'shape' in context:
+                prompt_parts.append(f"\n� DIMENSÕES: {context['shape']}")
+        
+        # Adicionar a consulta do usuário
+        prompt_parts.append(f"\n❓ CONSULTA DO USUÁRIO: {query}")
+        
+        # Instrução final diferenciada
+        if needs_data_analysis and context and context.get("csv_loaded"):
+            prompt_parts.append("""\n🎯 INSTRUÇÕES:
+- Analise SOMENTE os dados específicos carregados
+- Seja preciso sobre as colunas, tipos e estatísticas REAIS
+- NÃO dê respostas genéricas sobre conceitos
+- Forneça uma resposta baseada nos dados concretos""")
+        else:
+            prompt_parts.append("\n🎯 Forneça uma resposta útil e estruturada:")
+        
+        return "\n".join(prompt_parts)

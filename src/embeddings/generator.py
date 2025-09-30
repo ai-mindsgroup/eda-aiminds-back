@@ -14,6 +14,12 @@ from enum import Enum
 import numpy as np
 
 try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:  # pragma: no cover - dependência opcional
+    GROQ_AVAILABLE = False
+
+try:
     import openai
     OPENAI_AVAILABLE = True
 except ImportError:
@@ -27,10 +33,11 @@ except ImportError:
 
 from src.embeddings.chunker import TextChunk
 from src.utils.logging_config import get_logger
-from src.settings import OPENAI_API_KEY
+from src.settings import OPENAI_API_KEY, GROQ_API_KEY, GROQ_API_BASE
 
 
-MOCK_EMBEDDING_DIMENSION = 384
+TARGET_EMBEDDING_DIMENSION = 384
+MOCK_EMBEDDING_DIMENSION = TARGET_EMBEDDING_DIMENSION
 
 logger = get_logger(__name__)
 
@@ -39,6 +46,7 @@ class EmbeddingProvider(Enum):
     """Provedores de embeddings disponíveis."""
     OPENAI = "openai"
     SENTENCE_TRANSFORMER = "sentence_transformer"
+    GROQ = "groq"
     MOCK = "mock"  # Para desenvolvimento/teste
 
 
@@ -51,6 +59,7 @@ class EmbeddingResult:
     model: str
     dimensions: int
     processing_time: float
+    raw_dimensions: int
     chunk_metadata: Dict[str, Any] = None
 
 
@@ -82,7 +91,8 @@ class EmbeddingGenerator:
         """Retorna modelo padrão para cada provider."""
         defaults = {
             EmbeddingProvider.OPENAI: "text-embedding-3-small",
-            EmbeddingProvider.SENTENCE_TRANSFORMER: "all-MiniLM-L6-v2",
+            EmbeddingProvider.SENTENCE_TRANSFORMER: "all-MiniLM-L6-v2",  # Modelo mais rápido e leve
+            EmbeddingProvider.GROQ: "text-embedding-3-small",
             EmbeddingProvider.MOCK: "mock-model"
         }
         return defaults.get(provider, "unknown")
@@ -94,6 +104,8 @@ class EmbeddingGenerator:
                 self._initialize_openai()
             elif self.provider == EmbeddingProvider.SENTENCE_TRANSFORMER:
                 self._initialize_sentence_transformer()
+            elif self.provider == EmbeddingProvider.GROQ:
+                self._initialize_groq()
             elif self.provider == EmbeddingProvider.MOCK:
                 self._initialize_mock()
             else:
@@ -101,10 +113,8 @@ class EmbeddingGenerator:
                 
         except Exception as e:
             self.logger.error(f"Falha ao inicializar {self.provider}: {str(e)}")
-            self.logger.info("Fallback para provider MOCK")
-            self.provider = EmbeddingProvider.MOCK
-            self.model = "mock-model"
-            self._initialize_mock()
+            # Não fazer fallback automático - forçar correção da configuração
+            raise RuntimeError(f"Provider {self.provider.value} falhou na inicialização: {str(e)}")
     
     def _initialize_openai(self) -> None:
         """Inicializa cliente OpenAI."""
@@ -126,6 +136,20 @@ class EmbeddingGenerator:
         self._client = SentenceTransformer(self.model)
         self.logger.info("Sentence Transformer carregado com sucesso")
     
+    def _initialize_groq(self) -> None:
+        """Inicializa cliente Groq."""
+        if not GROQ_AVAILABLE:
+            raise ImportError("groq client não disponível. Instale com: pip install groq")
+
+        if not GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY não configurada no arquivo .env")
+
+        try:
+            self._client = Groq(api_key=GROQ_API_KEY)
+            self.logger.info(f"Cliente Groq inicializado com modelo: {self.model}")
+        except Exception as e:
+            raise RuntimeError(f"Falha ao criar cliente Groq: {str(e)}")
+
     def _initialize_mock(self) -> None:
         """Inicializa provider mock para desenvolvimento."""
         self._client = "mock_client"
@@ -143,20 +167,25 @@ class EmbeddingGenerator:
                 embedding = self._generate_openai_embedding(text)
             elif self.provider == EmbeddingProvider.SENTENCE_TRANSFORMER:
                 embedding = self._generate_sentence_transformer_embedding(text)
+            elif self.provider == EmbeddingProvider.GROQ:
+                embedding = self._generate_groq_embedding(text)
             elif self.provider == EmbeddingProvider.MOCK:
                 embedding = self._generate_mock_embedding(text)
             else:
                 raise ValueError(f"Provider não implementado: {self.provider}")
             
             processing_time = time.perf_counter() - start_time
+            raw_dimensions = len(embedding)
+            embedding = self._ensure_target_dimensions(embedding)
             
             result = EmbeddingResult(
-                chunk_content=text[:100] + "..." if len(text) > 100 else text,
+                chunk_content=text,  # CORREÇÃO: Manter conteúdo completo do chunk
                 embedding=embedding,
                 provider=self.provider,
                 model=self.model,
                 dimensions=len(embedding),
-                processing_time=processing_time
+                processing_time=processing_time,
+                raw_dimensions=raw_dimensions
             )
             
             self.logger.debug(f"Embedding gerado: {len(text)} chars -> {len(embedding)}D em {processing_time:.3f}s")
@@ -180,16 +209,40 @@ class EmbeddingGenerator:
         embedding = self._client.encode([text], normalize_embeddings=True)[0]
         return embedding.tolist()
     
+    def _generate_groq_embedding(self, text: str) -> List[float]:
+        """Gera embedding usando o endpoint compatível da Groq."""
+        response = self._client.embeddings.create(
+            model=self.model,
+            input=text,
+            encoding_format="float"
+        )
+        return response.data[0].embedding
+
     def _generate_mock_embedding(self, text: str) -> List[float]:
         """Gera embedding mock para desenvolvimento."""
         # Criar embedding determinístico baseado no hash do texto
         np.random.seed(hash(text) % (2**32))
         embedding = np.random.normal(0, 1, MOCK_EMBEDDING_DIMENSION).tolist()
         return embedding
+
+    def _ensure_target_dimensions(self, embedding: List[float]) -> List[float]:
+        """Redimensiona embeddings para TARGET_EMBEDDING_DIMENSION preservando informação."""
+        current_dim = len(embedding)
+        if current_dim == TARGET_EMBEDDING_DIMENSION:
+            return embedding
+
+        if current_dim <= 0:
+            raise ValueError("Embedding vazio retornado pelo provedor")
+
+        vector = np.asarray(embedding, dtype=np.float32)
+        # Reamostragem linear garante mapeamento determinístico independentemente da dimensão original
+        target_indexes = np.linspace(0, current_dim - 1, TARGET_EMBEDDING_DIMENSION, dtype=np.float32)
+        resized = np.interp(target_indexes, np.arange(current_dim, dtype=np.float32), vector)
+        return resized.astype(np.float32).tolist()
     
     def generate_embeddings_batch(self, 
                                   chunks: List[TextChunk], 
-                                  batch_size: int = 10) -> List[EmbeddingResult]:
+                                  batch_size: int = 30) -> List[EmbeddingResult]:
         """Gera embeddings para múltiplos chunks em batches.
         
         Args:
@@ -202,20 +255,20 @@ class EmbeddingGenerator:
         if not chunks:
             return []
         
-        self.logger.info(f"Gerando embeddings para {len(chunks)} chunks em batches de {batch_size}")
+        import datetime
+        self.logger.info(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Gerando embeddings para {len(chunks)} chunks em batches de {batch_size}")
         
         results = []
         total_start_time = time.perf_counter()
         
+        total_batches = (len(chunks) + batch_size - 1) // batch_size
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i:i + batch_size]
             batch_start_time = time.perf_counter()
-            
             batch_results = []
             for chunk in batch:
                 try:
                     result = self.generate_embedding(chunk.content)
-                    # Adicionar metadados do chunk ao resultado
                     result.chunk_metadata = {
                         "source": chunk.metadata.source,
                         "chunk_index": chunk.metadata.chunk_index,
@@ -224,20 +277,13 @@ class EmbeddingGenerator:
                         "word_count": chunk.metadata.word_count
                     }
                     batch_results.append(result)
-                    
                 except Exception as e:
                     self.logger.error(f"Erro no chunk {chunk.metadata.chunk_index}: {str(e)}")
-                    # Continuar com os outros chunks
                     continue
-            
             results.extend(batch_results)
             batch_time = time.perf_counter() - batch_start_time
-            
-            self.logger.info(f"Batch {i//batch_size + 1}: {len(batch_results)}/{len(batch)} chunks processados em {batch_time:.2f}s")
-            
-            # Rate limiting básico
-            if batch_size > 5:
-                time.sleep(0.1)  # 100ms entre batches grandes
+            now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.logger.info(f"[{now}] Batch {i//batch_size + 1}/{total_batches}: {len(batch_results)}/{len(batch)} chunks processados em {batch_time:.2f}s")
         
         total_time = time.perf_counter() - total_start_time
         success_rate = len(results) / len(chunks) * 100

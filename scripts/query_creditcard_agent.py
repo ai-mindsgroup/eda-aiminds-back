@@ -57,7 +57,7 @@ def main() -> int:
 
     try:
         agent = RAGAgent(
-            embedding_provider=EmbeddingProvider.MOCK,
+            embedding_provider=EmbeddingProvider.SENTENCE_TRANSFORMER,
             chunk_size=512,
             chunk_overlap=50,
             csv_chunk_size_rows=20,
@@ -71,7 +71,7 @@ def main() -> int:
         "similarity_threshold": 0.25,
         "max_results": 5,
         "include_context": True,
-        "filters": {"source": "creditcard_v1"},
+        "filters": {"source": "creditcard_balanced_v1"},
     }
 
     for idx, question in enumerate(QUESTIONS, start=1):

@@ -3,7 +3,7 @@
 Esta classe fornece a estrutura comum para todos os agentes especializados:
 - Logging centralizado
 - Interface padronizada de comunicação
-- Integração com LangChain
+- Integração com LLM Manager (abstração para múltiplos provedores)
 - Tratamento de erros
 """
 from __future__ import annotations
@@ -11,7 +11,20 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from src.utils.logging_config import get_logger
-from src.api.sonar_client import send_sonar_query
+
+# Import do LLM Manager para abstração de provedores
+try:
+    from src.llm.manager import get_llm_manager, LLMConfig, LLMResponse
+    LLM_MANAGER_AVAILABLE = True
+except ImportError:
+    LLM_MANAGER_AVAILABLE = False
+    get_llm_manager = None
+    LLMConfig = None
+    LLMResponse = None
+
+class AgentError(Exception):
+    """Exceção específica para erros em agentes."""
+    pass
 
 
 class BaseAgent(ABC):
@@ -43,35 +56,59 @@ class BaseAgent(ABC):
         pass
     
     def _call_llm(self, prompt: str, context: Optional[Dict[str, Any]] = None, **kwargs) -> Dict[str, Any]:
-        """Chama o LLM via Sonar API com configurações padrão.
+        """Chama LLM via LLM Manager com fallback automático entre provedores.
         
         Args:
             prompt: Prompt para o LLM
             context: Contexto adicional
-            **kwargs: Parâmetros extras para send_sonar_query
+            **kwargs: Parâmetros extras para configuração
         
         Returns:
-            Resposta da API Sonar
+            Resposta do LLM padronizada
         """
         try:
-            # Configurações padrão para agentes
-            default_params = {
-                "temperature": 0.2,
-                "max_tokens": 1024,
-                "top_p": 0.9
-            }
-            default_params.update(kwargs)
+            if not LLM_MANAGER_AVAILABLE:
+                raise ImportError("LLM Manager não disponível. Verifique imports.")
             
-            self.logger.debug(f"Chamando LLM para agente {self.name}")
-            response = send_sonar_query(prompt, context, **default_params)
-            return response
-        
-        except Exception as e:
-            self.logger.error(f"Erro ao chamar LLM: {str(e)[:100]}")
+            # Configuração padrão para agentes
+            config = LLMConfig(
+                temperature=kwargs.get("temperature", 0.2),
+                max_tokens=kwargs.get("max_tokens", 1024),
+                top_p=kwargs.get("top_p", 0.9),
+                model=kwargs.get("model", None)
+            )
+            
+            # Obter manager e fazer chamada
+            llm_manager = get_llm_manager()
+            self.logger.debug(f"Chamando LLM via manager para agente {self.name}")
+            
+            response = llm_manager.chat(prompt, config)
+            
+            if not response.success:
+                raise RuntimeError(f"Falha em todos os provedores LLM: {response.error}")
+            
+            self.logger.debug(f"LLM respondeu via {response.provider.value} em {response.processing_time:.2f}s")
+            
+            # Converter para formato compatível com código existente
             return {
-                "error": True,
-                "message": f"Falha na comunicação com LLM: {type(e).__name__}"
+                "choices": [
+                    {
+                        "message": {
+                            "content": response.content
+                        }
+                    }
+                ],
+                "usage": {
+                    "total_tokens": response.tokens_used or 0
+                },
+                "provider": response.provider.value,
+                "model": response.model,
+                "processing_time": response.processing_time
             }
+            
+        except Exception as e:
+            self.logger.error(f"Erro na chamada LLM: {str(e)}")
+            raise AgentError(f"Falha na comunicação com LLM: {str(e)}")
     
     def _build_response(self, content: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Constrói resposta padronizada do agente.

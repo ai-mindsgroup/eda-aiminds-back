@@ -9,7 +9,10 @@ Este agente combina:
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Union, Tuple
 import time
+import io
 from pathlib import Path
+
+import pandas as pd
 
 from src.agent.base_agent import BaseAgent, AgentError
 from src.embeddings.chunker import TextChunker, ChunkStrategy, TextChunk
@@ -90,13 +93,33 @@ class RAGAgent(BaseAgent):
                     "Nenhum chunk válido foi criado a partir do texto",
                     metadata={"error": True}
                 )
+
+            # OTIMIZAÇÃO BALANCEADA: Enriquecimento leve para manter precisão sem comprometer velocidade
+            if chunk_strategy == ChunkStrategy.CSV_ROW:
+                chunks = self._enrich_csv_chunks_light(chunks)
             
             chunk_stats = self.chunker.get_stats(chunks)
             self.logger.info(f"Criados {len(chunks)} chunks")
             
-            # 2. Geração de embeddings
-            self.logger.info("Gerando embeddings...")
-            embedding_results = self.embedding_generator.generate_embeddings_batch(chunks)
+            # 2. Geração de embeddings (MODO ASSÍNCRONO para performance)
+            self.logger.info("Gerando embeddings com processamento assíncrono...")
+            
+            # Usar geração assíncrona se disponível
+            try:
+                from src.embeddings.async_generator import run_async_embeddings
+                embedding_results = run_async_embeddings(
+                    chunks=chunks,
+                    provider=self.embedding_generator.provider,
+                    max_workers=4  # 4 workers paralelos
+                )
+                self.logger.info("✅ Embeddings gerados com processamento assíncrono")
+            except ImportError:
+                # Fallback para processamento síncrono
+                self.logger.warning("Processamento assíncrono não disponível, usando síncrono")
+                embedding_results = self.embedding_generator.generate_embeddings_batch(chunks)
+            except Exception as e:
+                self.logger.error(f"Erro no processamento assíncrono: {e}, fallback para síncrono")
+                embedding_results = self.embedding_generator.generate_embeddings_batch(chunks)
             
             if not embedding_results:
                 return self._build_response(
@@ -153,6 +176,72 @@ class RAGAgent(BaseAgent):
             source_type="csv",
             chunk_strategy=ChunkStrategy.CSV_ROW
         )
+
+    def _enrich_csv_chunks_light(self, chunks: List[TextChunk]) -> List[TextChunk]:
+        """VERSÃO BALANCEADA - Enriquecimento leve que mantém precisão sem comprometer velocidade."""
+        enriched_chunks: List[TextChunk] = []
+
+        for chunk in chunks:
+            info = chunk.metadata.additional_info or {}
+            start_row = info.get("start_row")
+            end_row = info.get("end_row")
+            row_span = f"linhas {start_row} a {end_row}" if start_row and end_row else "intervalo não identificado"
+            
+            # Análise rápida sem pandas
+            lines = chunk.content.split('\n')
+            header_line = lines[0] if lines else ""
+            data_lines = [line for line in lines[1:] if line.strip()]
+            
+            # Detectar colunas importantes
+            has_amount = "Amount" in header_line
+            has_class = "Class" in header_line  
+            has_time = "Time" in header_line
+            
+            # Análise básica de fraudes (contagem rápida)
+            fraud_count = 0
+            if has_class:
+                for line in data_lines[:100]:  # Amostra das primeiras 100 linhas
+                    parts = line.split(',')
+                    if parts and parts[-1].strip() == '1':  # Class=1 indica fraude
+                        fraud_count += 1
+            
+            # Construir descrição contextual otimizada
+            summary_lines = [
+                f"Chunk do dataset creditcard.csv ({row_span}) - {len(data_lines)} transações",
+                "Dataset de detecção de fraude em cartão de crédito com features PCA (V1-V28)",
+            ]
+            
+            if has_time:
+                summary_lines.append("Contém dados temporais (Time) para análise de padrões sequenciais")
+            
+            if has_amount:
+                summary_lines.append("Inclui valores de transação (Amount) para análise financeira")
+            
+            if has_class:
+                if fraud_count > 0:
+                    fraud_ratio = (fraud_count / min(len(data_lines), 100)) * 100
+                    summary_lines.append(f"Fraudes detectadas na amostra: ~{fraud_ratio:.1f}%")
+                else:
+                    summary_lines.append("Transações aparentemente normais (sem fraudes na amostra)")
+            
+            # Adicionar contexto das features
+            summary_lines.append("Features: V1-V28 (componentes PCA), Time, Amount, Class (0=normal, 1=fraude)")
+            
+            # Amostra das primeiras linhas para contexto
+            if len(data_lines) >= 2:
+                sample_line = data_lines[0][:150] + "..." if len(data_lines[0]) > 150 else data_lines[0]
+                summary_lines.append(f"Exemplo de transação: {sample_line}")
+            
+            # Incluir cabeçalho para referência
+            summary_lines.append(f"Colunas: {header_line}")
+
+            # CORREÇÃO CRÍTICA: Manter dados originais + adicionar contexto enriquecido
+            context_summary = "\n".join(summary_lines)
+            enriched_content = f"{context_summary}\n\n=== DADOS ORIGINAIS ===\n{chunk.content}"
+            
+            enriched_chunks.append(TextChunk(content=enriched_content, metadata=chunk.metadata))
+
+        return enriched_chunks
 
     def ingest_csv_file(self,
                         file_path: str,
@@ -384,3 +473,46 @@ RESPOSTA:"""
                 f"Erro ao limpar fonte: {str(e)}",
                 metadata={"error": True, "source_id": source_id}
             )
+
+    def _enrich_csv_chunks_simple(self, chunks: List[TextChunk]) -> List[TextChunk]:
+        """Versão simplificada do enriquecimento de chunks CSV."""
+        enriched_chunks: List[TextChunk] = []
+
+        for chunk in chunks:
+            try:
+                lines = chunk.content.strip().split('\n')
+                if len(lines) < 2:  # Precisa pelo menos do header + 1 linha
+                    enriched_chunks.append(chunk)
+                    continue
+                
+                header = lines[0]
+                data_lines = lines[1:]
+                
+                info = chunk.metadata.additional_info or {}
+                start_row = info.get("start_row", "desconhecido")
+                end_row = info.get("end_row", "desconhecido")
+                
+                # Criar descrição textual simples
+                summary = f"Dados do dataset creditcard.csv (linhas {start_row} a {end_row})\n"
+                summary += f"Total de {len(data_lines)} registros de transações\n"
+                summary += f"Colunas: {header}\n"
+                summary += f"Primeiras linhas como exemplo:\n"
+                
+                # Incluir algumas linhas de exemplo
+                for i, line in enumerate(data_lines[:3]):
+                    summary += f"  Linha {i+1}: {line}\n"
+                
+                enriched_chunks.append(TextChunk(content=summary, metadata=chunk.metadata))
+                
+            except Exception as exc:
+                self.logger.warning("Erro no enriquecimento simples CSV: %s", exc)
+                enriched_chunks.append(chunk)
+                
+        return enriched_chunks
+
+    @staticmethod
+    def _format_value(value: Any) -> str:
+        """Formata valores numéricos para texto compacto."""
+        if isinstance(value, (float, int)):
+            return f"{value:.3f}" if isinstance(value, float) else str(value)
+        return str(value)

@@ -100,6 +100,7 @@ class VectorStore:
                 "provider": result.provider.value,
                 "model": result.model,
                 "dimensions": result.dimensions,
+                "raw_dimensions": result.raw_dimensions,
                 "processing_time": result.processing_time,
                 "source_type": source_type,
                 "created_at": datetime.now().isoformat()
@@ -116,7 +117,7 @@ class VectorStore:
             })
         
         total = len(insert_data)
-        batch_size = 200
+        batch_size = 50  # Batch pequeno para evitar timeout no Supabase
         inserted_ids: List[str] = []
         total_batches = (total + batch_size - 1) // batch_size
         
