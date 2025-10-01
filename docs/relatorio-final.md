@@ -15,6 +15,7 @@
 - [X] ✅ **Carregamento de Dados Robusto** - Múltiplas fontes, validação automática, limpeza
 - [X] ✅ **Sistema de Embeddings** - Sentence-transformers + armazenamento vetorial
 - [X] ✅ **Análises Estatísticas** - Correlações, distribuições, outliers, padrões temporais
+- [X] ✅ **Sistema de Visualização Gráfica** - 5 tipos de gráficos com detecção automática 🎨 **NOVO!**
 - [X] ✅ **Interface Unificada** - DataProcessor para carregamento/validação/análise
 - [X] ✅ **Geração de Dados Sintéticos** - Fraud, sales, customer, generic datasets
 - [X] ✅ **Documentação Completa** - Guias técnicos, exemplos práticos, instruções
@@ -29,6 +30,15 @@
 - [X] ✅ **TextChunker** - Chunking inteligente (src/embeddings/chunker.py)
 - [X] ✅ **EmbeddingGenerator** - Sentence-transformers (src/embeddings/generator.py)
 - [X] ✅ **VectorStore** - PostgreSQL + pgvector (src/embeddings/vector_store.py)
+#### 🎨 Sistema de Visualização 🆕
+- [X] ✅ **GraphGenerator** - Geração automática de gráficos (src/tools/graph_generator.py)
+  - Histogramas com KDE e estatísticas
+  - Scatter plots com correlação
+  - Boxplots com detecção de outliers
+  - Gráficos de barras verticais/horizontais
+  - Heatmaps de correlação
+  - Detecção automática de necessidade de visualização
+  - Retorno em base64 para APIs/web
 #### 📊 Sistema de Dados
 - [X] ✅ **DataProcessor** - Interface unificada carregamento/análise (src/data/data_processor.py)
 - [X] ✅ **DataLoader** - Carregamento múltiplas fontes (src/data/data_loader.py)
@@ -76,7 +86,8 @@
 │  ┌─────────────────┐  ┌─────────────────┐                  │
 │  │    Pandas 2.2.2 │  │ Matplotlib 3.10 │                  │
 │  │    + CSV        │  │ + Seaborn 0.13  │                  │
-│  │    + Analytics  │  │ + Plots/Graphs  │                  │
+│  │    + Analytics  │  │ + Plotly 6.0    │                  │
+│  │                 │  │ + GraphGenerator│                  │
 │  └─────────────────┘  └─────────────────┘                  │
 ├─────────────────────────────────────────────────────────────┤
 │  🧪 ML & AI STACK                                           │
@@ -94,10 +105,22 @@
 - **Carregamento**: Detecção automática de encoding, separadores
 - **Estatísticas**: Resumos descritivos, médias, contagens, correlações  
 - **Detecção Fraude**: Padrões temporais, valores atípicos, categorização
-- **Visualizações**: Gráficos automáticos com matplotlib/seaborn
+- **Visualizações**: Gráficos automáticos com matplotlib/seaborn/plotly
 - **Flexibilidade**: Funciona com/sem LLM disponível
 
-#### 2. **Sistema RAG Completo** ✅ **NOVO!**
+#### 2. **Sistema de Visualização Gráfica** ✅ 🆕
+- **5 Tipos de Gráficos**:
+  - Histogramas com KDE e estatísticas completas
+  - Scatter plots com linha de tendência e correlação
+  - Boxplots com detecção automática de outliers
+  - Gráficos de barras (verticais/horizontais)
+  - Heatmaps de correlação com análise de pares
+- **Detecção Automática**: Keywords como 'histograma', 'gráfico', 'distribuição'
+- **Retorno Flexível**: Base64 para APIs ou salvamento em arquivo
+- **Integração**: Método `generate_visualization()` disponível em todos os agentes
+- **Exemplo Validado**: `examples/exemplo_visualizacao_graficos.py` testado com sucesso
+
+#### 3. **Sistema RAG Completo** ✅
 - **Chunking Inteligente**: 5 estratégias (sentence, paragraph, fixed_size, semantic, csv_row)
 - **Embeddings**: Sentence Transformers (384D) + OpenAI API (1536D) 
 - **Vector Database**: Supabase pgvector com busca por similaridade
@@ -105,7 +128,7 @@
 - **Generation**: Respostas contextualizadas via LLM
 - **Ingestão Mock Validada**: 17.801 embeddings (384D) armazenados com sucesso em 29/09/2025
 
-#### 3. **Sistema de Logging Estruturado** ✅
+#### 4. **Sistema de Logging Estruturado** ✅
 - **Configuração Centralizada**: Níveis, formatação padronizada
 - **Contexto Estruturado**: Timestamps, módulos, mensagens formatadas
 - **Segurança**: Não exposição de credenciais em logs

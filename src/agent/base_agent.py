@@ -275,6 +275,52 @@ class BaseAgent(ABC):
             return {'memory_available': False, 'error': str(e)}
     
     # ========================================================================
+    # MÉTODOS DE VISUALIZAÇÃO
+    # ========================================================================
+    
+    def generate_visualization(self, data: Any, viz_type: str, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Gera visualização gráfica usando GraphGenerator.
+        
+        Args:
+            data: Dados para visualizar (DataFrame, Series, etc.)
+            viz_type: Tipo de visualização ('histogram', 'scatter', 'boxplot', 'bar', 'heatmap')
+            **kwargs: Parâmetros específicos para o tipo de gráfico
+            
+        Returns:
+            Dict com imagem (base64 ou caminho) e estatísticas, ou None se erro
+        """
+        try:
+            from src.tools.graph_generator import GraphGenerator
+            
+            generator = GraphGenerator()
+            
+            if viz_type == 'histogram':
+                img, stats = generator.histogram(data, **kwargs)
+            elif viz_type == 'scatter':
+                img, stats = generator.scatter_plot(data, **kwargs)
+            elif viz_type == 'boxplot':
+                img, stats = generator.boxplot(data, **kwargs)
+            elif viz_type == 'bar':
+                img, stats = generator.bar_chart(data, **kwargs)
+            elif viz_type == 'heatmap':
+                img, stats = generator.correlation_heatmap(data, **kwargs)
+            else:
+                self.logger.warning(f"Tipo de visualização não suportado: {viz_type}")
+                return None
+            
+            self.logger.info(f"Visualização '{viz_type}' gerada com sucesso")
+            return {
+                'image': img,
+                'statistics': stats,
+                'type': viz_type
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao gerar visualização: {e}")
+            return None
+    
+    # ========================================================================
     # MÉTODOS ABSTRATOS
     # ========================================================================
     

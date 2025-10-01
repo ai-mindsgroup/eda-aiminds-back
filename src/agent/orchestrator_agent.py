@@ -383,6 +383,26 @@ class OrchestratorAgent(BaseAgent):
             self.logger.debug("⚠️ Cliente Supabase não disponível")
             return False
     
+    def _detect_visualization_need(self, query: str) -> Optional[str]:
+        """
+        Detecta se a query do usuário requer visualização gráfica.
+        
+        Args:
+            query: Pergunta do usuário
+            
+        Returns:
+            Tipo de gráfico necessário ou None
+        """
+        try:
+            from src.tools.graph_generator import detect_visualization_need
+            viz_type = detect_visualization_need(query)
+            if viz_type:
+                self.logger.info(f"🎨 Visualização detectada: {viz_type}")
+            return viz_type
+        except Exception as e:
+            self.logger.warning(f"⚠️ Erro ao detectar visualização: {e}")
+            return None
+    
     def _retrieve_data_context_from_supabase(self) -> Optional[Dict[str, Any]]:
         """Recupera contexto de dados armazenados no Supabase.
         
@@ -532,6 +552,15 @@ class OrchestratorAgent(BaseAgent):
             Tipo da consulta identificado
         """
         query_lower = query.lower()
+        
+        # Verificar se é solicitação de visualização
+        viz_type = self._detect_visualization_need(query)
+        if viz_type:
+            self.logger.info(f"📊 Visualização detectada: {viz_type}")
+            # Adicionar flag ao contexto para processamento posterior
+            if context is None:
+                context = {}
+            context['visualization_requested'] = viz_type
         
         # Palavras-chave para cada tipo de consulta
         csv_keywords = [
