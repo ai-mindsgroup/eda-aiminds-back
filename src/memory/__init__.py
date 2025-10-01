@@ -6,6 +6,8 @@ incluindo armazenamento de conversações, contexto, preferências e busca semâ
 usando Supabase como backend.
 """
 
+from typing import Dict
+
 from .base_memory import BaseMemoryManager, MemoryMixin
 from .memory_types import (
     # Enums

@@ -174,6 +174,12 @@ class PythonDataAnalyzer:
             df = pd.DataFrame(result.data)
             self.logger.info(f"✅ Dados recuperados: {len(df)} registros da tabela embeddings")
             
+            # Remover colunas com tipos não-hashable (metadata, embedding) para evitar erros
+            if 'metadata' in df.columns:
+                df = df.drop(columns=['metadata'])
+            if 'embedding' in df.columns:
+                df = df.drop(columns=['embedding'])
+            
             return df
             
         except Exception as e:
