@@ -91,11 +91,21 @@ Colunas: {columns_summary}
 📈 **ANÁLISE DISPONÍVEL**:
 {csv_analysis}
 
-🎯 **INSTRUÇÕES ESPECÍFICAS**:
+🎯 **INSTRUÇÕES CRÍTICAS PARA TIPOS DE DADOS**:
+- Use EXCLUSIVAMENTE os dtypes reais do DataFrame para classificar tipos
+- int64, float64, int32, float32 = NUMÉRICOS
+- object = CATEGÓRICO (mas verifique se não são números como strings)
+- bool = BOOLEANO
+- datetime64 = TEMPORAL
+- NÃO interprete semanticamente - use apenas os tipos técnicos
+- NÃO assuma que colunas como "Class" são categóricas se forem int64
+
+🔍 **INSTRUÇÕES DE RESPOSTA**:
 - Base sua resposta EXCLUSIVAMENTE nos dados carregados
 - Seja preciso sobre estatísticas e tipos REAIS
 - NÃO forneça respostas genéricas sobre conceitos
-- Inclua números específicos quando relevante""",
+- Inclua números específicos quando relevante
+- Para tipos de dados, liste apenas o que os dtypes indicam""",
                 variables=["has_data", "file_path", "shape", "columns_summary", "csv_analysis"]
             )
         }
@@ -157,6 +167,35 @@ Este dataset contém transações financeiras para análise de fraude.
 - Dados podem estar normalizados (PCA)
 - Classes tipicamente desbalanceadas
 - Features V1-V28 são anônimas por segurança""",
+                variables=[]
+            ),
+            
+            "data_types_analysis": PromptTemplate(
+                role=AgentRole.CSV_ANALYST,
+                type=PromptType.INSTRUCTION,
+                content="""🔍 **ANÁLISE PRECISA DE TIPOS DE DADOS**
+
+Para responder sobre tipos de dados, siga RIGOROSAMENTE:
+
+📊 **CLASSIFICAÇÃO BASEADA EM DTYPES**:
+- **NUMÉRICOS**: int64, float64, int32, float32, int8, int16, float16
+- **CATEGÓRICOS**: object (strings/texto)
+- **BOOLEANOS**: bool
+- **TEMPORAIS**: datetime64, timedelta64
+
+⚠️ **REGRAS CRÍTICAS**:
+1. NÃO interprete semanticamente o nome da coluna
+2. Uma coluna "Class" com dtype int64 é NUMÉRICA, não categórica
+3. Use apenas a informação técnica dos dtypes
+4. Se todos os dtypes são numéricos, diga que NÃO há colunas categóricas
+5. Liste as colunas exatas por tipo, não faça generalizações
+
+📋 **FORMATO DE RESPOSTA**:
+- **Numéricas (X)**: [lista exata das colunas]
+- **Categóricas (Y)**: [lista exata das colunas ou "Nenhuma"]
+- **Total**: X numéricas, Y categóricas
+
+Baseie-se EXCLUSIVAMENTE nos dados reais fornecidos.""",
                 variables=[]
             )
         }

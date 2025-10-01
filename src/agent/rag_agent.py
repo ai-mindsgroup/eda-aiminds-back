@@ -1,5 +1,8 @@
 """Agente RAG (Retrieval Augmented Generation) para consultas inteligentes.
 
+⚠️ CONFORMIDADE: Este agente funciona como AGENTE DE INGESTÃO autorizado.
+Pode ler CSV diretamente para indexação na tabela embeddings.
+
 Este agente combina:
 - Chunking de texto/dados
 - Geração de embeddings  
@@ -22,7 +25,11 @@ from src.api.sonar_client import send_sonar_query
 
 
 class RAGAgent(BaseAgent):
-    """Agente RAG para consultas inteligentes com contexto vetorial."""
+    """Agente RAG para consultas inteligentes com contexto vetorial.
+    
+    ⚠️ CONFORMIDADE: Este agente é o AGENTE DE INGESTÃO AUTORIZADO do sistema.
+    Tem permissão para ler CSV diretamente e indexar na tabela embeddings.
+    """
     
     def __init__(self, 
                  embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMER,
@@ -39,8 +46,12 @@ class RAGAgent(BaseAgent):
         """
         super().__init__(
             name="rag_agent",
-            description="Agente RAG para consultas contextualizadas com busca vetorial"
+            description="Agente RAG para consultas contextualizadas com busca vetorial",
+            enable_memory=True  # Habilita sistema de memória
         )
+        # Cache de buscas em memória local (otimização)
+        self._search_cache: Dict[str, Any] = {}
+        self._relevance_scores: Dict[str, float] = {}
         
         # Inicializar componentes
         try:
@@ -58,7 +69,7 @@ class RAGAgent(BaseAgent):
             
             self.vector_store = VectorStore()
             
-            self.logger.info("Agente RAG inicializado com sucesso")
+            self.logger.info("Agente RAG inicializado com sucesso e sistema de memória")
             
         except Exception as e:
             self.logger.error(f"Erro na inicialização do RAG: {str(e)}")
@@ -169,7 +180,14 @@ class RAGAgent(BaseAgent):
                        csv_text: str, 
                        source_id: str,
                        include_headers: bool = True) -> Dict[str, Any]:
-        """Ingesta dados CSV (conteúdo bruto) usando estratégia especializada."""
+        """Ingesta dados CSV (conteúdo bruto) usando estratégia especializada.
+        
+        ⚠️ CONFORMIDADE: RAGAgent é o AGENTE DE INGESTÃO AUTORIZADO.
+        Este método tem permissão para processar CSV diretamente.
+        """
+        self.logger.info(f"✅ INGESTÃO AUTORIZADA: RAGAgent processando CSV: {source_id}")
+        self.logger.info("✅ CONFORMIDADE: Agente de ingestão tem permissão para ler CSV")
+        
         return self.ingest_text(
             text=csv_text,
             source_id=source_id,
@@ -250,6 +268,9 @@ class RAGAgent(BaseAgent):
                         errors: str = "ignore") -> Dict[str, Any]:
         """Lê um arquivo CSV do disco e ingesta utilizando a estratégia CSV_ROW.
 
+        ⚠️ CONFORMIDADE: RAGAgent é o AGENTE DE INGESTÃO AUTORIZADO.
+        Este método tem permissão para ler arquivos CSV diretamente.
+
         Args:
             file_path: Caminho absoluto ou relativo para o arquivo CSV.
             source_id: Identificador opcional para a fonte; usa o nome do arquivo se não fornecido.
@@ -276,6 +297,11 @@ class RAGAgent(BaseAgent):
             )
 
         resolved_source_id = source_id or path.stem
+        
+        # ⚠️ CONFORMIDADE: Logging de acesso autorizado
+        self.logger.info(f"✅ INGESTÃO AUTORIZADA: RAGAgent lendo arquivo CSV: {file_path}")
+        self.logger.info("✅ CONFORMIDADE: Agente de ingestão tem permissão para ler CSV")
+        
         self.logger.info(
             "Iniciando ingestão do arquivo CSV",
             extra={"file_path": str(path.resolve()), "source_id": resolved_source_id}
@@ -283,6 +309,84 @@ class RAGAgent(BaseAgent):
 
         return self.ingest_csv_data(csv_text=csv_text, source_id=resolved_source_id)
     
+    async def process_with_search_memory(self, query: str, context: Optional[Dict[str, Any]] = None,
+                                       session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Processa consulta RAG com memória de buscas e aprendizado de relevância.
+        
+        Args:
+            query: Consulta do usuário
+            context: Contexto adicional
+            session_id: ID da sessão
+            
+        Returns:
+            Resposta contextualizada com otimização baseada em histórico
+        """
+        import time
+        start_time = time.time()
+        
+        try:
+            # 1. Inicializar sessão de memória se necessário
+            if session_id and self.has_memory:
+                if not self._current_session_id or self._current_session_id != session_id:
+                    await self.init_memory_session(session_id)
+            elif not self._current_session_id and self.has_memory:
+                await self.init_memory_session()
+            
+            # 2. Verificar cache de buscas similares
+            search_key = self._generate_search_cache_key(query, context)
+            cached_search = await self.recall_cached_search(search_key)
+            
+            if cached_search:
+                self.logger.info(f"🔍 Busca recuperada do cache: {search_key}")
+                cached_search['metadata']['from_search_cache'] = True
+                return cached_search
+            
+            # 3. Recuperar histórico de relevância
+            relevance_history = await self.recall_relevance_history()
+            if relevance_history:
+                self.logger.debug(f"📊 Aplicando histórico de relevância: {len(relevance_history)} registros")
+                context = context or {}
+                context['relevance_history'] = relevance_history
+            
+            # 4. Ajustar threshold baseado em aprendizado
+            similarity_threshold = self._adaptive_similarity_threshold(query, context)
+            if context:
+                context['similarity_threshold'] = similarity_threshold
+            else:
+                context = {'similarity_threshold': similarity_threshold}
+            
+            # 5. Processar consulta com otimizações
+            result = self.process(query, context)
+            
+            # 6. Calcular tempo de processamento
+            processing_time_ms = int((time.time() - start_time) * 1000)
+            result.setdefault('metadata', {})['processing_time_ms'] = processing_time_ms
+            
+            # 7. Aprender relevância dos resultados
+            await self.learn_search_relevance(query, result)
+            
+            # 8. Cachear busca se significativa
+            if self._should_cache_search(result, processing_time_ms):
+                await self.cache_search_result(search_key, result, expiry_hours=6)
+                self.logger.debug(f"💾 Busca salva no cache: {search_key}")
+            
+            # 9. Salvar interação na memória
+            if self.has_memory and self._current_session_id:
+                await self.remember_interaction(
+                    query=query,
+                    response=result.get('content', str(result)),
+                    processing_time_ms=processing_time_ms,
+                    metadata=result.get('metadata', {})
+                )
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Erro no processamento RAG com memória: {e}")
+            # Fallback para processamento sem memória
+            return self.process(query, context)
+
     def process(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Processa consulta RAG com busca vetorial e geração contextualizada.
         
@@ -440,6 +544,174 @@ RESPOSTA:"""
                 f"Erro ao obter estatísticas: {str(e)}",
                 metadata={"error": True}
             )
+    
+    # ========================================================================
+    # MÉTODOS DE MEMÓRIA ESPECÍFICOS PARA RAG
+    # ========================================================================
+    
+    def _generate_search_cache_key(self, query: str, context: Optional[Dict[str, Any]]) -> str:
+        """Gera chave única para cache de busca."""
+        import hashlib
+        
+        # Normaliza query para cache
+        normalized_query = query.lower().strip()
+        
+        # Adiciona parâmetros relevantes de busca
+        search_params = ""
+        if context:
+            relevant_params = {
+                'similarity_threshold': context.get('similarity_threshold', 0.7),
+                'max_results': context.get('max_results', 5)
+            }
+            search_params = str(sorted(relevant_params.items()))
+        
+        # Gera hash
+        cache_input = f"{normalized_query}_{search_params}"
+        return f"search_{hashlib.md5(cache_input.encode()).hexdigest()[:12]}"
+    
+    def _should_cache_search(self, result: Dict[str, Any], processing_time_ms: int) -> bool:
+        """Determina se uma busca deve ser cacheada."""
+        # Cachear se:
+        # 1. Busca demorada (> 1000ms)
+        # 2. Encontrou resultados relevantes
+        # 3. Não é erro
+        
+        if result.get('metadata', {}).get('error', False):
+            return False
+        
+        if processing_time_ms > 1000:
+            return True
+        
+        metadata = result.get('metadata', {})
+        search_results_count = metadata.get('search_results_count', 0)
+        
+        return search_results_count > 0
+    
+    async def cache_search_result(self, search_key: str, result: Dict[str, Any], 
+                                expiry_hours: int = 6) -> None:
+        """Salva resultado de busca no cache."""
+        if not self.has_memory or not self._current_session_id:
+            return
+        
+        try:
+            await self.remember_analysis_result(search_key, result, expiry_hours)
+            self.logger.debug(f"Resultado de busca cacheado: {search_key}")
+        except Exception as e:
+            self.logger.debug(f"Erro ao cachear busca: {e}")
+    
+    async def recall_cached_search(self, search_key: str) -> Optional[Dict[str, Any]]:
+        """Recupera resultado de busca do cache."""
+        if not self.has_memory or not self._current_session_id:
+            return None
+        
+        try:
+            cached_result = await self.recall_cached_analysis(search_key)
+            if cached_result:
+                self.logger.debug(f"Busca recuperada do cache: {search_key}")
+            return cached_result
+        except Exception as e:
+            self.logger.debug(f"Erro ao recuperar busca cacheada: {e}")
+            return None
+    
+    async def learn_search_relevance(self, query: str, result: Dict[str, Any]) -> None:
+        """Aprende relevância de buscas para otimização futura."""
+        if not self.has_memory or not self._current_session_id:
+            return
+        
+        try:
+            metadata = result.get('metadata', {})
+            search_results_count = metadata.get('search_results_count', 0)
+            avg_similarity = metadata.get('avg_similarity', 0.0)
+            
+            # Extrai características da busca
+            relevance_data = {
+                'query_length': len(query),
+                'query_words': len(query.split()),
+                'search_results_count': search_results_count,
+                'avg_similarity': avg_similarity,
+                'processing_time_ms': metadata.get('processing_time_ms', 0),
+                'success': search_results_count > 0,
+                'timestamp': time.time()
+            }
+            
+            # Salva dados de relevância
+            relevance_key = f"relevance_{int(time.time())}"
+            context_key = f"search_relevance_{relevance_key}"
+            
+            await self.remember_data_context(relevance_data, context_key)
+            
+            self.logger.debug(f"Relevância de busca aprendida: {relevance_key}")
+            
+        except Exception as e:
+            self.logger.debug(f"Erro ao aprender relevância: {e}")
+    
+    async def recall_relevance_history(self) -> List[Dict[str, Any]]:
+        """Recupera histórico de relevância de buscas."""
+        if not self.has_memory or not self._current_session_id:
+            return []
+        
+        try:
+            # Recupera contexto de relevância
+            context = await self.recall_conversation_context(hours=72)  # 3 dias
+            
+            relevance_history = []
+            for key, data in context.get('data_context', {}).items():
+                if key.startswith('search_relevance_'):
+                    relevance_history.append(data)
+            
+            # Ordena por timestamp (mais recente primeiro)
+            relevance_history.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+            
+            return relevance_history[:50]  # Últimos 50 registros
+            
+        except Exception as e:
+            self.logger.debug(f"Erro ao recuperar histórico de relevância: {e}")
+            return []
+    
+    def _adaptive_similarity_threshold(self, query: str, context: Optional[Dict[str, Any]]) -> float:
+        """Calcula threshold de similaridade adaptativo baseado no histórico."""
+        base_threshold = context.get('similarity_threshold', 0.7) if context else 0.7
+        
+        # Se não há memória, usa base
+        if not self.has_memory or not self._current_session_id:
+            return base_threshold
+        
+        try:
+            # Recupera histórico de relevância do cache local se disponível
+            relevance_history = self._relevance_scores.get('recent_searches', [])
+            
+            if not relevance_history:
+                return base_threshold
+            
+            # Calcula estatísticas de sucesso por threshold
+            successful_searches = [r for r in relevance_history if r.get('success', False)]
+            
+            if not successful_searches:
+                return base_threshold
+            
+            # Calcula threshold médio de buscas bem-sucedidas
+            avg_successful_similarity = sum(r.get('avg_similarity', 0.7) for r in successful_searches) / len(successful_searches)
+            
+            # Ajusta threshold baseado na taxa de sucesso
+            success_rate = len(successful_searches) / len(relevance_history)
+            
+            if success_rate > 0.8:
+                # Alta taxa de sucesso - pode ser mais restritivo
+                adjusted_threshold = min(base_threshold + 0.1, avg_successful_similarity + 0.05)
+            elif success_rate < 0.5:
+                # Baixa taxa de sucesso - ser mais permissivo
+                adjusted_threshold = max(base_threshold - 0.1, 0.5)
+            else:
+                # Taxa média - usar média das buscas bem-sucedidas
+                adjusted_threshold = (base_threshold + avg_successful_similarity) / 2
+            
+            self.logger.debug(f"Threshold adaptativo: {base_threshold:.3f} → {adjusted_threshold:.3f} (taxa sucesso: {success_rate:.1%})")
+            
+            return round(adjusted_threshold, 3)
+            
+        except Exception as e:
+            self.logger.debug(f"Erro no threshold adaptativo: {e}")
+            return base_threshold
     
     def _format_stats_dict(self, stats_dict: Dict[str, int]) -> str:
         """Formata dicionário de estatísticas."""

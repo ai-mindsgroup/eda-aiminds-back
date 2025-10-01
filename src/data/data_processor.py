@@ -1,40 +1,58 @@
 """Interface unificada para carregamento e processamento de dados CSV.
 
+⚠️ CONFORMIDADE CRÍTICA: Este módulo deve ser usado APENAS pelo agente de ingestão.
+Agentes de resposta devem consultar exclusivamente a tabela embeddings do Supabase.
+
 Este módulo fornece uma interface simples e poderosa que integra:
-- DataLoader: carregamento de múltiplas fontes
-- DataValidator: validação e limpeza
-- CSVAnalysisAgent: análise inteligente
-- Suporte a diferentes formatos e fontes de dados
+- DataLoader: carregamento de múltiplas fontes (RESTRITO)
+- DataValidator: validação e limpeza (RESTRITO)
+- EmbeddingsAnalysisAgent: análise via embeddings (PERMITIDO)
+- Suporte a diferentes formatos e fontes de dados (RESTRITO)
 """
 from __future__ import annotations
 import os
 import tempfile
+import inspect
 from typing import Any, Dict, List, Optional, Tuple, Union
 from pathlib import Path
 import pandas as pd
 
 from src.data.data_loader import DataLoader, DataLoaderError  
 from src.data.data_validator import DataValidator, DataValidationError
-from src.agent.csv_analysis_agent import CSVAnalysisAgent
+from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
 from src.utils.logging_config import get_logger
 
 
+class UnauthorizedCSVAccessError(Exception):
+    """Exceção lançada quando acesso não autorizado a CSV é detectado."""
+    pass
+
+
 class DataProcessor:
-    """Interface unificada para carregamento, validação e análise de dados CSV."""
+    """Interface unificada para carregamento, validação e análise de dados CSV.
     
-    def __init__(self, auto_validate: bool = True, auto_clean: bool = True):
+    ⚠️ CONFORMIDADE: Restrito ao agente de ingestão apenas.
+    """
+    
+    def __init__(self, auto_validate: bool = True, auto_clean: bool = True, 
+                 caller_agent: Optional[str] = None):
         """Inicializa o processador de dados.
         
         Args:
             auto_validate: Se True, valida automaticamente dados carregados
             auto_clean: Se True, limpa automaticamente problemas detectados
+            caller_agent: Nome do agente que está chamando (para validação)
         """
         self.logger = get_logger(__name__)
         
-        # Componentes principais
-        self.loader = DataLoader()
+        # Validar conformidade crítica
+        self.caller_agent = caller_agent or self._detect_caller_agent()
+        self._validate_csv_access_authorization()
+        
+        # Componentes principais (com caller_agent)
+        self.loader = DataLoader(caller_agent=self.caller_agent)
         self.validator = DataValidator()
-        self.analyzer = CSVAnalysisAgent()
+        self.analyzer = EmbeddingsAnalysisAgent()
         
         # Configurações
         self.auto_validate = auto_validate
@@ -46,10 +64,59 @@ class DataProcessor:
         self.validation_results: Optional[Dict[str, Any]] = None
         self.cleaning_results: Optional[Dict[str, Any]] = None
         
-        self.logger.info("DataProcessor inicializado")
+        self.logger.info(f"DataProcessor inicializado por: {self.caller_agent}")
+    
+    def _detect_caller_agent(self) -> str:
+        """Detecta qual agente está chamando este processador."""
+        frame = inspect.currentframe()
+        try:
+            # Subir na stack para encontrar o caller
+            for i in range(10):  # Limite de segurança
+                frame = frame.f_back
+                if frame is None:
+                    break
+                    
+                filename = frame.f_code.co_filename
+                
+                # Verificar se é um agente conhecido
+                if 'ingestion_agent' in filename:
+                    return 'ingestion_agent'
+                elif 'orchestrator_agent' in filename:
+                    return 'orchestrator_agent'
+                elif 'csv_analysis_agent' in filename or 'embeddings_analysis_agent' in filename:
+                    return 'analysis_agent'
+                elif 'rag_agent' in filename:
+                    return 'rag_agent'
+                    
+            return 'unknown_caller'
+            
+        finally:
+            del frame
+    
+    def _validate_csv_access_authorization(self) -> None:
+        """Valida se o caller tem autorização para acessar CSV diretamente."""
+        authorized_agents = [
+            'ingestion_agent',
+            'data_loading_system',  # Para casos de carregamento inicial
+            'test_system'           # Para testes
+        ]
+        
+        if self.caller_agent not in authorized_agents:
+            error_msg = (
+                f"⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!\n"
+                f"Agente '{self.caller_agent}' tentou acessar CSV diretamente.\n"
+                f"Apenas agentes autorizados podem ler CSV: {authorized_agents}\n"
+                f"Agentes de resposta devem usar APENAS a tabela embeddings."
+            )
+            self.logger.error(error_msg)
+            raise UnauthorizedCSVAccessError(error_msg)
+        
+        self.logger.info(f"✅ Acesso autorizado para agente: {self.caller_agent}")
     
     def load_from_file(self, file_path: str, **kwargs) -> Dict[str, Any]:
         """Carrega dados de arquivo local.
+        
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
         
         Args:
             file_path: Caminho para o arquivo CSV
@@ -58,13 +125,19 @@ class DataProcessor:
         Returns:
             Resultado do processamento completo
         """
+        self._validate_csv_access_authorization()
+        
         try:
+            self.logger.warning(f"🚨 ACESSO CSV DETECTADO por {self.caller_agent}: {file_path}")
+            
             # Carregar dados
             df, load_info = self.loader.load_from_file(file_path, **kwargs)
             
             # Processar dados carregados
             return self._process_loaded_data(df, load_info)
             
+        except UnauthorizedCSVAccessError:
+            raise  # Re-lançar erro de autorização
         except Exception as e:
             error_msg = f"Erro ao carregar arquivo {file_path}: {str(e)}"
             self.logger.error(error_msg)
@@ -73,6 +146,8 @@ class DataProcessor:
     def load_from_url(self, url: str, **kwargs) -> Dict[str, Any]:
         """Carrega dados de URL remota.
         
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
+        
         Args:
             url: URL do arquivo CSV
             **kwargs: Argumentos para pd.read_csv()
@@ -80,13 +155,19 @@ class DataProcessor:
         Returns:
             Resultado do processamento completo
         """
+        self._validate_csv_access_authorization()
+        
         try:
+            self.logger.warning(f"🚨 ACESSO CSV VIA URL DETECTADO por {self.caller_agent}: {url}")
+            
             # Carregar dados
             df, load_info = self.loader.load_from_url(url, **kwargs)
             
             # Processar dados carregados
             return self._process_loaded_data(df, load_info)
             
+        except UnauthorizedCSVAccessError:
+            raise  # Re-lançar erro de autorização
         except Exception as e:
             error_msg = f"Erro ao carregar URL {url}: {str(e)}"
             self.logger.error(error_msg)
@@ -94,6 +175,8 @@ class DataProcessor:
     
     def load_from_upload(self, base64_content: str, filename: str = "upload.csv", **kwargs) -> Dict[str, Any]:
         """Carrega dados de upload base64.
+        
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
         
         Args:
             base64_content: Conteúdo CSV em base64
@@ -103,13 +186,19 @@ class DataProcessor:
         Returns:
             Resultado do processamento completo
         """
+        self._validate_csv_access_authorization()
+        
         try:
+            self.logger.warning(f"🚨 ACESSO CSV VIA UPLOAD DETECTADO por {self.caller_agent}: {filename}")
+            
             # Carregar dados
             df, load_info = self.loader.load_from_base64(base64_content, filename, **kwargs)
             
             # Processar dados carregados
             return self._process_loaded_data(df, load_info)
             
+        except UnauthorizedCSVAccessError:
+            raise  # Re-lançar erro de autorização
         except Exception as e:
             error_msg = f"Erro ao processar upload {filename}: {str(e)}"
             self.logger.error(error_msg)
@@ -161,23 +250,23 @@ class DataProcessor:
             return self._build_error_response(error_msg)
     
     def analyze(self, query: str) -> Dict[str, Any]:
-        """Executa análise no dataset atual.
+        """Executa análise usando dados da tabela embeddings.
+        
+        ⚠️ CONFORMIDADE: Sempre usa embeddings, nunca CSV diretamente.
         
         Args:
             query: Consulta ou comando de análise
             
         Returns:
-            Resultado da análise
+            Resultado da análise baseada em embeddings
         """
-        if self.current_df is None:
-            return self._build_error_response("Nenhum dataset carregado. Use load_* methods primeiro.")
-        
         try:
-            result = self.analyzer.process(query)
+            # Usar análise baseada em embeddings
+            result = self.analyzer.load_from_embeddings(query)
             return result
             
         except Exception as e:
-            error_msg = f"Erro na análise: {str(e)}"
+            error_msg = f"Erro na análise via embeddings: {str(e)}"
             self.logger.error(error_msg)
             return self._build_error_response(error_msg)
     
@@ -259,33 +348,34 @@ class DataProcessor:
             return False
     
     def quick_analysis(self) -> Dict[str, Any]:
-        """Executa análise rápida automática do dataset."""
-        if self.current_df is None:
-            return {"error": "Nenhum dataset carregado"}
+        """Executa análise rápida usando dados da tabela embeddings.
         
+        ⚠️ CONFORMIDADE: Sempre usa embeddings, nunca CSV diretamente.
+        """
         results = {}
         
-        # Análises básicas
+        # Análises básicas via embeddings
         try:
             results['basic_stats'] = self.analyze("Faça um resumo básico dos dados")
         except:
-            results['basic_stats'] = {"error": "Falha na análise básica"}
+            results['basic_stats'] = {"error": "Falha na análise básica via embeddings"}
         
         try:
             results['correlations'] = self.analyze("Analise as correlações entre variáveis")
         except:
-            results['correlations'] = {"error": "Falha na análise de correlação"}
+            results['correlations'] = {"error": "Falha na análise de correlação via embeddings"}
         
-        # Detecção de fraude se houver colunas apropriadas
-        fraud_cols = ['is_fraud', 'eh_fraude', 'fraud', 'fraude']
-        if any(col in self.current_df.columns for col in fraud_cols):
-            try:
-                results['fraud_analysis'] = self.analyze("Analise os padrões de fraude")
-            except:
-                results['fraud_analysis'] = {"error": "Falha na análise de fraude"}
+        # Detecção de fraude via embeddings
+        try:
+            results['fraud_analysis'] = self.analyze("Analise os padrões de fraude nos dados")
+        except:
+            results['fraud_analysis'] = {"error": "Falha na análise de fraude via embeddings"}
         
-        # Qualidade dos dados
-        results['data_quality'] = self.get_data_quality_report()
+        # Qualidade dos dados (apenas se dados locais disponíveis para ingestão)
+        if self.current_df is not None and self.caller_agent == 'ingestion_agent':
+            results['data_quality'] = self.get_data_quality_report()
+        else:
+            results['data_quality'] = {"note": "Análise de qualidade disponível apenas durante ingestão"}
         
         return results
     
@@ -336,25 +426,23 @@ class DataProcessor:
                 self.logger.warning(f"Falha na limpeza automática: {str(e)}")
                 result['cleaning'] = {"error": str(e)}
         
-        # Conectar com CSVAnalysisAgent
+        # Conectar com EmbeddingsAnalysisAgent
         try:
-            # Salvar temporariamente para o agente
-            temp_file = None
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as f:
-                temp_file = f.name
-                self.current_df.to_csv(f, index=False)
-            
-            # Carregar no agente
-            agent_result = self.analyzer.load_csv(temp_file)
-            
-            # Limpar arquivo temporário
-            os.unlink(temp_file)
-            
-            result['agent_ready'] = agent_result.get('success', True)
+            # ⚠️ CONFORMIDADE: Este processador é restrito ao agente de ingestão
+            # O agente de embeddings será usado apenas se autorizado
+            if self.caller_agent == 'ingestion_agent':
+                # Dados devem ser enviados para indexação na tabela embeddings
+                # Aqui seria o local para iniciar processo de vetorização
+                self.logger.info("Dados prontos para indexação em embeddings")
+                result['embeddings_ready'] = True
+            else:
+                # Outros agentes devem usar apenas embeddings
+                result['embeddings_ready'] = False
+                result['note'] = "Use EmbeddingsAnalysisAgent.load_from_embeddings() para consultas"
             
         except Exception as e:
-            self.logger.warning(f"Falha ao conectar com CSVAnalysisAgent: {str(e)}")
-            result['agent_ready'] = False
+            self.logger.warning(f"Falha ao preparar dados para embeddings: {str(e)}")
+            result['embeddings_ready'] = False
         
         return result
     
@@ -367,18 +455,21 @@ class DataProcessor:
         }
 
 
-# Funções de conveniência para uso direto
-def load_csv_file(file_path: str, **kwargs) -> DataProcessor:
+# Funções de conveniência para uso direto (⚠️ CONFORMIDADE: Apenas agente de ingestão)
+def load_csv_file(file_path: str, caller_agent: str = "unknown_caller", **kwargs) -> DataProcessor:
     """Função de conveniência para carregar arquivo CSV rapidamente.
+    
+    ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
     
     Args:
         file_path: Caminho para o arquivo CSV
+        caller_agent: Nome do agente que está chamando
         **kwargs: Argumentos para pd.read_csv()
         
     Returns:
         DataProcessor com dados carregados
     """
-    processor = DataProcessor()
+    processor = DataProcessor(caller_agent=caller_agent)
     result = processor.load_from_file(file_path, **kwargs)
     
     if not result['success']:
@@ -387,17 +478,20 @@ def load_csv_file(file_path: str, **kwargs) -> DataProcessor:
     return processor
 
 
-def load_csv_url(url: str, **kwargs) -> DataProcessor:
+def load_csv_url(url: str, caller_agent: str = "unknown_caller", **kwargs) -> DataProcessor:
     """Função de conveniência para carregar CSV de URL.
+    
+    ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
     
     Args:
         url: URL do arquivo CSV
+        caller_agent: Nome do agente que está chamando
         **kwargs: Argumentos para pd.read_csv()
         
     Returns:
         DataProcessor com dados carregados
     """
-    processor = DataProcessor()
+    processor = DataProcessor(caller_agent=caller_agent)
     result = processor.load_from_url(url, **kwargs)
     
     if not result['success']:
@@ -406,18 +500,21 @@ def load_csv_url(url: str, **kwargs) -> DataProcessor:
     return processor
 
 
-def create_demo_data(data_type: str = "fraud_detection", num_rows: int = 1000, **kwargs) -> DataProcessor:
+def create_demo_data(data_type: str = "fraud_detection", num_rows: int = 1000, caller_agent: str = "unknown_caller", **kwargs) -> DataProcessor:
     """Função de conveniência para criar dados de demonstração.
+    
+    ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
     
     Args:
         data_type: Tipo de dados sintéticos
         num_rows: Número de linhas
+        caller_agent: Nome do agente que está chamando
         **kwargs: Parâmetros específicos
         
     Returns:
         DataProcessor com dados sintéticos carregados
     """
-    processor = DataProcessor()
+    processor = DataProcessor(caller_agent=caller_agent)
     result = processor.load_synthetic_data(data_type, num_rows, **kwargs)
     
     if not result['success']:
