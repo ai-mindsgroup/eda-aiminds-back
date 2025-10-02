@@ -77,6 +77,23 @@
 - ✅ **Pandas**: Manipulação eficiente de dados tabulares
 - ✅ **Matplotlib/Seaborn**: Geração de visualizações
 
+
+## Contexto Auditoria e Diagnóstico do Sistema Multiagente EDA AI Minds:
+
+O sistema deve garantir uma camada de abstração robusta para integração e troca entre fornecedores diferentes de LLMs (exemplo: OpenAI, Gemini, Groq), adotando os módulos de abstração do LangChain como recomendação central.
+
+Todo fluxo de chunking, embeddings, armazenamento vetorial e mecanismos de memória devem priorizar o uso de componentes oficiais do LangChain, exceto onde houver justificativa técnica robusta para customização.
+
+O agente responsável por leitura, chunking e ingestão de arquivos CSV deve obrigatoriamente realizar a carga de embeddings no Supabase, habilitando outros agentes a trabalhar exclusivamente sobre a tabela de embeddings para RAG.
+
+Qualquer implementação ou refatoração deve garantir: logging estruturado, fallback entre LLMs, validação de parâmetros críticos (temperatura, top_k, chunk_overlap) e testes automatizados.
+
+Workflows devem ser modularizados via chains, facilitando validação, mantenabilidade, auditoria e integração futura.
+
+O histórico dos agentes, decisões técnicas e arquitetura devem ser mantidos e versionados conforme modelo estabelecido em docs/, promovendo rastreabilidade e evolução controlada do sistema.
+
+Devem ser evidenciadas limitações, pontos fortes e recomendações presentes nos relatórios técnicos — conferindo prioridade para padronização, extensibilidade, segurança e facilidade de onboarding de novos desenvolvedores.
+
 ## 🚀 Início Rápido
 
 ### 1. Instalação
