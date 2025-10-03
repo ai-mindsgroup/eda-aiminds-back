@@ -1,51 +1,175 @@
-# EDA AI Minds Backend - Requirements
+# EDA AI Minds Backend - Production Requirements
+# ==============================================
 # Sistema multiagente para análise inteligente de dados CSV
-# Versão Python: 3.10+
+# Python 3.10+ requerido
 
 # ============================================================================
-# CORE DEPENDENCIES - Essenciais para funcionamento básico
+# CORE FRAMEWORK - FastAPI e servidor web
 # ============================================================================
 
-# Configuração e ambiente
+fastapi==0.115.6
+uvicorn[standard]==0.33.0
+python-multipart==0.0.17
+
+# ============================================================================
+# CONFIGURATION & ENVIRONMENT
+# ============================================================================
+
 python-dotenv==1.1.1
 pydantic==2.11.7
 pydantic-settings==2.10.1
 
-# Manipulação de dados
+# ============================================================================
+# DATA PROCESSING - Pandas e bibliotecas científicas
+# ============================================================================
+
 pandas==2.2.3
 numpy==2.3.2
-
-# Visualizações
 matplotlib==3.10.6
 seaborn==0.13.2
 plotly==6.0.1
-
-# HTTP requests e APIs
-requests==2.32.5
-requests-toolbelt==1.0.0
-
-# Detecção de encoding
-chardet==5.2.0
+scikit-learn==1.7.2
+scipy==1.16.2
 
 # ============================================================================
-# DATABASE & VECTOR STORE
+# DATABASE & VECTOR STORE - Supabase e PostgreSQL
 # ============================================================================
 
-# PostgreSQL
+supabase==2.20.0
 psycopg==3.2.9
 psycopg-binary==3.2.9
 psycopg2-binary==2.9.10
 psycopg-pool==3.2.6
-
-# Supabase
-supabase==2.20.0
-
-# Vector database
 pgvector==0.3.6
 
 # ============================================================================
-# AI/ML STACK - Machine Learning e Embeddings
+# AI/ML STACK - LangChain e modelos de linguagem
 # ============================================================================
+
+# LangChain Core
+langchain==0.3.27
+langchain-core==0.3.76
+langchain-community==0.3.27
+langchain-text-splitters==0.3.9
+langchain-experimental==0.3.4
+langsmith==0.4.20
+
+# LangChain Integrations
+langchain-google-genai==2.1.9
+langchain-openai==0.3.30
+
+# LLM Providers
+openai==1.102.0
+groq==0.32.0
+google-ai-generativelanguage==0.6.18
+google-api-core==2.25.1
+google-auth==2.40.3
+
+# ============================================================================
+# EMBEDDINGS & ML MODELS - Sentence Transformers e PyTorch
+# ============================================================================
+
+sentence-transformers==5.1.1
+torch==2.8.0
+transformers==4.56.2
+tokenizers==0.22.1
+safetensors==0.6.2
+
+# ============================================================================
+# HTTP & NETWORKING - Requests e clientes HTTP
+# ============================================================================
+
+requests==2.32.5
+requests-toolbelt==1.0.0
+aiohttp==3.12.15
+httpx>=0.25.0
+
+# ============================================================================
+# MIDDLEWARE & SECURITY - Rate limiting e autenticação
+# ============================================================================
+
+slowapi==0.1.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==42.0.8
+
+# ============================================================================
+# SYSTEM & MONITORING - Monitoramento e sistema
+# ============================================================================
+
+psutil==6.1.0
+watchfiles==0.24.0
+coloredlogs==15.0.1
+colorama==0.4.6
+
+# ============================================================================
+# UTILITIES - Utilitários diversos
+# ============================================================================
+
+chardet==5.2.0
+anyio==4.10.0
+tabulate==0.9.0
+tqdm==4.67.1
+orjson==3.11.3
+email-validator>=2.1.0
+jinja2>=3.1.4
+
+# ============================================================================
+# TESTING - Testes básicos (para desenvolvimento usar requirements-dev.txt)
+# ============================================================================
+
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ============================================================================
+# OPTIONAL PRODUCTION DEPENDENCIES
+# ============================================================================
+
+# Event loop otimizado (Linux/macOS apenas)
+uvloop>=0.19.0; sys_platform != "win32"
+
+# Server para produção
+gunicorn>=22.0.0
+
+# ============================================================================
+# INSTALLATION GUIDE
+# ============================================================================
+#
+# 1. INSTALAÇÃO BÁSICA:
+#    pip install -r requirements.txt
+#
+# 2. DESENVOLVIMENTO:
+#    pip install -r configs/requirements-dev.txt
+#
+# 3. API MÍNIMA:
+#    pip install -r configs/requirements-api.txt
+#
+# 4. INSTALAÇÃO MÍNIMA (sem AI):
+#    pip install -r configs/requirements-minimal.txt
+#
+# 5. VERIFICAR INSTALAÇÃO:
+#    python -c "import src.api.main; print('✅ Dependências OK')"
+#
+# 6. EXECUTAR:
+#    python api_simple.py          # API simples
+#    python -m src.api.main        # API completa
+#
+# 7. PRODUÇÃO:
+#    uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+#
+fastapi==0.115.6
+uvicorn[standard]==0.33.0
+python-multipart==0.0.17
+
+# Middleware e segurança
+slowapi==0.1.9  # Rate limiting
+python-jose[cryptography]==3.3.0  # JWT tokens
+passlib[bcrypt]==1.7.4  # Hash de senhas
+cryptography==42.0.8  # Criptografia adicional
+
+# Sistema e monitoramento
+psutil==6.1.0
+watchfiles==0.24.0  # File watching para reload automático
 
 # Sentence Transformers para embeddings
 sentence-transformers==5.1.1
@@ -110,6 +234,26 @@ tqdm==4.67.1
 orjson==3.11.3
 
 # ============================================================================
+# API REST DEPENDENCIES - Dependências específicas da API
+# ============================================================================
+
+# Server e ASGI
+uvloop>=0.19.0; sys_platform != "win32"  # Event loop otimizado (Linux/macOS)
+gunicorn>=22.0.0  # WSGI server para produção
+
+# Validação e serialização adicional
+email-validator>=2.1.0  # Validação de emails
+phonevalidators>=0.0.3  # Validação de telefones
+
+# Formatação de dados
+markdown>=3.6.0  # Para documentação
+jinja2>=3.1.4  # Templates (usado pelo FastAPI)
+
+# Compressão e otimização
+gzip-stream>=0.3.0  # Compressão de responses
+orjson>=3.11.3  # JSON parser rápido (já listado acima)
+
+# ============================================================================
 # DEVELOPMENT & TESTING - Dependências de desenvolvimento
 # ============================================================================
 
@@ -117,6 +261,8 @@ orjson==3.11.3
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 pytest-mock>=3.10.0
+httpx>=0.25.0  # Para testes da API
+python-dateutil>=2.8.2  # Para manipulação de datas
 
 # Code quality
 black>=23.0.0
@@ -169,4 +315,15 @@ lxml>=5.0.0
 # 
 # Para instalar com AI/ML:
 # pip install sentence-transformers langchain openai
+#
+# Para executar API REST:
+# pip install fastapi uvicorn python-multipart httpx
+# python start_api.py
+#
+# Para testes da API:
+# python test_api.py
+# pytest tests/test_api.py -v
+#
+# Para produção:
+# uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
 #

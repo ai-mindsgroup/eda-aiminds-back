@@ -1,0 +1,69 @@
+# API REST - Dependências Mínimas
+# ===============================
+# 
+# Para executar apenas a API REST sem todo o sistema multiagente
+# Use este arquivo para deploys otimizados
+
+# Web Framework
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+python-multipart==0.0.20
+
+# Validação e serialização
+pydantic==2.11.7
+pydantic-settings==2.10.1
+email-validator>=2.1.0
+
+# Middleware e segurança
+slowapi==0.1.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==42.0.8
+
+# HTTP e Async
+httpx>=0.25.0
+aiohttp==3.12.15
+anyio==4.10.0
+
+# Sistema e monitoramento  
+psutil==6.1.0
+watchfiles==0.24.0
+
+# Configuração
+python-dotenv==1.1.1
+
+# Processamento de dados (core)
+pandas==2.2.3
+numpy==2.3.2
+
+# Database
+psycopg==3.2.9
+psycopg-binary==3.2.9
+supabase==2.20.0
+
+# JSON otimizado
+orjson==3.11.3
+
+# Logging
+coloredlogs==15.0.1
+colorama==0.4.6
+
+# Templates e documentação
+jinja2>=3.1.4
+markdown>=3.6.0
+
+# Produção
+gunicorn>=22.0.0
+
+# Testes (opcional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# ===============================
+# Instalação:
+# pip install -r requirements-api.txt
+# 
+# Executar:
+# python start_api.py
+# ou
+# uvicorn src.api.main:app --host 0.0.0.0 --port 8000

@@ -26,18 +26,25 @@ from src.agent.base_agent import BaseAgent, AgentError
 from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
 from src.data.data_processor import DataProcessor
 
-# Import condicional do RAGAgent (pode falhar se Supabase não configurado)
-try:
-    from src.agent.rag_agent import RAGAgent
-    RAG_AGENT_AVAILABLE = True
-except ImportError as e:
-    RAG_AGENT_AVAILABLE = False
-    RAGAgent = None
-    print(f"⚠️ RAGAgent não disponível: {str(e)[:100]}...")
-except RuntimeError as e:
-    RAG_AGENT_AVAILABLE = False  
-    RAGAgent = None
-    print(f"⚠️ RAGAgent não disponível: {str(e)[:100]}...")
+# Lazy loading para RAGAgent - será importado apenas quando necessário
+RAG_AGENT_AVAILABLE = None  # None = não verificado ainda
+_rag_agent_module = None
+
+def _get_rag_agent():
+    """Importa RAGAgent lazily."""
+    global RAG_AGENT_AVAILABLE, _rag_agent_module
+    
+    if RAG_AGENT_AVAILABLE is None:
+        try:
+            from src.agent.rag_agent import RAGAgent
+            _rag_agent_module = RAGAgent
+            RAG_AGENT_AVAILABLE = True
+        except (ImportError, RuntimeError) as e:
+            RAG_AGENT_AVAILABLE = False
+            _rag_agent_module = None
+            print(f"⚠️ RAGAgent não disponível: {str(e)[:100]}...")
+    
+    return _rag_agent_module
 
 # Import do cliente Supabase para verificação de dados
 try:
@@ -178,18 +185,20 @@ class OrchestratorAgent(BaseAgent):
                 self.logger.warning(f"⚠️ {error_msg}")
         
         # RAG Agent (requer Supabase configurado)
-        if enable_rag_agent and RAG_AGENT_AVAILABLE:
-            try:
-                self.agents["rag"] = RAGAgent()
-                self.logger.info("✅ Agente RAG inicializado")
-            except Exception as e:
-                error_msg = f"RAG Agent: {str(e)}"
+        if enable_rag_agent:
+            RAGAgentClass = _get_rag_agent()
+            if RAGAgentClass:
+                try:
+                    self.agents["rag"] = RAGAgentClass()
+                    self.logger.info("✅ Agente RAG inicializado")
+                except Exception as e:
+                    error_msg = f"RAG Agent: {str(e)}"
+                    initialization_errors.append(error_msg)
+                    self.logger.warning(f"⚠️ {error_msg}")
+            else:
+                error_msg = "RAG Agent: Dependências não disponíveis (Supabase não configurado)"
                 initialization_errors.append(error_msg)
                 self.logger.warning(f"⚠️ {error_msg}")
-        elif enable_rag_agent and not RAG_AGENT_AVAILABLE:
-            error_msg = "RAG Agent: Dependências não disponíveis (Supabase não configurado)"
-            initialization_errors.append(error_msg)
-            self.logger.warning(f"⚠️ {error_msg}")
 
         # LLM Manager (camada de abstração para múltiplos provedores)
         if enable_llm_manager and LLM_MANAGER_AVAILABLE:

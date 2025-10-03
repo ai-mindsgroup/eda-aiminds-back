@@ -27,14 +27,28 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
+# Lazy loading - sentence_transformers será importado apenas quando necessário
+SENTENCE_TRANSFORMERS_AVAILABLE = None  # None = não verificado ainda
+_sentence_transformer_module = None
+
+def _get_sentence_transformers():
+    """Importa sentence_transformers lazily."""
+    global SENTENCE_TRANSFORMERS_AVAILABLE, _sentence_transformer_module
+    
+    if SENTENCE_TRANSFORMERS_AVAILABLE is None:
+        try:
+            import sentence_transformers
+            _sentence_transformer_module = sentence_transformers
+            SENTENCE_TRANSFORMERS_AVAILABLE = True
+        except ImportError:
+            SENTENCE_TRANSFORMERS_AVAILABLE = False
+            _sentence_transformer_module = None
+    
+    return _sentence_transformer_module
 
 from src.embeddings.chunker import TextChunk
 from src.utils.logging_config import get_logger
+from src.utils.model_cache import get_model_cache
 from src.llm.manager import LLMManager
 
 
@@ -148,13 +162,21 @@ class EmbeddingGenerator:
             raise RuntimeError(f"Falha ao inicializar OpenAI via LLM Manager: {str(e)}")
     
     def _initialize_sentence_transformer(self) -> None:
-        """Inicializa Sentence Transformers."""
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+        """Inicializa Sentence Transformers com cache."""
+        st_module = _get_sentence_transformers()
+        if not st_module:
             raise ImportError("sentence-transformers não disponível. Install: pip install sentence-transformers")
         
-        self.logger.info(f"Carregando modelo Sentence Transformer: {self.model}")
-        self._client = SentenceTransformer(self.model)
-        self.logger.info("Sentence Transformer carregado com sucesso")
+        # Usar cache para evitar recarregamento
+        cache = get_model_cache()
+        cache_key = f"sentence_transformer_{self.model}"
+        
+        def loader():
+            self.logger.info(f"Carregando modelo Sentence Transformer: {self.model}")
+            return st_module.SentenceTransformer(self.model)
+        
+        self._client = cache.get(cache_key, loader)
+        self.logger.info("Sentence Transformer inicializado com cache")
     
     def _initialize_groq(self) -> None:
         """Inicializa cliente Groq via LLM Manager."""

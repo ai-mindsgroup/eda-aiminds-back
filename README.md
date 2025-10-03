@@ -1,52 +1,295 @@
-# 🎯 EDA AI Minds Backend - Sistema Multiagente
+# 🤖 EDA AI Minds Backend
 
-<div align="center">
+**Sistema multiagente para análise inteligente de dados CSV com LangChain, Supabase e vetorização.**
 
-![Status](https://img.shields.io/badge/Status-Em_Desenvolviment.venv\Scripts\python.exe scripts\run_utils_simple.py tests     # Testa funcionamento
-.venv\Scripts\python.exe scripts\run_utils_simple.py examples  # Executa demos
-.venv\Scripts\python.exe scripts\run_utils_simple.py list      # Lista arquivosellow?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)
-![Stars](https://img.shields.io/badge/⭐_Star-This_Repo-gold?style=for-the-badge)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3+-purple.svg)](https://langchain.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Enabled-green.svg)](https://supabase.com)
 
-**Sistema multiagente inteligente para análise exploratória de dados CSV**  
-*Carregamento automático • Validação • Limpeza • Análise através de LLMs*
+> **💡 Duas APIs Disponíveis:**  
+> 🚀 **API Simples** (`python api_simple.py`) - Para desenvolvimento e testes rápidos  
+> 🤖 **API Robusta** (`python -m src.api.main`) - Para produção com sistema multiagente completo
 
-</div>
+## 🚀 Quick Start
+
+### 1. Instalação
+```bash
+# Clone o repositório
+git clone https://github.com/ai-mindsgroup/eda-aiminds-back.git
+cd eda-aiminds-back-1
+
+# Crie ambiente virtual
+python -m venv .venv
+.venv\\Scripts\\Activate.ps1  # Windows
+source .venv/bin/activate     # Linux/Mac
+
+# Instale dependências
+pip install -r requirements.txt
+```
+
+### 2. Configuração
+```bash
+# Copie o arquivo de configuração
+cp configs/.env.example configs/.env
+
+# Configure suas variáveis de ambiente
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_anon_key
+GOOGLE_API_KEY=your_google_api_key
+```
+
+### 3. Executar
+```bash
+# 🚀 API SIMPLES - Para desenvolvimento e testes rápidos
+python api_simple.py
+
+# 🤖 API ROBUSTA - Para funcionalidade completa com IA
+python -m src.api.main
+```
+
+**📊 API disponível em: http://localhost:8000**
+
+## ⚡ Escolha da API
+
+### 🚀 **API Simples** (`api_simple.py`)
+**Para desenvolvimento rápido e integração frontend**
+
+```bash
+python api_simple.py
+```
+
+✅ **Vantagens:**
+- ⚡ Startup instantâneo (~0.1s)
+- 🔧 Sem dependências ML pesadas
+- 🎯 Perfeita para desenvolvimento frontend
+- 💻 Ideal para testes e demos
+
+❌ **Limitações:**
+- 🤖 Chat básico (sem orchestrator)
+- 📊 Análise CSV simplificada
+- 🚫 Sem sistema RAG/embeddings
+
+### 🤖 **API Robusta** (`src.api.main`)
+**Para produção com sistema multiagente completo**
+
+```bash
+python -m src.api.main
+```
+
+✅ **Vantagens:**
+- 🧠 **Orchestrator Agent** - Coordenação inteligente
+- � **Sistema RAG** - Busca semântica avançada
+- 📈 **Análise ML** - Detecção de fraudes e padrões
+- 💬 **Chat Inteligente** - Conversação sobre dados
+- �📊 **Visualizações** - Gráficos automáticos
+
+⚡ **Performance Otimizada:**
+- 🚀 Startup rápido (~1.14s)
+- 🔄 ML carregado sob demanda
+- 💾 Cache inteligente de modelos
+
+### 🎯 **Quando Usar Cada Uma:**
+
+| Cenário | API Recomendada | Comando |
+|---------|-----------------|---------|
+| 🎨 **Desenvolvimento Frontend** | API Simples | `python api_simple.py` |
+| 🧪 **Testes Rápidos** | API Simples | `python api_simple.py` |
+| 🚀 **Demos e Apresentações** | API Simples | `python api_simple.py` |
+| 🏭 **Produção** | API Robusta | `python -m src.api.main` |
+| 🤖 **IA/ML Completa** | API Robusta | `python -m src.api.main` |
+| 📊 **Análise Avançada** | API Robusta | `python -m src.api.main` |
+
+## 📁 Estrutura do Projeto
+
+```
+eda-aiminds-back-1/
+├── 📚 documentation/         # Documentação organizada
+│   ├── guides/              # Guias de início
+│   ├── api/                 # Documentação da API
+│   ├── troubleshooting/     # Solução de problemas
+│   └── development/         # Desenvolvimento
+├── 🔧 src/                  # Código fonte principal
+│   ├── api/                 # FastAPI e rotas
+│   ├── agent/               # Agentes multiagente
+│   ├── embeddings/          # Sistema vetorial
+│   ├── llm/                 # LLM managers
+│   └── utils/               # Utilitários
+├── 🧪 tests/               # Testes automatizados
+├── 🛠️ tools/               # Scripts e ferramentas
+├── ⚙️ configs/             # Configurações
+├── 📊 data/                # Dados de exemplo
+└── 📖 docs/                # Histórico de desenvolvimento
+```
+
+## 🎯 Funcionalidades
+
+- **📊 Análise Inteligente de CSV** - Upload e análise automática
+- **🤖 Sistema Multiagente** - Orquestração de agentes especializados  
+- **🔍 Sistema RAG** - Busca semântica com embeddings
+- **💬 Chat Inteligente** - Conversa sobre seus dados
+- **🔒 Detecção de Fraudes** - Análise avançada com LLMs
+- **📈 Visualizações** - Gráficos automáticos
+- **⚡ Performance Otimizada** - Carregamento lazy de ML
+
+## 🔧 Comparativo Detalhado das APIs
+
+| Característica | 🚀 **API Simples** | 🤖 **API Robusta** |
+|----------------|-------------------|-------------------|
+| **Startup** | ⚡ ~0.1s | ⚡ ~1.14s |
+| **Orchestrator** | ❌ Não | ✅ Sim |
+| **Sistema RAG** | ❌ Não | ✅ Sim |
+| **Chat IA** | 🔧 Básico | 🧠 Inteligente |
+| **Análise ML** | 📊 Simples | 🤖 Avançada |
+| **Embeddings** | ❌ Não | ✅ Sim |
+| **Dependências** | 📦 Mínimas | 📦 Completas |
+| **Uso** | Desenvolvimento | Produção |
+
+### 🎯 **Funcionalidades por API:**
+
+#### 🚀 **API Simples** - Funcionalidades Básicas:
+- ✅ Upload CSV (até 100MB)
+- ✅ Health check detalhado
+- ✅ Chat básico (respostas simuladas)
+- ✅ Dashboard metrics simples
+- ✅ CORS configurado
+- ✅ Documentação Swagger
+
+#### 🤖 **API Robusta** - Funcionalidades Avançadas:
+- ✅ **Tudo da API Simples** +
+- 🧠 **OrchestratorAgent** - Coordenação multiagente
+- 🔍 **RAGAgent** - Busca semântica com embeddings
+- 📊 **CSVAnalysisAgent** - Análise inteligente de dados
+- 🔒 **Detecção de Fraudes** - ML para anomalias
+- 💬 **Chat Contextual** - Conversa sobre seus dados
+- 📈 **Visualizações Auto** - Gráficos inteligentes
+- 🗂️ **Sistema Vetorial** - Supabase + pgvector
+
+## 💡 Exemplos Práticos de Uso
+
+### 🚀 **Desenvolvimento Frontend**
+```bash
+# Inicie a API simples para desenvolvimento rápido
+python api_simple.py
+
+# Teste no navegador
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Olá!", "session_id": "dev123"}'
+```
+
+### 🤖 **Análise Completa com IA**
+```bash
+# Inicie a API robusta para funcionalidade completa
+python -m src.api.main
+
+# Upload e análise inteligente de CSV
+curl -X POST http://localhost:8000/csv/upload \
+     -F "file=@data/example.csv"
+
+# Chat sobre os dados carregados
+curl -X POST http://localhost:8000/chat \
+     -H "Content-Type: application/json" \
+     -d '{"message": "Quais padrões você vê nos dados?", "session_id": "analysis123"}'
+
+# Busca semântica
+curl -X POST http://localhost:8000/rag/search \
+     -H "Content-Type: application/json" \
+     -d '{"query": "fraudes no cartão de crédito", "limit": 5}'
+```
+
+### 🔄 **Migração de API Simples → Robusta**
+```bash
+# 1. Desenvolveu com API simples
+python api_simple.py  # Frontend funcionando
+
+# 2. Migre para API robusta sem mudanças no frontend
+python -m src.api.main  # Mesmas rotas + funcionalidades IA
+```
+
+## 📚 Documentação
+
+**[📖 Documentação Completa](./documentation/README.md)**
+
+### Links Rápidos
+- **[Guia de Início](./documentation/guides/LEIA_PRIMEIRO.md)** - Comece aqui
+- **[Comparativo APIs](./documentation/guides/COMPARATIVO_APIS.md)** - Qual API usar
+- **[Solução de Problemas](./documentation/troubleshooting/)** - Resolva issues
+- **[API Reference](http://localhost:8000/docs)** - Swagger UI
+
+## 🔗 Links Úteis
+
+- **[Documentação API](http://localhost:8000/docs)** - Interface Swagger
+- **[Health Check](http://localhost:8000/health)** - Status da API
+- **[Supabase Dashboard](https://supabase.com/dashboard)** - Banco de dados
+- **[Repository](https://github.com/ai-mindsgroup/eda-aiminds-back)** - Código fonte
+
+## 🚨 Solução Rápida de Problemas
+
+| Problema | Solução Rápida | API Recomendada |
+|----------|----------------|-----------------|
+| **API não inicia** | `python api_simple.py` | 🚀 API Simples |
+| **Erro dependências ML** | `python api_simple.py` | 🚀 API Simples |
+| **Startup muito lento** | `python api_simple.py` | 🚀 API Simples |
+| **Erro 413 upload** | Veja [Erro 413](./documentation/troubleshooting/ERRO_413_ARQUIVO_GRANDE.md) | Ambas |
+| **Chat não funciona** | `python -m src.api.main` | 🤖 API Robusta |
+| **Funcionalidades IA** | `python -m src.api.main` | 🤖 API Robusta |
+| **Análise avançada** | `python -m src.api.main` | 🤖 API Robusta |
+
+### 🆘 **Troubleshooting por Cenário:**
+
+#### 🚀 **Problemas com API Simples**
+- **Não inicia**: Verifique Python 3.10+
+- **Erro de módulo**: `pip install fastapi uvicorn pandas`
+- **CORS**: Já configurado para localhost:3000
+
+#### 🤖 **Problemas com API Robusta**  
+- **Startup lento**: Normal na primeira vez (carrega ML)
+- **Erro Supabase**: Configure `.env` corretamente
+- **Erro LLM**: Verifique API keys no `.env`
+| Dependências ML | `pip install -r configs/requirements-minimal.txt` |
+
+## 📋 Requirements
+
+### 🏗️ Instalação por Cenário
+
+```bash
+# Produção completa
+pip install -r requirements.txt
+
+# Desenvolvimento
+pip install -r configs/requirements-dev.txt
+
+# API mínima
+pip install -r configs/requirements-api.txt
+
+# Sem IA/ML
+pip install -r configs/requirements-minimal.txt
+```
+
+## 🧪 Testes
+
+```bash
+# Testes básicos
+python -m pytest tests/ -v
+
+# Teste específico do RAG
+python -m pytest tests/test_rag_system.py -v
+
+# Verificar API
+python tools/test_api.py
+```
+
+## 🏷️ Tags
+
+`multiagente` `llm` `rag` `fastapi` `langchain` `supabase` `embeddings` `csv-analysis` `fraud-detection`
 
 ---
 
-## 🛠️ Stack Tecnológica
-
-### Core & Framework
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![LangChain](https://img.shields.io/badge/🦜_LangChain-0.3.27-1C3C3C?style=for-the-badge)
-![FastAPI](https://img.shields.io/badge/FastAPI-Ready-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-
-### Data & Analysis
-![Pandas](https://img.shields.io/badge/Pandas-2.2.3-150458?style=for-the-badge&logo=pandas&logoColor=white)
-![NumPy](https://img.shields.io/badge/NumPy-2.3.2-013243?style=for-the-badge&logo=numpy&logoColor=white)
-![Scikit Learn](https://img.shields.io/badge/Scikit_Learn-1.7.2-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
-
-### Visualization
-![Matplotlib](https://img.shields.io/badge/Matplotlib-3.10.6-11557c?style=for-the-badge)
-![Seaborn](https://img.shields.io/badge/Seaborn-0.13.2-76B900?style=for-the-badge)
-
-### AI & LLMs
-![OpenAI](https://img.shields.io/badge/OpenAI-1.102.0-412991?style=for-the-badge&logo=openai&logoColor=white)
-![Google AI](https://img.shields.io/badge/Google_AI-2.1.9-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![Transformers](https://img.shields.io/badge/🤗_Transformers-4.56.2-FFD21E?style=for-the-badge)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
-
-### Database & Vector Store
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![pgvector](https://img.shields.io/badge/pgvector-0.3.6-336791?style=for-the-badge)
-
-### Development & Testing
-![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
-![Pydantic](https://img.shields.io/badge/Pydantic-2.11.7-E92063?style=for-the-badge)
-![AsyncIO](https://img.shields.io/badge/AsyncIO-Supported-3776AB?style=for-the-badge)
+**👥 Mantido por**: [AI Minds Group](https://github.com/ai-mindsgroup)  
+**📅 Última Atualização**: October 2025  
+**📄 Licença**: MIT
 
 ## ✨ Funcionalidades Principais
 
@@ -157,6 +400,78 @@ resultados = processor.quick_analysis()
 resposta = processor.analyze("Qual a distribuição das variáveis numéricas?")
 print(resposta['content'])
 ```
+
+## 🌐 API REST
+
+### Início Rápido da API
+
+```powershell
+# Verificar dependências
+python check_api_quick.py
+
+# Iniciar API (desenvolvimento)
+python start_api.py
+
+# Acessar documentação
+# http://localhost:8000/docs (Swagger UI)
+# http://localhost:8000/redoc (ReDoc)
+```
+
+### Principais Endpoints
+
+#### 🔍 Health & Info
+- `GET /health` - Status da API
+- `GET /` - Informações do sistema
+
+#### 📄 Upload e Análise de CSV
+- `POST /csv/upload` - Upload de arquivo CSV
+- `GET /csv/analyze/{file_id}` - Análise específica
+- `GET /csv/list` - Listar dados carregados
+
+#### 🤖 Busca Semântica (RAG)
+- `POST /rag/search` - Busca vetorial nos dados
+- `POST /rag/ask` - Pergunta com contexto
+
+#### 🎯 Análise Inteligente
+- `POST /analysis/detect-fraud` - Detecção de fraudes
+- `POST /analysis/generate-insights` - Insights automáticos
+- `POST /chat` - Chat com agente IA
+
+### Exemplo de Uso
+
+```python
+import httpx
+
+# Cliente HTTP
+client = httpx.Client(base_url="http://localhost:8000")
+
+# Upload de CSV
+with open("dados.csv", "rb") as f:
+    response = client.post("/csv/upload", files={"file": f})
+    file_id = response.json()["file_id"]
+
+# Análise automática
+analysis = client.get(f"/csv/analyze/{file_id}")
+print(analysis.json())
+
+# Chat com IA
+chat_response = client.post("/chat", json={
+    "message": "Analise os dados carregados",
+    "session_id": "my-session"
+})
+print(chat_response.json()["response"])
+```
+
+### Instalação Mínima (Apenas API)
+
+```powershell
+pip install -r requirements-api.txt
+python start_api.py
+```
+
+📖 **Guia Completo**: [API_QUICK_START.md](API_QUICK_START.md)
+
+---
 
 ## 📊 Exemplos de Uso
 
