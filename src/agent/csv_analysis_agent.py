@@ -574,7 +574,8 @@ Datasets: {', '.join(self.dataset_metadata.get('sources', ['N/A']))}
             'violations': [],
             'data_source': 'embeddings_table_only',
             'csv_access': False,
-            'agent_name': self.name
+            'agent_name': self.name,
+            'compliance_score': 1.0  # Score inicial perfeito
         }
         
         # Verificar se há vestígios de acesso a CSV
@@ -583,11 +584,16 @@ Datasets: {', '.join(self.dataset_metadata.get('sources', ['N/A']))}
             if hasattr(self, attr):
                 compliance_report['compliant'] = False
                 compliance_report['violations'].append(f"Atributo proibido encontrado: {attr}")
+                compliance_report['compliance_score'] -= 0.3  # Penalizar por violação
         
         # Verificar se usa apenas Supabase
         if not SUPABASE_AVAILABLE:
             compliance_report['compliant'] = False
             compliance_report['violations'].append("Supabase não disponível")
+            compliance_report['compliance_score'] -= 0.5
+        
+        # Garantir score mínimo 0
+        compliance_report['compliance_score'] = max(0.0, compliance_report['compliance_score'])
         
         return compliance_report
     

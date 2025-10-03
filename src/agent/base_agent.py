@@ -23,15 +23,12 @@ except ImportError:
     LLMConfig = None
     LLMResponse = None
 
-# Import do sistema de memória
 try:
-    from src.memory import MemoryMixin, SupabaseMemoryManager, MemoryConfig
+    from src.memory.langchain_supabase_memory import LangChainSupabaseMemory
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False
-    MemoryMixin = None
-    SupabaseMemoryManager = None
-    MemoryConfig = None
+    LangChainSupabaseMemory = None
 
 class AgentError(Exception):
     """Exceção específica para erros em agentes."""
@@ -60,10 +57,10 @@ class BaseAgent(ABC):
         
         if self._memory_enabled:
             try:
-                self._memory_manager = SupabaseMemoryManager(self.name)
-                self.logger.info(f"Sistema de memória habilitado para agente {name}")
+                self._memory_manager = LangChainSupabaseMemory(agent_name=self.name)
+                self.logger.info(f"Memória LangChain+Supabase habilitada para agente {name}")
             except Exception as e:
-                self.logger.warning(f"Falha ao inicializar memória: {e}")
+                self.logger.warning(f"Falha ao inicializar memória LangChainSupabase: {e}")
                 self._memory_enabled = False
         
         self.logger.info(f"Agente {name} inicializado: {description}")

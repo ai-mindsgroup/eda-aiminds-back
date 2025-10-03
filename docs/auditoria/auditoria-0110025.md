@@ -1,15 +1,19 @@
+
 # Auditoria Técnica - EDA AI Minds Backend
 
 **Data:** 01/10/2025
+
+**Este relatório refere-se a um trabalho em grupo, sem menção a autores individuais. Todas as análises, decisões e recomendações são resultado do esforço coletivo dos membros do projeto.**
 
 ---
 
 ## 1. Bibliotecas e Frameworks Utilizados
 
+
 ### 1.1. LangChain
-- **Status:** NÃO utilizado no código-fonte.
-- **Presença:** Listado em `requirements.txt` (várias dependências LangChain), mas não há nenhum import ou uso real nos arquivos Python.
-- **Motivo:** Documentação previa uso, mas arquitetura final é 100% customizada.
+- **Status:** Utilizado apenas como camada de abstração/fallback para múltiplos provedores LLM (OpenAI, Gemini, Groq).
+- **Presença:** Listado em `requirements.txt` e importado em módulos de LLM, mas não há uso de chains ou workflows LangChain.
+- **Motivo:** Arquitetura final prioriza implementação customizada para chunking, embeddings, RAG e memória. LangChain é usado apenas para abstração de LLMs, não para chains.
 
 ### 1.2. Outras Dependências
 - **Manipulação de dados:** `pandas`, `numpy`
@@ -21,25 +25,29 @@
 
 ---
 
+
 ## 2. Arquitetura dos Agentes
 
-- **BaseAgent:** Classe abstrata, fornece logging, interface, integração com LLM Manager e sistema de memória.
-- **OrchestratorAgent:** Orquestrador central, coordena agentes especializados, mantém contexto e histórico.
+- **OrchestratorAgent:** Coordenador central, roteia consultas, integra respostas, mantém contexto e histórico.
+- **CSVAnalysisAgent:** Análise de dados CSV via Pandas, sem acesso direto ao arquivo após ingestão.
+- **RAGAgent:** Agente de ingestão autorizado, realiza chunking, geração de embeddings e armazenamento vetorial no Supabase.
 - **EmbeddingsAnalysisAgent:** Analisa dados exclusivamente via tabela embeddings do Supabase.
-- **RAGAgent:** Agente de ingestão autorizado, faz chunking, gera embeddings, busca vetorial e respostas via LLM.
-- **LLM Manager:** Abstração para múltiplos provedores (Groq, Google, OpenAI), com fallback automático.
-- **Memória:** Sistema customizado usando SupabaseMemoryManager (`src/memory/supabase_memory.py`).
+- **DataProcessor:** Interface unificada para carregamento, validação, limpeza e análise de dados.
+- **GraphGenerator:** Geração de gráficos e visualizações (matplotlib, seaborn, plotly).
+- **SupabaseMemoryManager:** Gerencia memória persistente, contexto e histórico de sessões.
+- **LLM Manager:** Abstração para múltiplos provedores (Groq, Google, OpenAI), com fallback automático via LangChain.
 
 ---
 
 ## 3. Flows, Chains e Métodos
 
-- **Não há chains do LangChain.**
+
+- **Não há chains/workflows do LangChain.**
 - **Fluxo multiagente:** Orchestrator recebe consulta, delega para agentes conforme tipo (análise, RAG, ingestão, visualização).
-- **Memória:** Persistência de sessões, contexto e histórico via Supabase.
-- **Chunking:** Implementado em `src/embeddings/chunker.py`.
+- **Memória:** Persistência de sessões, contexto e histórico via SupabaseMemoryManager.
+- **Chunking:** Implementado em `src/embeddings/chunker.py` (customizado).
 - **Retrieval:** Busca vetorial via pgvector/Supabase.
-- **LLM Calls:** Direto via SDKs, sem LangChain.
+- **LLM Calls:** Direto via SDKs ou abstração LangChain (fallback multi-provider).
 
 ---
 
@@ -71,16 +79,19 @@
 - Suporte a múltiplos provedores LLM com fallback.
 - Conformidade: agentes de resposta não acessam CSV diretamente.
 
+
 ### Limitações
-- **LangChain não utilizado:** Divergência entre documentação e implementação real.
-- **Dependências desnecessárias:** LangChain ocupa espaço e pode causar conflitos.
+- **LangChain não utilizado para chains/workflows:** Usado apenas para abstração de LLMs.
+- **Dependências desnecessárias:** LangChain pode ser removido se não houver necessidade de fallback multi-provider.
 - **Documentação desatualizada:** Menciona flows/chains que não existem.
-- **Chunking e retrieval são customizados, não padronizados.**
+- **Chunking, retrieval e memória são customizados, não padronizados.
 
 ### Lacunas
-- Remover dependências LangChain do projeto para evitar confusão.
-- Atualizar documentação para refletir arquitetura real.
-- Avaliar integração futura com LangChain se desejado.
+
+- Remover dependências LangChain do projeto se não houver necessidade de fallback multi-provider.
+- Atualizar documentação para refletir arquitetura real e módulos implementados.
+- Avaliar integração futura com LangChain para chains/workflows se desejado.
+- Manter modularidade, clareza e documentação detalhada para facilitar onboarding e evolução futura.
 
 ---
 
@@ -104,6 +115,15 @@
 
 ---
 
+
+## 9. Documentação Técnica Consolidada
+
+Relatórios completos de conformidade, segurança, agentes e fluxos estão disponíveis em `docs/`:
+	- `docs/ANALISE-CONFORMIDADE-REQUISITOS.md`
+	- `docs/ANALISE-COPYRIGHT-SEGURANCA.md`
+	- `docs/RELATORIO-AGENTES-PROMPTS-GUARDRAILS.md`
+	- `docs/GUIA-CORRECAO-SEGURANCA.md`
+
 **Auditoria concluída.**
 
-Sistema funcional, mas recomenda-se ajuste nas dependências e documentação para evitar confusões futuras.
+Sistema funcional, aderente à arquitetura multiagente, com documentação técnica consolidada. Recomenda-se manter modularidade, clareza e atualização contínua dos documentos para evitar confusões futuras.

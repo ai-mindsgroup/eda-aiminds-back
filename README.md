@@ -9,8 +9,11 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Stars](https://img.shields.io/badge/⭐_Star-This_Repo-gold?style=for-the-badge)
 
-**Sistema multiagente inteligente para análise exploratória de dados CSV**  
+
+**Sistema multiagente inteligente para análise exploratória de dados CSV**
 *Carregamento automático • Validação • Limpeza • Análise através de LLMs*
+
+> **Nota:** Este projeto é resultado de trabalho em grupo, sem menção a autores individuais. Todas as funcionalidades, decisões e recomendações refletem o esforço coletivo dos membros do projeto.
 
 </div>
 
@@ -80,19 +83,42 @@
 
 ## Contexto Auditoria e Diagnóstico do Sistema Multiagente EDA AI Minds:
 
-O sistema deve garantir uma camada de abstração robusta para integração e troca entre fornecedores diferentes de LLMs (exemplo: OpenAI, Gemini, Groq), adotando os módulos de abstração do LangChain como recomendação central.
 
-Todo fluxo de chunking, embeddings, armazenamento vetorial e mecanismos de memória devem priorizar o uso de componentes oficiais do LangChain, exceto onde houver justificativa técnica robusta para customização.
+## 🧩 Arquitetura Multiagente Real
 
-O agente responsável por leitura, chunking e ingestão de arquivos CSV deve obrigatoriamente realizar a carga de embeddings no Supabase, habilitando outros agentes a trabalhar exclusivamente sobre a tabela de embeddings para RAG.
+O sistema implementa uma arquitetura multiagente robusta e modular, com agentes especializados para cada etapa do fluxo:
 
-Qualquer implementação ou refatoração deve garantir: logging estruturado, fallback entre LLMs, validação de parâmetros críticos (temperatura, top_k, chunk_overlap) e testes automatizados.
+- **OrchestratorAgent**: Coordena todos os agentes, roteia consultas, mantém contexto e histórico.
+- **CSVAnalysisAgent**: Realiza análise de dados CSV via Pandas, sem acesso direto ao arquivo após ingestão.
+- **RAGAgent**: Responsável por ingestão de CSV, chunking, geração de embeddings e armazenamento vetorial no Supabase.
+- **EmbeddingsAnalysisAgent**: Analisa dados exclusivamente via tabela embeddings do Supabase.
+- **DataProcessor**: Interface unificada para carregamento, validação, limpeza e análise de dados.
+- **GraphGenerator**: Geração de gráficos e visualizações (matplotlib, seaborn, plotly).
+- **SupabaseMemoryManager**: Gerencia memória persistente, contexto e histórico de sessões.
 
-Workflows devem ser modularizados via chains, facilitando validação, mantenabilidade, auditoria e integração futura.
+### Integração de LLMs
+- **LangChain** é utilizado apenas como camada de abstração/fallback para múltiplos provedores LLM (OpenAI, Gemini, Groq), não para chains ou workflows.
+- Chunking, embeddings, RAG e memória são implementados de forma customizada, priorizando performance e controle.
 
-O histórico dos agentes, decisões técnicas e arquitetura devem ser mantidos e versionados conforme modelo estabelecido em docs/, promovendo rastreabilidade e evolução controlada do sistema.
+### Fluxos e Garantias
+- O agente de ingestão (RAGAgent) é o único autorizado a ler CSV e realizar carga de embeddings no Supabase.
+- Todos os demais agentes trabalham exclusivamente sobre a tabela embeddings, garantindo conformidade e segurança.
+- Logging estruturado, fallback entre LLMs, validação de parâmetros críticos e testes automatizados são implementados em todos módulos.
+- Workflows são modularizados via chains customizadas, facilitando validação, manutenção e auditoria.
+- Histórico de agentes, decisões técnicas e arquitetura são mantidos e versionados em `docs/`, promovendo rastreabilidade e evolução controlada.
 
-Devem ser evidenciadas limitações, pontos fortes e recomendações presentes nos relatórios técnicos — conferindo prioridade para padronização, extensibilidade, segurança e facilidade de onboarding de novos desenvolvedores.
+### Documentação Técnica
+- Relatórios completos de conformidade, segurança, agentes e fluxos estão disponíveis em `docs/`:
+    - `docs/ANALISE-CONFORMIDADE-REQUISITOS.md`
+    - `docs/ANALISE-COPYRIGHT-SEGURANCA.md`
+    - `docs/RELATORIO-AGENTES-PROMPTS-GUARDRAILS.md`
+    - `docs/GUIA-CORRECAO-SEGURANCA.md`
+    - `docs/auditoria/auditoria-0110025.md`
+
+### Limitações e Recomendações
+- LangChain não é utilizado para chains/workflows, apenas para abstração de LLMs.
+- Chunking, retrieval e memória são customizados para maior controle e performance.
+- Recomenda-se manter modularidade, clareza e documentação detalhada para facilitar onboarding e evolução futura.
 
 ## 🚀 Início Rápido
 

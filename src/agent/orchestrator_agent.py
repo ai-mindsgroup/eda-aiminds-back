@@ -872,19 +872,40 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
         if self.current_data_context:
             llm_context.update(self.current_data_context)
         
-        # NOVA FUNCIONALIDADE: Recuperar dados do Supabase quando necessário
-        if needs_data_analysis and has_loaded_data and not llm_context.get("csv_analysis"):
-            self.logger.info("🔍 Recuperando dados da base Supabase para análise...")
-            try:
-                # Recuperar informações sobre os dados armazenados
-                supabase_data_context = self._retrieve_data_context_from_supabase()
-                if supabase_data_context:
-                    llm_context.update(supabase_data_context)
-                    self.logger.info("✅ Contexto de dados recuperado do Supabase")
-                else:
-                    self.logger.warning("⚠️ Não foi possível recuperar contexto de dados do Supabase")
-            except Exception as e:
-                self.logger.error(f"❌ Erro ao recuperar dados do Supabase: {str(e)}")
+        # 🔄 REDIRECIONAMENTO PARA RAG: Se precisa de análise de dados e há embeddings no Supabase
+        if needs_data_analysis and has_loaded_data:
+            self.logger.info("🔄 Redirecionando para LLM analysis (dados no Supabase detectados)")
+            
+            # Verificar se deve usar RAG para interpretação semântica dos chunks
+            if "rag" in self.agents:
+                try:
+                    # Enriquecer contexto com análise semântica via RAG
+                    self.logger.info("📚 Usando RAG para interpretação semântica dos chunks...")
+                    rag_result = self.agents["rag"].process(query, {"include_context": True, "max_results": 5})
+                    
+                    if rag_result and not rag_result.get("metadata", {}).get("error"):
+                        # Adicionar contexto RAG ao LLM context
+                        llm_context["rag_context"] = rag_result.get("content", "")
+                        llm_context["rag_sources"] = rag_result.get("metadata", {}).get("sources", [])
+                        self.logger.info("✅ Contexto enriquecido com dados do RAG (resumido)")
+                    else:
+                        self.logger.warning("⚠️ RAG não retornou resultados, continuando sem contexto RAG")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Erro ao usar RAG: {str(e)}, continuando sem contexto RAG")
+            
+            # NOVA FUNCIONALIDADE: Recuperar dados do Supabase quando necessário
+            if not llm_context.get("csv_analysis"):
+                self.logger.info("🔍 Recuperando dados da base Supabase para análise...")
+                try:
+                    # Recuperar informações sobre os dados armazenados
+                    supabase_data_context = self._retrieve_data_context_from_supabase()
+                    if supabase_data_context:
+                        llm_context.update(supabase_data_context)
+                        self.logger.info("✅ Contexto de dados recuperado do Supabase")
+                    else:
+                        self.logger.warning("⚠️ Não foi possível recuperar contexto de dados do Supabase")
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao recuperar dados do Supabase: {str(e)}")
         
         # 5. CONSTRUIR PROMPT CONTEXTUALIZADO
         prompt = self._build_llm_prompt(query, llm_context, needs_data_analysis)
@@ -1500,7 +1521,38 @@ Responda de forma clara, precisa e útil. Use português brasileiro.""")
         
         # Instrução final diferenciada
         if needs_data_analysis and context and context.get("csv_loaded"):
-            prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA ANÁLISE DE DADOS:
+            # 🔄 CORREÇÃO: Se há contexto RAG, priorizar interpretação semântica GENÉRICA
+            if context.get("rag_context"):
+                prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA INTERPRETAÇÃO SEMÂNTICA (GENÉRICA PARA QUALQUER CSV):
+
+📋 CONTEXTO RECEBIDO:
+- Você recebeu DESCRIÇÕES TEXTUAIS do dataset na seção "ANÁLISE DOS DADOS"
+- Essas descrições contêm informações sobre a ESTRUTURA e COLUNAS do dataset original
+- Essas descrições foram geradas automaticamente durante a ingestão do arquivo CSV
+
+🔍 COMO INTERPRETAR:
+1. LEIA o conteúdo textual das descrições fornecidas
+2. IDENTIFIQUE menções a:
+   - Nomes de colunas/features mencionados
+   - Tipos de dados descritos (numérico, categórico, temporal, texto)
+   - Exemplos de dados ou valores mencionados
+   - Estrutura do dataset (linhas, colunas, dimensões)
+   
+3. CLASSIFIQUE os tipos de dados baseado nas descrições:
+   - **Numéricos**: Colunas descritas como numéricas, valores numéricos, medidas, quantidades, componentes matemáticos (ex: PCA), valores decimais
+   - **Categóricos**: Colunas descritas como categorias, classes, labels, tipos, grupos, valores discretos
+   - **Temporais**: Colunas descritas como datas, timestamps, tempo, temporais
+   - **Texto**: Colunas descritas como texto, strings, descrições
+
+⚠️ IMPORTANTE:
+- NÃO analise a estrutura da tabela embeddings (id, chunk_text, created_at)
+- ANALISE o CONTEÚDO TEXTUAL dentro das descrições que falam sobre o dataset real
+- Seja GENÉRICO: não assuma colunas específicas, extraia do que está descrito
+- Se as descrições mencionam "Colunas:" ou "Features:", liste-as
+- Se as descrições incluem exemplos de dados, use-os para inferir tipos
+- Seja específico sobre o que ENCONTROU nas descrições, não o que SUPÕE""")
+            else:
+                prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA ANÁLISE DE DADOS:
 - Use EXCLUSIVAMENTE os dados reais fornecidos no contexto
 - Para tipos de dados: Base-se apenas nos dtypes técnicos (int64=numérico, object=categórico)
 - Para estatísticas: Use apenas os valores calculados fornecidos

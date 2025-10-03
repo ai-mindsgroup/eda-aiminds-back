@@ -66,10 +66,13 @@ class LLMResponse:
 
 @dataclass
 class LLMConfig:
-    """Configuração para chamadas LLM."""
+    """Configuração para chamadas LLM.
+    
+    top_p ajustado para 0.25 visando menor aleatoriedade e maior precisão em respostas técnicas, matemáticas e estatísticas.
+    """
     temperature: float = 0.2
     max_tokens: int = 1024
-    top_p: float = 0.9
+    top_p: float = 0.25  # Valor reduzido para priorizar respostas mais determinísticas
     model: Optional[str] = None  # Se None, usa modelo padrão do provedor
 
 
@@ -174,13 +177,14 @@ class LangChainLLMManager:
         client = None
         model = config.model or self._get_default_model(provider)
         
+        # Justificativa: top_p = 0.25 reduz aleatoriedade, tornando respostas mais precisas e confiáveis para conteúdos técnicos.
         if provider == LLMProvider.GROQ:
             client = ChatGroq(
                 api_key=GROQ_API_KEY,
                 model=model,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
-                top_p=config.top_p
+                model_kwargs={"top_p": config.top_p}
             )
         
         elif provider == LLMProvider.GOOGLE:
@@ -198,7 +202,7 @@ class LangChainLLMManager:
                 model=model,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
-                top_p=config.top_p
+                model_kwargs={"top_p": config.top_p}
             )
         
         if client:

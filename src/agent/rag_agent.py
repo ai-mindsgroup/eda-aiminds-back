@@ -419,24 +419,12 @@ class RAGAgent(BaseAgent):
                 similarity_threshold=similarity_threshold,
                 limit=max_results
             )
-            
-            if not search_results:
-                return self._build_response(
-                    "❌ Nenhum contexto relevante encontrado na base de conhecimento.",
-                    metadata={
-                        "query": query,
-                        "search_results_count": 0,
-                        "similarity_threshold": similarity_threshold
-                    }
-                )
-            
             # 3. Construir contexto a partir dos resultados
             context_pieces = []
             source_info = {}
-            
-            for result in search_results:
-                context_pieces.append(f"[Fonte: {result.source}, Similaridade: {result.similarity_score:.3f}]\n{result.chunk_text}")
-                
+            for idx, result in enumerate(search_results, 1):
+                chunk_content = result.chunk_text
+                context_pieces.append(f"[Fonte: {result.source}, Similaridade: {result.similarity_score:.3f}]\n{chunk_content}")
                 source = result.source
                 if source not in source_info:
                     source_info[source] = {
@@ -444,43 +432,78 @@ class RAGAgent(BaseAgent):
                         "avg_similarity": 0,
                         "max_similarity": 0
                     }
-                
                 source_info[source]["chunks"] += 1
                 source_info[source]["max_similarity"] = max(source_info[source]["max_similarity"], result.similarity_score)
-            
+
             # Calcular médias de similaridade
             for source in source_info:
                 source_results = [r for r in search_results if r.source == source]
                 source_info[source]["avg_similarity"] = sum(r.similarity_score for r in source_results) / len(source_results)
-            
+
             # 4. Gerar resposta contextualizada via LLM
             if include_context:
                 context_text = "\n\n---\n\n".join(context_pieces)
-                
-                rag_prompt = f"""Você é um assistente especializado em análise de dados. Baseando-se EXCLUSIVAMENTE no contexto fornecido abaixo, responda à pergunta do usuário de forma clara e objetiva.
+                # 📋 LOG DE AUDITORIA: Contexto completo enviado ao LLM
+                self.logger.info(f"📤 Enviando {len(context_pieces)} chunks ao LLM para interpretação semântica")
+                self.logger.debug(f"\n{'='*80}\n🤖 CONTEXTO COMPLETO ENVIADO AO LLM:\n{'='*80}\n{context_text[:1000]}...\n{'='*80}")
 
-CONTEXTO RELEVANTE:
+                # Recuperar estatísticas do chunker para explicar diferença entre chunks e linhas do CSV
+                chunk_stats = self.chunker.get_stats([r for r in search_results if hasattr(r, 'chunk_text')])
+                total_chunks = chunk_stats.get('total_chunks', len(search_results))
+                total_csv_rows = chunk_stats.get('total_csv_rows', None)
+                explain_chunk_vs_row = ""
+                if total_csv_rows is not None:
+                    explain_chunk_vs_row = (
+                        f"\n\n🟦 **Nota Importante:** O sistema divide o arquivo CSV em chunks para análise semântica. "
+                        f"O número de chunks ({total_chunks}) não corresponde ao total de linhas do CSV original. "
+                        f"O total de linhas processadas foi {total_csv_rows}. "
+                        f"Cada chunk pode conter múltiplas linhas, conforme configuração de chunking. "
+                        f"Para estatísticas precisas, sempre consulte o campo 'total_csv_rows' nas estatísticas."
+                    )
+
+                rag_prompt = f"""Você é um assistente especializado em análise de dados e datasets. Sua função é interpretar SEMANTICAMENTE o conteúdo textual dos chunks fornecidos abaixo para responder à pergunta do usuário.
+
+⚠️ DIRETRIZES OBRIGATÓRIAS:
+1. ANÁLISE SEMÂNTICA: Interprete o significado e contexto do texto nos chunks, não apenas repita informações literais
+2. DADOS DO DATASET: Os chunks contêm descrições de datasets reais. Extraia informações sobre:
+   - Tipos de dados (numéricos, categóricos, temporais)
+   - Estrutura das colunas e features
+   - Características dos dados (valores, distribuições, padrões)
+   - Exemplos e amostras presentes no texto
+3. FUNDAMENTAÇÃO: Base sua resposta EXCLUSIVAMENTE nas informações presentes nos chunks
+4. PRECISÃO: Se os chunks mencionam colunas, valores ou estatísticas, inclua-os explicitamente na resposta
+5. CONTEXTO: Considere que cada chunk pode conter descrições textuais, metadados e amostras de dados
+6. CLAREZA: Responda de forma estruturada, citando as informações específicas encontradas nos chunks
+
+{explain_chunk_vs_row}
+
+CONTEXTO RECUPERADO DA BASE DE DADOS (chunk_text da tabela embeddings):
 {context_text}
 
 PERGUNTA DO USUÁRIO: {query}
 
-INSTRUÇÕES:
-- Use APENAS as informações do contexto fornecido
-- Se não houver informação suficiente no contexto, diga claramente
-- Cite as fontes quando apropriado
-- Seja preciso e objetivo na resposta
-- Se encontrar dados numéricos, inclua-os na resposta
+INSTRUÇÕES DE RESPOSTA:
+- Leia e interprete SEMANTICAMENTE cada chunk fornecido
+- Extraia informações relevantes sobre o dataset descrito nos chunks
+- Se encontrar menções a tipos de dados, colunas ou features, liste-os explicitamente
+- Se houver exemplos de dados nos chunks, use-os para fundamentar sua resposta
+- Seja específico e detalhado, evitando respostas genéricas
+- Se não houver informação suficiente nos chunks, informe claramente
 
-RESPOSTA:"""
-                
-                self.logger.debug("Gerando resposta via LLM...")
+RESPOSTA FUNDAMENTADA:"""
+
+                self.logger.info("🤖 Solicitando interpretação semântica ao LLM...")
                 llm_response = self._call_llm(rag_prompt, context)
-                
+
                 # Extrair conteúdo da resposta
                 if llm_response and 'choices' in llm_response:
                     content = llm_response['choices'][0]['message']['content']
+                    # 📋 LOG DE AUDITORIA: Resposta do LLM
+                    self.logger.info("✅ Resposta gerada pelo LLM com sucesso")
+                    self.logger.debug(f"\n{'='*80}\n📥 RESPOSTA DO LLM:\n{'='*80}\n{content[:500]}...\n{'='*80}")
                 else:
                     content = "Erro ao gerar resposta contextualizada."
+                    self.logger.error("❌ Falha ao obter resposta do LLM")
             
             else:
                 # Apenas retornar informações dos resultados da busca

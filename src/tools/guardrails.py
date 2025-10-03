@@ -98,6 +98,11 @@ class StatisticsGuardrails:
         confidence_score = 1.0
         corrected_values = {}
         
+        # 🛡️ GUARDRAIL: Validar que a resposta utiliza informações dos chunks
+        if not self._validates_semantic_interpretation(content, context):
+            issues.append("⚠️ Resposta não demonstra interpretação semântica adequada dos chunks fornecidos")
+            confidence_score -= 0.3
+        
         # Extrair dados reais do contexto
         real_data = context.get('csv_analysis', {})
         
@@ -477,6 +482,51 @@ class StatisticsGuardrails:
                     prompt += f"- {key}: R$ {value:.2f}\n"
                 else:
                     prompt += f"- {key}: {value:,}\n"
+    
+    def _validates_semantic_interpretation(self, content: str, context: Dict[str, Any]) -> bool:
+        """Valida se a resposta demonstra interpretação semântica dos chunks.
+        
+        Args:
+            content: Conteúdo da resposta do LLM
+            context: Contexto com dados dos chunks
+            
+        Returns:
+            True se a resposta demonstra interpretação semântica adequada
+        """
+        # 🛡️ GUARDRAIL: Verificar se a resposta menciona informações específicas dos chunks
+        content_lower = content.lower()
+        
+        # Verificar se há menção a elementos comuns em descrições de datasets
+        semantic_indicators = [
+            'features', 'colunas', 'columns', 'transações', 'dataset',
+            'v1', 'v2', 'v3', 'pca', 'time', 'amount', 'class',
+            'fraude', 'fraud', 'cartão', 'crédito', 'credit', 'card',
+            'numérico', 'categórico', 'temporal', 'numeric', 'categorical'
+        ]
+        
+        # Contar quantos indicadores semânticos estão presentes
+        indicators_found = sum(1 for indicator in semantic_indicators if indicator in content_lower)
+        
+        # Resposta deve mencionar pelo menos 3 indicadores semânticos
+        if indicators_found < 3:
+            self.logger.warning(f"⚠️ Resposta não demonstra interpretação semântica adequada (apenas {indicators_found} indicadores encontrados)")
+            return False
+        
+        # 🛡️ GUARDRAIL: Verificar se não é uma resposta genérica
+        generic_phrases = [
+            'não tenho informações suficientes',
+            'não posso fornecer detalhes',
+            'sem contexto adicional',
+            'dados não disponíveis'
+        ]
+        
+        for phrase in generic_phrases:
+            if phrase in content_lower:
+                self.logger.warning(f"⚠️ Resposta contém frase genérica: '{phrase}'")
+                return False
+        
+        self.logger.info(f"✅ Resposta demonstra interpretação semântica adequada ({indicators_found} indicadores encontrados)")
+        return True
         
         return prompt
 

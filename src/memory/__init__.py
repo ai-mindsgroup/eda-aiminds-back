@@ -8,7 +8,7 @@ usando Supabase como backend.
 
 from typing import Dict
 
-from .base_memory import BaseMemoryManager, MemoryMixin
+from .base_memory import BaseMemoryManager
 from .memory_types import (
     # Enums
     SessionType,
@@ -79,7 +79,6 @@ from .memory_utils import (
     identify_cleanup_candidates,
     format_memory_summary
 )
-from .supabase_memory import SupabaseMemoryManager
 
 # Versão do módulo
 __version__ = "1.0.0"
@@ -88,8 +87,8 @@ __version__ = "1.0.0"
 __all__ = [
     # Classes principais
     "BaseMemoryManager",
-    "SupabaseMemoryManager", 
-    "MemoryMixin",
+    # "SupabaseMemoryManager", 
+    # "MemoryMixin",
     
     # Tipos de dados
     "SessionInfo",
@@ -107,7 +106,7 @@ __all__ = [
     "EmbeddingType",
     
     # Configuração
-    "MemoryConfig",
+    # "MemoryConfig",
     
     # Exceções
     "MemoryError",
@@ -148,9 +147,7 @@ def create_memory_manager(agent_name: str, backend: str = "supabase") -> BaseMem
         ValueError: Se backend não suportado
     """
     if backend.lower() == "supabase":
-        return SupabaseMemoryManager(agent_name)
-    else:
-        raise ValueError(f"Backend '{backend}' não suportado. Use: 'supabase'")
+        raise ValueError("A integração SupabaseMemoryManager foi descontinuada. Utilize LangChainSupabaseMemory.")
 
 
 def get_memory_info() -> Dict[str, str]:
@@ -192,10 +189,10 @@ if __name__ == "__main__":
     
     print("\nExemplo de uso:")
     print("""
-    from src.memory import SupabaseMemoryManager, MemoryMixin
+    # from src.memory import SupabaseMemoryManager, MemoryMixin
     
     # Criar gerenciador de memória
-    memory = SupabaseMemoryManager("meu_agente")
+    # memory = SupabaseMemoryManager("meu_agente")
     
     # Inicializar sessão
     session_id = await memory.initialize_session()
