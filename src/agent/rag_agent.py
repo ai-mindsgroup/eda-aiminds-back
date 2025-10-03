@@ -210,45 +210,63 @@ class RAGAgent(BaseAgent):
             header_line = lines[0] if lines else ""
             data_lines = [line for line in lines[1:] if line.strip()]
             
-            # Detectar colunas importantes
-            has_amount = "Amount" in header_line
-            has_class = "Class" in header_line  
-            has_time = "Time" in header_line
+            # Extrair nome do arquivo CSV do metadata ou do chunk
+            csv_filename = metadata.get('source_file', 'dataset.csv')
+            if not csv_filename.endswith('.csv'):
+                # Tentar extrair do chunk_text
+                import re
+                csv_match = re.search(r'([\w-]+\.csv)', chunk_text)
+                if csv_match:
+                    csv_filename = csv_match.group(1)
             
-            # Análise básica de fraudes (contagem rápida)
-            fraud_count = 0
-            if has_class:
-                for line in data_lines[:100]:  # Amostra das primeiras 100 linhas
+            # Detectar automaticamente colunas do header (genérico para qualquer CSV)
+            detected_columns = []
+            if header_line:
+                # Parsear header (com ou sem aspas)
+                detected_columns = [col.strip().strip('"') for col in header_line.split(',')]
+                detected_columns = [col for col in detected_columns if col and not col.startswith('#')]
+            
+            # Análise genérica: detectar possíveis colunas de classificação/target (última coluna)
+            target_column = None
+            binary_class_count = 0
+            if detected_columns and len(detected_columns) > 0:
+                target_column = detected_columns[-1]  # Última coluna geralmente é o target
+                # Verificar se é binária (0 ou 1)
+                for line in data_lines[:100]:  # Amostra
                     parts = line.split(',')
-                    if parts and parts[-1].strip() == '1':  # Class=1 indica fraude
-                        fraud_count += 1
+                    if parts and parts[-1].strip() in ['0', '1', '"0"', '"1"']:
+                        binary_class_count += 1
             
-            # Construir descrição contextual otimizada
+            # Construir descrição contextual genérica e otimizada
             summary_lines = [
-                f"Chunk do dataset creditcard.csv ({row_span}) - {len(data_lines)} transações",
-                "Dataset de detecção de fraude em cartão de crédito com features PCA (V1-V28)",
+                f"Chunk do dataset {csv_filename} ({row_span}) - {len(data_lines)} registros",
             ]
             
-            if has_time:
-                summary_lines.append("Contém dados temporais (Time) para análise de padrões sequenciais")
+            # Adicionar informações sobre colunas detectadas
+            if detected_columns:
+                num_cols = len(detected_columns)
+                col_sample = ', '.join(detected_columns[:3])
+                if num_cols > 3:
+                    col_sample += f", ... ({num_cols} colunas no total)"
+                summary_lines.append(f"Colunas: {col_sample}")
             
-            if has_amount:
-                summary_lines.append("Inclui valores de transação (Amount) para análise financeira")
+            # Se detectar possível classificação binária
+            if binary_class_count > 0:
+                binary_ratio = (binary_class_count / min(len(data_lines), 100)) * 100
+                if binary_ratio > 50:  # Se >50% das linhas são binárias na última coluna
+                    if target_column:
+                        summary_lines.append(f"Coluna '{target_column}': Variável binária detectada (~{binary_ratio:.1f}% de valores binários na amostra)")
+                    else:
+                        summary_lines.append(f"Classificação binária detectada (~{binary_ratio:.1f}% na amostra)")
             
-            if has_class:
-                if fraud_count > 0:
-                    fraud_ratio = (fraud_count / min(len(data_lines), 100)) * 100
-                    summary_lines.append(f"Fraudes detectadas na amostra: ~{fraud_ratio:.1f}%")
-                else:
-                    summary_lines.append("Transações aparentemente normais (sem fraudes na amostra)")
-            
-            # Adicionar contexto das features
-            summary_lines.append("Features: V1-V28 (componentes PCA), Time, Amount, Class (0=normal, 1=fraude)")
+            # Adicionar informação sobre tipo de dados
+            if len(detected_columns) > 5:
+                summary_lines.append(f"Dataset com {len(detected_columns)} features para análise")
             
             # Amostra das primeiras linhas para contexto
             if len(data_lines) >= 2:
                 sample_line = data_lines[0][:150] + "..." if len(data_lines[0]) > 150 else data_lines[0]
-                summary_lines.append(f"Exemplo de transação: {sample_line}")
+                summary_lines.append(f"Exemplo de registro: {sample_line}")
             
             # Incluir cabeçalho para referência
             summary_lines.append(f"Colunas: {header_line}")
@@ -448,9 +466,18 @@ class RAGAgent(BaseAgent):
                 self.logger.debug(f"\n{'='*80}\n🤖 CONTEXTO COMPLETO ENVIADO AO LLM:\n{'='*80}\n{context_text[:1000]}...\n{'='*80}")
 
                 # Recuperar estatísticas do chunker para explicar diferença entre chunks e linhas do CSV
-                chunk_stats = self.chunker.get_stats([r for r in search_results if hasattr(r, 'chunk_text')])
-                total_chunks = chunk_stats.get('total_chunks', len(search_results))
-                total_csv_rows = chunk_stats.get('total_csv_rows', None)
+                # CORREÇÃO: search_results são objetos VectorSearchResult, não TextChunk
+                # Não podemos usar get_stats() diretamente, precisamos calcular manualmente
+                total_chunks = len(search_results)
+                total_csv_rows = None
+                
+                # Tentar extrair total de linhas dos metadados dos chunks
+                for result in search_results:
+                    if hasattr(result, 'metadata') and isinstance(result.metadata, dict):
+                        if 'total_csv_rows' in result.metadata:
+                            total_csv_rows = result.metadata.get('total_csv_rows')
+                            break
+                
                 explain_chunk_vs_row = ""
                 if total_csv_rows is not None:
                     explain_chunk_vs_row = (
@@ -787,9 +814,14 @@ RESPOSTA FUNDAMENTADA:"""
                 start_row = info.get("start_row", "desconhecido")
                 end_row = info.get("end_row", "desconhecido")
                 
-                # Criar descrição textual simples
-                summary = f"Dados do dataset creditcard.csv (linhas {start_row} a {end_row})\n"
-                summary += f"Total de {len(data_lines)} registros de transações\n"
+                # Detectar nome do arquivo CSV do metadata
+                csv_filename = chunk.metadata.source or "dataset.csv"
+                if not csv_filename.endswith('.csv'):
+                    csv_filename = "dataset.csv"
+                
+                # Criar descrição textual simples e genérica
+                summary = f"Dados do dataset {csv_filename} (linhas {start_row} a {end_row})\n"
+                summary += f"Total de {len(data_lines)} registros\n"
                 summary += f"Colunas: {header}\n"
                 summary += f"Primeiras linhas como exemplo:\n"
                 

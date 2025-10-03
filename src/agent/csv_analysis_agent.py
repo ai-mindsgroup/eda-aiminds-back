@@ -202,6 +202,25 @@ class EmbeddingsAnalysisAgent(BaseAgent):
             # Determinar tipo de consulta
             query_lower = query.lower()
             
+            # NOVO: Detectar solicitações de visualização (histogramas, gráficos, distribuição)
+            viz_keywords = ['histograma', 'histogram', 'distribuição', 'distribuicao', 'gráfico', 'grafico', 
+                           'visualização', 'visualizacao', 'plotar', 'plot', 'mostre graficamente']
+            if any(word in query_lower for word in viz_keywords):
+                return self._handle_visualization_query(query, context)
+            
+            # NOVO: Detectar perguntas sobre medidas de tendência central (média, mediana, moda)
+            central_tendency_keywords = ['média', 'media', 'mediana', 'median', 'mean', 
+                                        'tendência central', 'tendencia central', 'moda', 'mode',
+                                        'medidas de tendência']
+            if any(word in query_lower for word in central_tendency_keywords):
+                return self._handle_central_tendency_query_from_embeddings(query, context)
+            
+            # NOVO: Detectar perguntas sobre intervalos e estatísticas (min, max, range)
+            stats_keywords = ['intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
+                            'variância', 'desvio', 'percentil', 'quartil', 'valores']
+            if any(word in query_lower for word in stats_keywords):
+                return self._handle_statistics_query_from_embeddings(query, context)
+            
             if any(word in query_lower for word in ['resumo', 'describe', 'info', 'overview', 'summary']):
                 return self._handle_summary_query_from_embeddings(query, context)
             elif any(word in query_lower for word in ['análise', 'analyze', 'estatística', 'statistics']):
@@ -521,6 +540,414 @@ class EmbeddingsAnalysisAgent(BaseAgent):
             **analysis,
             'conformidade': 'embeddings_only'
         })
+    
+    def _handle_statistics_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre estatísticas (min, max, intervalos) usando dados reais dos embeddings.
+        
+        Args:
+            query: Pergunta do usuário sobre estatísticas
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com estatísticas calculadas a partir dos dados reais
+        """
+        try:
+            self.logger.info("📊 Calculando estatísticas reais dos dados via embeddings...")
+            
+            # Importar Python Analyzer para processar chunk_text
+            try:
+                from src.tools.python_analyzer import PythonDataAnalyzer
+                analyzer = PythonDataAnalyzer()
+            except ImportError as e:
+                self.logger.error(f"Erro ao importar PythonDataAnalyzer: {e}")
+                return self._build_response(
+                    "❌ Erro: PythonDataAnalyzer não disponível para calcular estatísticas",
+                    metadata={"error": True}
+                )
+            
+            # Obter DataFrame real dos chunks
+            df = analyzer.get_data_from_embeddings(limit=None, parse_chunk_text=True)
+            
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível obter dados dos embeddings para calcular estatísticas",
+                    metadata={"error": True}
+                )
+            
+            self.logger.info(f"✅ DataFrame carregado: {len(df)} registros, {len(df.columns)} colunas")
+            
+            # Calcular intervalos (min/max) para TODAS as colunas numéricas
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if not numeric_cols:
+                return self._build_response(
+                    "❌ Nenhuma coluna numérica encontrada nos dados",
+                    metadata={"error": True}
+                )
+            
+            # Calcular estatísticas de intervalo
+            stats_data = []
+            for col in numeric_cols:
+                col_min = df[col].min()
+                col_max = df[col].max()
+                col_range = col_max - col_min
+                stats_data.append({
+                    'variavel': col,
+                    'minimo': col_min,
+                    'maximo': col_max,
+                    'amplitude': col_range
+                })
+            
+            # Formatar resposta
+            response = f"""📊 **Intervalo de Cada Variável (Mínimo e Máximo)**
+
+**Fonte:** Dados reais extraídos da tabela embeddings (coluna chunk_text parseada)
+**Total de registros analisados:** {len(df):,}
+**Total de variáveis numéricas:** {len(numeric_cols)}
+
+"""
+            
+            # Adicionar tabela formatada
+            response += "| Variável | Mínimo | Máximo | Amplitude |\n"
+            response += "|----------|--------|--------|----------|\n"
+            
+            # Mostrar TODAS as variáveis (removida limitação de 15)
+            for stat in stats_data:
+                var_name = stat['variavel']
+                var_min = stat['minimo']
+                var_max = stat['maximo']
+                var_range = stat['amplitude']
+                
+                # Formatar valores com precisão adequada
+                if abs(var_min) < 1000 and abs(var_max) < 1000:
+                    response += f"| {var_name} | {var_min:.6f} | {var_max:.6f} | {var_range:.6f} |\n"
+                else:
+                    response += f"| {var_name} | {var_min:.2f} | {var_max:.2f} | {var_range:.2f} |\n"
+            
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+            response += f"✅ **Método:** Parsing de chunk_text + análise com pandas\n"
+            
+            return self._build_response(response, metadata={
+                'total_records': len(df),
+                'total_numeric_columns': len(numeric_cols),
+                'statistics': stats_data,
+                'conformidade': 'embeddings_only',
+                'query_type': 'statistics'
+            })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao calcular estatísticas: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao calcular estatísticas dos dados: {str(e)}",
+                metadata={"error": True, "conformidade": "embeddings_only"}
+            )
+    
+    def _handle_central_tendency_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre medidas de tendência central (média, mediana, moda) usando dados REAIS dos embeddings.
+        
+        Args:
+            query: Pergunta do usuário sobre medidas de tendência central
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com medidas de tendência central calculadas a partir dos dados reais
+        """
+        try:
+            self.logger.info("📊 Calculando medidas de tendência central dos dados via embeddings...")
+            
+            # Importar Python Analyzer para processar chunk_text
+            try:
+                from src.tools.python_analyzer import PythonDataAnalyzer
+                analyzer = PythonDataAnalyzer(caller_agent=self.name)
+            except ImportError as e:
+                self.logger.error(f"Erro ao importar PythonDataAnalyzer: {e}")
+                return self._build_response(
+                    "❌ Erro: PythonDataAnalyzer não disponível para calcular medidas de tendência central",
+                    metadata={"error": True}
+                )
+            
+            # Obter DataFrame real dos chunks (APENAS EMBEDDINGS - NUNCA CSV)
+            df = analyzer.get_data_from_embeddings(limit=None, parse_chunk_text=True)
+            
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível obter dados dos embeddings para calcular medidas de tendência central",
+                    metadata={"error": True}
+                )
+            
+            self.logger.info(f"✅ DataFrame carregado: {len(df)} registros, {len(df.columns)} colunas")
+            
+            # Calcular medidas de tendência central para TODAS as colunas numéricas
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if not numeric_cols:
+                return self._build_response(
+                    "❌ Nenhuma coluna numérica encontrada nos dados",
+                    metadata={"error": True}
+                )
+            
+            # Calcular média, mediana e moda
+            stats_data = []
+            for col in numeric_cols:
+                col_mean = df[col].mean()
+                col_median = df[col].median()
+                
+                # Moda (pode ter múltiplas modas)
+                mode_values = df[col].mode()
+                col_mode = mode_values.iloc[0] if len(mode_values) > 0 else None
+                
+                stats_data.append({
+                    'variavel': col,
+                    'media': col_mean,
+                    'mediana': col_median,
+                    'moda': col_mode
+                })
+            
+            # Formatar resposta
+            response = f"""📊 **Medidas de Tendência Central**
+
+**Fonte:** Dados reais extraídos da tabela embeddings (coluna chunk_text parseada)
+**Total de registros analisados:** {len(df):,}
+**Total de variáveis numéricas:** {len(numeric_cols)}
+
+**O que são Medidas de Tendência Central?**
+
+As medidas de tendência central são estatísticas que descrevem o valor central de uma distribuição de dados:
+
+• **Média**: Soma de todos os valores dividida pelo número de valores. Sensível a outliers.
+• **Mediana**: Valor do meio quando os dados estão ordenados. Mais robusta a outliers.
+• **Moda**: Valor que aparece com maior frequência nos dados.
+
+"""
+            
+            # Adicionar tabela formatada
+            response += "| Variável | Média | Mediana | Moda |\n"
+            response += "|----------|-------|---------|------|\n"
+            
+            # Mostrar TODAS as variáveis (removida limitação de 15)
+            for stat in stats_data:
+                var_name = stat['variavel']
+                var_mean = stat['media']
+                var_median = stat['mediana']
+                var_mode = stat['moda']
+                
+                # Formatar valores com precisão adequada
+                if abs(var_mean) < 1000 and abs(var_median) < 1000:
+                    mode_str = f"{var_mode:.6f}" if var_mode is not None else "N/A"
+                    response += f"| {var_name} | {var_mean:.6f} | {var_median:.6f} | {mode_str} |\n"
+                else:
+                    mode_str = f"{var_mode:.2f}" if var_mode is not None else "N/A"
+                    response += f"| {var_name} | {var_mean:.2f} | {var_median:.2f} | {mode_str} |\n"
+            
+            response += f"\n**Diferença entre Média e Mediana:**\n"
+            response += f"• A média é sensível a valores extremos (outliers), enquanto a mediana não.\n"
+            response += f"• Se houver outliers nos dados, a mediana é uma medida mais representativa do centro.\n"
+            response += f"• Para distribuições simétricas, média e mediana têm valores próximos.\n"
+            
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+            response += f"✅ **Método:** Parsing de chunk_text + análise com pandas\n"
+            
+            return self._build_response(response, metadata={
+                'total_records': len(df),
+                'total_numeric_columns': len(numeric_cols),
+                'central_tendency': stats_data,
+                'conformidade': 'embeddings_only',
+                'query_type': 'central_tendency'
+            })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao calcular medidas de tendência central: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao calcular medidas de tendência central dos dados: {str(e)}",
+                metadata={"error": True, "conformidade": "embeddings_only"}
+            )
+    
+    def _handle_visualization_query(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas que solicitam visualizações (histogramas, gráficos, distribuição).
+        
+        Args:
+            query: Pergunta do usuário solicitando visualização
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com histogramas gerados e salvos em arquivos
+        """
+        try:
+            self.logger.info("📊 Processando solicitação de visualização...")
+            
+            # Importar módulos necessários
+            from src.tools.python_analyzer import PythonDataAnalyzer
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            import os
+            from pathlib import Path
+            
+            # Configurar estilo dos gráficos
+            sns.set_style("whitegrid")
+            
+            # Inicializar analyzer
+            analyzer = PythonDataAnalyzer(caller_agent=self.name)
+            
+            # Reconstruir DataFrame a partir dos embeddings
+            self.logger.info("🔄 Reconstruindo DataFrame a partir dos embeddings...")
+            df = analyzer.reconstruct_original_data()
+            
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível reconstruir os dados para gerar visualizações. Verifique se há dados na tabela embeddings.",
+                    metadata={"error": True, "conformidade": "embeddings_only"}
+                )
+            
+            self.logger.info(f"✅ DataFrame reconstruído: {df.shape[0]} linhas, {df.shape[1]} colunas")
+            
+            # Criar diretório de saída
+            output_dir = Path('outputs/histogramas')
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Separar variáveis numéricas e categóricas
+            numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+            
+            self.logger.info(f"📊 Gerando histogramas para {len(numeric_cols)} variáveis numéricas...")
+            self.logger.info(f"📊 Gerando gráficos de barras para {len(categorical_cols)} variáveis categóricas...")
+            
+            graficos_gerados = []
+            estatisticas_geradas = {}
+            
+            # Gerar histogramas para variáveis numéricas
+            for col in numeric_cols:
+                try:
+                    self.logger.info(f"  Gerando histograma para: {col}")
+                    
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    
+                    # Histograma
+                    ax.hist(df[col].dropna(), bins=50, alpha=0.7, color='steelblue', edgecolor='black')
+                    
+                    # Estatísticas
+                    mean_val = df[col].mean()
+                    median_val = df[col].median()
+                    std_val = df[col].std()
+                    
+                    # Linhas de referência
+                    ax.axvline(mean_val, color='red', linestyle='--', linewidth=2, label=f'Média: {mean_val:.2f}')
+                    ax.axvline(median_val, color='green', linestyle='--', linewidth=2, label=f'Mediana: {median_val:.2f}')
+                    
+                    ax.set_xlabel(col, fontsize=12)
+                    ax.set_ylabel('Frequência', fontsize=12)
+                    ax.set_title(f'Distribuição de {col}', fontsize=14, fontweight='bold')
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Salvar
+                    filename = output_dir / f'hist_{col}.png'
+                    plt.tight_layout()
+                    plt.savefig(filename, dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                    graficos_gerados.append(str(filename))
+                    estatisticas_geradas[col] = {
+                        'mean': float(mean_val),
+                        'median': float(median_val),
+                        'std': float(std_val),
+                        'min': float(df[col].min()),
+                        'max': float(df[col].max()),
+                        'count': int(df[col].count()),
+                        'missing': int(df[col].isna().sum())
+                    }
+                    
+                    self.logger.info(f"  ✅ Histograma salvo: {filename}")
+                    
+                except Exception as e:
+                    self.logger.error(f"  ❌ Erro ao gerar histograma para {col}: {e}")
+            
+            # Gerar gráficos de barras para variáveis categóricas (limitado a variáveis com poucos valores únicos)
+            for col in categorical_cols:
+                try:
+                    unique_count = df[col].nunique()
+                    if unique_count > 20:  # Limitar a variáveis com até 20 valores únicos
+                        self.logger.info(f"  Pulando {col} (muitos valores únicos: {unique_count})")
+                        continue
+                    
+                    self.logger.info(f"  Gerando gráfico de barras para: {col}")
+                    
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    
+                    # Contagem de valores
+                    value_counts = df[col].value_counts()
+                    
+                    # Gráfico de barras
+                    value_counts.plot(kind='bar', ax=ax, color='coral', edgecolor='black', alpha=0.7)
+                    
+                    ax.set_xlabel(col, fontsize=12)
+                    ax.set_ylabel('Frequência', fontsize=12)
+                    ax.set_title(f'Distribuição de {col}', fontsize=14, fontweight='bold')
+                    ax.grid(True, alpha=0.3, axis='y')
+                    
+                    # Rotacionar labels se necessário
+                    plt.xticks(rotation=45, ha='right')
+                    
+                    # Salvar
+                    filename = output_dir / f'bar_{col}.png'
+                    plt.tight_layout()
+                    plt.savefig(filename, dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                    graficos_gerados.append(str(filename))
+                    estatisticas_geradas[col] = {
+                        'unique_values': unique_count,
+                        'most_common': str(value_counts.index[0]) if len(value_counts) > 0 else None,
+                        'most_common_count': int(value_counts.values[0]) if len(value_counts) > 0 else 0,
+                        'count': int(df[col].count()),
+                        'missing': int(df[col].isna().sum())
+                    }
+                    
+                    self.logger.info(f"  ✅ Gráfico de barras salvo: {filename}")
+                    
+                except Exception as e:
+                    self.logger.error(f"  ❌ Erro ao gerar gráfico para {col}: {e}")
+            
+            # Construir resposta
+            if graficos_gerados:
+                response = f"""📊 **Visualizações Geradas com Sucesso!**
+
+✅ Total de gráficos gerados: {len(graficos_gerados)}
+   • Histogramas (variáveis numéricas): {len([g for g in graficos_gerados if 'hist_' in g])}
+   • Gráficos de barras (variáveis categóricas): {len([g for g in graficos_gerados if 'bar_' in g])}
+
+📁 **Local dos arquivos:**
+   {output_dir.absolute()}
+
+📈 **Gráficos salvos:**
+"""
+                for i, grafico in enumerate(graficos_gerados, 1):
+                    response += f"   {i}. {Path(grafico).name}\n"
+                
+                response += f"\n💡 **Dica:** Você pode visualizar os gráficos abrindo os arquivos PNG no diretório indicado."
+                
+                return self._build_response(response, metadata={
+                    'graficos_gerados': graficos_gerados,
+                    'estatisticas': estatisticas_geradas,
+                    'output_dir': str(output_dir.absolute()),
+                    'numeric_cols': numeric_cols,
+                    'categorical_cols': categorical_cols,
+                    'conformidade': 'embeddings_only',
+                    'visualization_success': True
+                })
+            else:
+                return self._build_response(
+                    "❌ Não foi possível gerar visualizações. Verifique os logs para mais detalhes.",
+                    metadata={'error': True, 'conformidade': 'embeddings_only'}
+                )
+                
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao processar visualização: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._build_response(
+                f"❌ Erro ao gerar visualizações: {str(e)}",
+                metadata={'error': True, 'conformidade': 'embeddings_only', 'exception': str(e)}
+            )
     
     def _handle_general_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa consultas gerais usando embeddings."""

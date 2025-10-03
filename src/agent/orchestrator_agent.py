@@ -434,10 +434,23 @@ class OrchestratorAgent(BaseAgent):
                 if chunk_text:
                     sample_chunks.append(chunk_text[:200])  # Primeiros 200 caracteres
                 
-                # Extrair informações específicas dos chunks sobre dataset
-                if 'creditcard.csv' in chunk_text.lower():
-                    dataset_info['dataset_name'] = 'creditcard.csv'
+                # Extrair informações genéricas dos chunks sobre dataset
+                # Detectar nome do arquivo CSV
+                import re
+                csv_match = re.search(r'([\w-]+\.csv)', chunk_text)
+                if csv_match:
+                    dataset_info['dataset_name'] = csv_match.group(1)
+                
+                # Detectar tipo de dataset baseado em palavras-chave genéricas
+                chunk_lower = chunk_text.lower()
+                if 'fraud' in chunk_lower or 'fraude' in chunk_lower:
                     dataset_info['type'] = 'fraud_detection'
+                elif 'classification' in chunk_lower or 'classificação' in chunk_lower:
+                    dataset_info['type'] = 'classification'
+                elif 'regression' in chunk_lower or 'regressão' in chunk_lower:
+                    dataset_info['type'] = 'regression'
+                else:
+                    dataset_info['type'] = 'general'
                 
                 # Tentar extrair informações de colunas dos chunks
                 if 'colunas:' in chunk_text.lower() or 'columns:' in chunk_text.lower():
@@ -459,47 +472,54 @@ class OrchestratorAgent(BaseAgent):
                 context['file_path'] = dataset_info['dataset_name']
                 context['csv_analysis'] += f" Dataset: {dataset_info['dataset_name']}"
                 
-                if dataset_info.get('type') == 'fraud_detection':
-                    context['csv_analysis'] += " (detecção de fraude em cartão de crédito)"
-                    
-                    # NOVA FUNCIONALIDADE: Calcular estatísticas reais usando Python Analyzer
-                    if PYTHON_ANALYZER_AVAILABLE and python_analyzer:
-                        try:
-                            self.logger.info("🔢 Calculando estatísticas reais com Python Analyzer...")
-                            real_stats = python_analyzer.calculate_real_statistics("all")
+                # 🔧 SISTEMA GENÉRICO: Calcular estatísticas reais para QUALQUER CSV
+                if PYTHON_ANALYZER_AVAILABLE and python_analyzer:
+                    try:
+                        self.logger.info("🔢 Calculando estatísticas reais com Python Analyzer...")
+                        real_stats = python_analyzer.calculate_real_statistics("all")
+                        
+                        if "error" not in real_stats:
+                            # Usar estatísticas reais ao invés de estimativas
+                            context['csv_analysis'] += f"\n\n📊 ESTATÍSTICAS REAIS (do chunk_text parseado):"
+                            context['csv_analysis'] += f"\n- Total de registros: {real_stats['total_records']:,}"
+                            context['csv_analysis'] += f"\n- Total de colunas: {real_stats['total_columns']}"
                             
-                            if "error" not in real_stats:
-                                # Usar estatísticas reais ao invés de estimativas
-                                context['csv_analysis'] += f"\n\n📊 ESTATÍSTICAS REAIS:"
-                                context['csv_analysis'] += f"\n- Total de registros: {real_stats['total_records']:,}"
-                                context['csv_analysis'] += f"\n- Total de colunas: {real_stats['total_columns']}"
+                            if 'tipos_dados' in real_stats:
+                                tipos = real_stats['tipos_dados']
+                                # ✅ INFORMAÇÃO ESTRUTURADA GENÉRICA DAS COLUNAS (funciona com qualquer CSV)
+                                context['csv_analysis'] += f"\n\n📋 COLUNAS RECONSTRUÍDAS DA TABELA EMBEDDINGS (chunk_text parseado):"
+                                context['csv_analysis'] += f"\n- Colunas totais: {real_stats['total_columns']}"
+                                context['csv_analysis'] += f"\n- Lista completa de colunas: {real_stats['columns']}"
+                                context['csv_analysis'] += f"\n\n📊 TIPOS DE DADOS (baseado em dtypes reais do DataFrame parseado):"
+                                context['csv_analysis'] += f"\n- Numéricas ({tipos['total_numericos']}): {tipos['numericos']}"
+                                context['csv_analysis'] += f"\n- Categóricas ({tipos['total_categoricos']}): {tipos['categoricos']}"
+                                if tipos.get('datetime'):
+                                    context['csv_analysis'] += f"\n- Temporais ({tipos['total_datetime']}): {tipos['datetime']}"
                                 
-                                if 'tipos_dados' in real_stats:
-                                    tipos = real_stats['tipos_dados']
-                                    context['columns_summary'] = f"Numéricos: {', '.join(tipos['numericos'][:5])}... ({tipos['total_numericos']} colunas), Categóricos: {', '.join(tipos['categoricos'])}"
+                                context['columns_summary'] = f"Numéricos: {', '.join(tipos['numericos'][:5])}{'...' if len(tipos['numericos']) > 5 else ''} ({tipos['total_numericos']} colunas), Categóricos: {', '.join(tipos['categoricos'])}"
+                            
+                            # 🔍 Estatísticas específicas por tipo de dataset (APENAS se for fraud_detection e tiver as colunas)
+                            if 'estatisticas' in real_stats and dataset_info.get('type') == 'fraud_detection':
+                                stats = real_stats['estatisticas']
+                                # Verificar se as colunas específicas existem antes de tentar acessar
+                                if 'Amount' in stats:
+                                    amt = stats['Amount']
+                                    context['csv_analysis'] += f"\n- Amount: média=R$ {amt['mean']:.2f}, desvio=R$ {amt['std']:.2f}, min=R$ {amt['min']:.2f}, max=R$ {amt['max']:.2f}"
                                 
-                                if 'estatisticas' in real_stats:
-                                    stats = real_stats['estatisticas']
-                                    if 'Amount' in stats:
-                                        amt = stats['Amount']
-                                        context['csv_analysis'] += f"\n- Amount: média=R$ {amt['mean']:.2f}, desvio=R$ {amt['std']:.2f}, min=R$ {amt['min']:.2f}, max=R$ {amt['max']:.2f}"
-                                    
-                                    if 'Class' in stats:
-                                        cls = stats['Class']
-                                        context['csv_analysis'] += f"\n- Class: {cls['value_counts']}"
+                                if 'Class' in stats:
+                                    cls = stats['Class']
+                                    context['csv_analysis'] += f"\n- Class: {cls.get('value_counts', 'N/A')}"
+                                    if 'percentages' in cls:
                                         for val, pct in cls['percentages'].items():
                                             label = "Normal" if val == 0 else "Fraude"
                                             context['csv_analysis'] += f"\n  • {label} (Class {val}): {pct:.2f}%"
-                                
-                                self.logger.info("✅ Estatísticas reais calculadas com sucesso")
-                            else:
-                                self.logger.warning(f"⚠️ Erro no Python Analyzer: {real_stats.get('error')}")
-                                # Fallback para informações genéricas
-                                context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
-                                context['shape'] = "284.807 transações, 31 colunas"
-                                context['csv_analysis'] += "\n\nEstrutura genérica do dataset de fraudes (estatísticas aproximadas)"
-                        
-                        except Exception as e:
+                            
+                            self.logger.info("✅ Estatísticas reais calculadas com sucesso")
+                        else:
+                            self.logger.warning(f"⚠️ Erro no Python Analyzer: {real_stats.get('error')}")
+                            # Não há fallback com colunas hardcoded - sistema deve funcionar genericamente
+                    
+                    except Exception as e:
                             self.logger.error(f"❌ Erro ao calcular estatísticas reais: {str(e)}")
                             # Fallback para informações genéricas
                             context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
@@ -567,7 +587,9 @@ class OrchestratorAgent(BaseAgent):
             'csv', 'tabela', 'dados', 'análise', 'estatística', 'correlação',
             'gráfico', 'plot', 'visualização', 'resumo', 'describe', 'dataset',
             'colunas', 'linhas', 'média', 'mediana', 'fraude', 'outlier',
-            'tipos de dados', 'numéricos', 'categóricos', 'distribuição'
+            'tipos de dados', 'numéricos', 'categóricos', 'distribuição',
+            'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
+            'variância', 'desvio', 'percentil', 'quartil', 'valores'
         ]
         
         rag_keywords = [
@@ -611,7 +633,24 @@ class OrchestratorAgent(BaseAgent):
         llm_score = sum(3 for kw in llm_keywords if kw in query_lower)  # Peso triplicado para LLM
         general_score = sum(1 for kw in general_keywords if kw in query_lower)
         
-        # NOVA LÓGICA: Se há dados no Supabase, priorizar LLM analysis
+        # PRIORIDADE: Se há visualização detectada, sempre usar CSV_ANALYSIS
+        # porque apenas o EmbeddingsAnalysisAgent tem o método _handle_visualization_query
+        if viz_type and has_supabase_data:
+            self.logger.info("🎨 Redirecionando para CSV analysis (visualização solicitada)")
+            return QueryType.CSV_ANALYSIS
+        
+        # PRIORIDADE 2: Se há palavras-chave de estatísticas (min, max, intervalo), usar CSV_ANALYSIS
+        # porque o agente CSV tem método específico para calcular estatísticas reais
+        stats_keywords = [
+            'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
+            'variância', 'desvio', 'percentil', 'quartil',
+            'média', 'mediana', 'mean', 'median', 'tendência central'
+        ]
+        if has_supabase_data and any(kw in query_lower for kw in stats_keywords):
+            self.logger.info("📊 Redirecionando para CSV analysis (estatísticas solicitadas)")
+            return QueryType.CSV_ANALYSIS
+        
+        # NOVA LÓGICA: Se há dados no Supabase (mas não visualização ou stats), priorizar LLM analysis
         if has_supabase_data and (csv_score > 0 or data_score > 0):
             self.logger.info("🔄 Redirecionando para LLM analysis (dados no Supabase detectados)")
             return QueryType.LLM_ANALYSIS
@@ -671,7 +710,7 @@ class OrchestratorAgent(BaseAgent):
         if result.get("metadata") and not result["metadata"].get("error"):
             self.current_data_context.update(result["metadata"])
         
-        return self._enhance_response(result, ["csv"])
+        return self._enhance_response(result, ["embeddings_analyzer"])
     
     def _handle_rag_search(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Delega busca semântica para o agente RAG."""
@@ -967,7 +1006,7 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             # 8. REGISTRAR AGENTES USADOS CORRETAMENTE
             agents_used = ["llm_manager"]
             if needs_data_analysis and self.current_data_context.get("csv_loaded"):
-                agents_used.append("csv")  # CSV foi usado para carregar dados
+                agents_used.append("embeddings_analyzer")  # Agente de análise via embeddings
             
             return self._enhance_response(result, agents_used)
             
@@ -996,7 +1035,7 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             if "csv" in self.agents and self.current_data_context:
                 csv_result = self.agents["csv"].process(query, context)
                 results.append(("csv", csv_result))
-                agents_used.append("csv")
+                agents_used.append("embeddings_analyzer")  # Nome correto do agente
             
             # Segundo: busca RAG
             if "rag" in self.agents:
@@ -1521,46 +1560,34 @@ Responda de forma clara, precisa e útil. Use português brasileiro.""")
         
         # Instrução final diferenciada
         if needs_data_analysis and context and context.get("csv_loaded"):
-            # 🔄 CORREÇÃO: Se há contexto RAG, priorizar interpretação semântica GENÉRICA
-            if context.get("rag_context"):
-                prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA INTERPRETAÇÃO SEMÂNTICA (GENÉRICA PARA QUALQUER CSV):
+            # 🔄 CORREÇÃO CRÍTICA: Sempre analisar dados CSV ESTRUTURADOS reconstruídos da tabela embeddings
+            prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA ANÁLISE DE DADOS CSV (da tabela embeddings):
 
-📋 CONTEXTO RECEBIDO:
-- Você recebeu DESCRIÇÕES TEXTUAIS do dataset na seção "ANÁLISE DOS DADOS"
-- Essas descrições contêm informações sobre a ESTRUTURA e COLUNAS do dataset original
-- Essas descrições foram geradas automaticamente durante a ingestão do arquivo CSV
+� CONTEXTO RECEBIDO:
+- Você recebeu DADOS ESTRUTURADOS (DataFrame) reconstruídos da coluna chunk_text da tabela embeddings
+- Esses dados foram parseados como CSV e representam as COLUNAS ORIGINAIS do arquivo CSV carregado
+- As estatísticas fornecidas (dtypes, describe, info) refletem os DADOS REAIS, não a estrutura da tabela embeddings
 
-🔍 COMO INTERPRETAR:
-1. LEIA o conteúdo textual das descrições fornecidas
-2. IDENTIFIQUE menções a:
-   - Nomes de colunas/features mencionados
-   - Tipos de dados descritos (numérico, categórico, temporal, texto)
-   - Exemplos de dados ou valores mencionados
-   - Estrutura do dataset (linhas, colunas, dimensões)
-   
-3. CLASSIFIQUE os tipos de dados baseado nas descrições:
-   - **Numéricos**: Colunas descritas como numéricas, valores numéricos, medidas, quantidades, componentes matemáticos (ex: PCA), valores decimais
-   - **Categóricos**: Colunas descritas como categorias, classes, labels, tipos, grupos, valores discretos
-   - **Temporais**: Colunas descritas como datas, timestamps, tempo, temporais
-   - **Texto**: Colunas descritas como texto, strings, descrições
+🔍 COMO ANALISAR:
+1. EXAMINE as COLUNAS listadas na seção "ANÁLISE DOS DADOS"
+2. IDENTIFIQUE os TIPOS DE DADOS usando dtypes:
+   - **Numéricos**: float64, int64, float32, int32, etc.
+   - **Categóricos**: object, category, bool
+   - **Temporais**: datetime64, timedelta
+   - **Texto**: object (sem padrão numérico)
 
-⚠️ IMPORTANTE:
-- NÃO analise a estrutura da tabela embeddings (id, chunk_text, created_at)
-- ANALISE o CONTEÚDO TEXTUAL dentro das descrições que falam sobre o dataset real
-- Seja GENÉRICO: não assuma colunas específicas, extraia do que está descrito
-- Se as descrições mencionam "Colunas:" ou "Features:", liste-as
-- Se as descrições incluem exemplos de dados, use-os para inferir tipos
-- Seja específico sobre o que ENCONTROU nas descrições, não o que SUPÕE""")
-            else:
-                prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA ANÁLISE DE DADOS:
-- Use EXCLUSIVAMENTE os dados reais fornecidos no contexto
-- Para tipos de dados: Base-se apenas nos dtypes técnicos (int64=numérico, object=categórico)
-- Para estatísticas: Use apenas os valores calculados fornecidos
-- Para distribuições: Use apenas as contagens reais fornecidas
-- NÃO interprete semanticamente nomes de colunas
-- NÃO faça suposições além dos dados fornecidos
-- Seja preciso sobre números e estatísticas REAIS
-- Se a informação não está no contexto, diga que não tem acesso a ela""")
+3. USE as ESTATÍSTICAS FORNECIDAS:
+   - Para distribuições: count, mean, std, min, max, quartis
+   - Para valores únicos: nunique(), value_counts()
+   - Para tipos: dtypes explícitos
+
+⚠️ REGRAS CRÍTICAS:
+- Use APENAS os dtypes fornecidos para classificar tipos de dados
+- NÃO confunda com colunas da tabela embeddings (id, chunk_text, created_at, embedding)
+- NÃO interprete palavras soltas ou descrições textuais como se fossem colunas
+- Se o contexto mostra "Colunas: ['Time', 'V1', ..., 'Amount', 'Class']", essas são as colunas REAIS
+- Seja PRECISO: liste EXATAMENTE as colunas fornecidas, com seus tipos REAIS
+- Se a informação não está no contexto estruturado, diga que não tem acesso a ela""")
         else:
             prompt_parts.append("\n🎯 Forneça uma resposta útil e estruturada:")
         

@@ -138,15 +138,16 @@ class PythonDataAnalyzer:
             'np': np,
         }
     
-    def get_data_from_embeddings(self, limit: int = None, metadata_filter: Dict = None) -> Optional[pd.DataFrame]:
+    def get_data_from_embeddings(self, limit: int = None, metadata_filter: Dict = None, parse_chunk_text: bool = True) -> Optional[pd.DataFrame]:
         """Recupera dados APENAS da tabela embeddings (CONFORMIDADE).
         
         Args:
             limit: Limite de registros (None para todos)
             metadata_filter: Filtros por metadata
+            parse_chunk_text: Se True, parseia o conteúdo CSV do chunk_text para reconstruir colunas originais (PADRÃO: True)
             
         Returns:
-            DataFrame com os dados ou None se falhar
+            DataFrame com os dados PARSEADOS do CSV original ou None se falhar
         """
         if not SUPABASE_CLIENT_AVAILABLE or not supabase:
             self.logger.error("Cliente Supabase não disponível")
@@ -174,7 +175,18 @@ class PythonDataAnalyzer:
             df = pd.DataFrame(result.data)
             self.logger.info(f"✅ Dados recuperados: {len(df)} registros da tabela embeddings")
             
-            # Remover colunas com tipos não-hashable (metadata, embedding) para evitar erros
+            # SEMPRE tentar parsear chunk_text para reconstruir dados originais do CSV
+            if 'chunk_text' in df.columns:
+                self.logger.info("🔄 Parseando chunk_text para reconstruir colunas originais do CSV...")
+                parsed_df = self._parse_chunk_text_to_dataframe(df)
+                if parsed_df is not None:
+                    self.logger.info(f"✅ Dados parseados com sucesso: {len(parsed_df)} linhas, {len(parsed_df.columns)} colunas originais")
+                    self.logger.info(f"📊 Colunas reconstruídas: {list(parsed_df.columns)}")
+                    return parsed_df
+                else:
+                    self.logger.warning("⚠️ Falha ao parsear chunk_text, retornando dados brutos da tabela embeddings")
+            
+            # Fallback: Remover colunas com tipos não-hashable (metadata, embedding) para evitar erros
             if 'metadata' in df.columns:
                 df = df.drop(columns=['metadata'])
             if 'embedding' in df.columns:
@@ -184,6 +196,130 @@ class PythonDataAnalyzer:
             
         except Exception as e:
             self.logger.error(f"Erro ao recuperar dados da tabela embeddings: {str(e)}")
+            return None
+    
+    def _parse_chunk_text_to_dataframe(self, embeddings_df: pd.DataFrame) -> Optional[pd.DataFrame]:
+        """Parseia o conteúdo CSV dentro do chunk_text para reconstruir DataFrame original.
+        
+        Args:
+            embeddings_df: DataFrame com coluna chunk_text contendo CSV
+            
+        Returns:
+            DataFrame com colunas originais do CSV ou None se falhar
+        """
+        try:
+            all_rows = []
+            header_found = None
+            
+            for idx, row in embeddings_df.iterrows():
+                chunk_text = row.get('chunk_text', '')
+                if not chunk_text or not isinstance(chunk_text, str):
+                    continue
+                
+                # Separar linhas do chunk
+                lines = chunk_text.strip().split('\n')
+                
+                # Procurar pelo cabeçalho CSV (linha que começa com aspas ou tem muitas vírgulas)
+                for line_idx, line in enumerate(lines):
+                    line = line.strip()
+                    
+                    # Pular linhas vazias, metadados ou descrições
+                    if not line or line.startswith('#') or line.startswith('CHUNK'):
+                        continue
+                    
+                    # IMPORTANTE: Ignorar linha descritiva que começa com "Colunas: "
+                    # Exemplo: Colunas: "Time","V1","V2"... (isso é metadado, não o header real)
+                    if line.startswith('Colunas:'):
+                        continue
+                    
+                    # Pular linha separadora
+                    if line.startswith('==='):
+                        continue
+                    
+                    # Detectar header REAL: linha que começa diretamente com aspas
+                    # Header válido para QUALQUER CSV: linha que começa com " e contém vírgulas separando colunas
+                    # Exemplos válidos: "Time","V1","V2" ou "Nome","Idade","Cidade" ou "id","valor","status"
+                    # A linha DEVE começar com " (aspas) para ser considerada header válido
+                    if header_found is None and line.startswith('"') and '","' in line:
+                        # Para ser header válido, deve ter pelo menos 2 colunas (separadas por ",")
+                        # Isso funciona para QUALQUER CSV, não apenas creditcard
+                        tentative_header = [col.strip().strip('"').strip() for col in line.split(',')]
+                        tentative_header = [col for col in tentative_header if col]  # Remover vazios
+                        
+                        # Validar que temos pelo menos 2 colunas com nomes válidos
+                        if len(tentative_header) >= 2:
+                            # Validar que os nomes não são apenas números (provavelmente são dados, não header)
+                            non_numeric_count = sum(1 for col in tentative_header[:5] if not col.replace('.','',1).replace('-','',1).isdigit())
+                            
+                            # Se a maioria das primeiras colunas não são puramente numéricas, é um header válido
+                            if non_numeric_count >= max(2, len(tentative_header[:5]) // 2):
+                                header_found = tentative_header
+                                self.logger.info(f"📋 Header CSV detectado: {len(header_found)} colunas - {header_found[:5]}...")
+                                continue
+                    
+                    # Se já temos header, parsear linhas de dados
+                    # Linha de dados: não começa com aspas, tem vírgulas, não é metadado
+                    if header_found and ',' in line:
+                        # Pular linhas de metadados/descrição
+                        skip_keywords = ['Chunk', 'Dataset', 'Contém', 'Inclui', 'Features', 
+                                       'Exemplo', 'Colunas:', 'Transações', '===', '---']
+                        if any(line.startswith(kw) for kw in skip_keywords):
+                            continue
+                        
+                        # Pular se for linha de header duplicada (começa com aspas)
+                        if line.startswith('"'):
+                            continue
+                        
+                        try:
+                            # Dividir por vírgula
+                            values = line.split(',')
+                            
+                            # Limpar valores (remover aspas extras se houver)
+                            values = [v.strip().strip('"') for v in values]
+                            
+                            # Verificar se tem o mesmo número de colunas do header
+                            if len(values) == len(header_found):
+                                all_rows.append(values)
+                            elif len(values) > len(header_found):
+                                # Truncar valores extras
+                                all_rows.append(values[:len(header_found)])
+                            elif len(values) >= len(header_found) - 2:  # Tolerância de 2 colunas
+                                # Preencher com None
+                                all_rows.append(values + [None] * (len(header_found) - len(values)))
+                        except Exception as e:
+                            self.logger.debug(f"Erro ao parsear linha: {str(e)}")
+                            continue
+            
+            if not header_found:
+                self.logger.warning("Nenhum header CSV encontrado no chunk_text")
+                return None
+                
+            if not all_rows:
+                self.logger.warning("Nenhuma linha de dados CSV encontrada no chunk_text")
+                self.logger.debug(f"Amostra de chunk_text analisado (primeiros 500 chars): {str(embeddings_df['chunk_text'].iloc[0])[:500] if len(embeddings_df) > 0 else 'N/A'}")
+                return None
+            
+            self.logger.info(f"📊 Parseando CSV: {len(all_rows)} linhas encontradas, {len(header_found)} colunas detectadas")
+            self.logger.info(f"📋 Colunas: {header_found}")
+            
+            # Criar DataFrame
+            df = pd.DataFrame(all_rows, columns=header_found)
+            
+            # Tentar converter colunas numéricas
+            for col in df.columns:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                except:
+                    pass
+            
+            self.logger.info(f"✅ DataFrame reconstruído: {len(df)} linhas, {len(df.columns)} colunas")
+            self.logger.info(f"📊 Tipos de dados: {df.dtypes.to_dict()}")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao parsear chunk_text: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return None
     
     def get_data_from_supabase(self, table: str = 'embeddings', limit: int = None) -> Optional[pd.DataFrame]:
@@ -234,153 +370,79 @@ class PythonDataAnalyzer:
             return None
     
     def reconstruct_original_data(self) -> Optional[pd.DataFrame]:
-        """Reconstrói dados originais do CSV a partir dos embeddings.
+        """Reconstrói dados originais APENAS da tabela embeddings do Supabase.
         
         Returns:
-            DataFrame com dados originais ou None se falhar
+            DataFrame com dados parseados do chunk_text ou None se falhar
+            
+        ⚠️ CONFORMIDADE TOTAL: APENAS SUPABASE EMBEDDINGS - NENHUM CSV.
         """
         try:
-            # Estratégia 1: Tentar detectar arquivo CSV automaticamente
-            self.logger.info("Tentando reconstruir dados originais...")
+            self.logger.info("🔄 Reconstruindo dados originais APENAS da tabela embeddings...")
             
-            embeddings_df = self.get_data_from_supabase('embeddings', limit=100)
-            if embeddings_df is None or 'chunk_text' not in embeddings_df.columns:
-                # Estratégia 2: Buscar arquivo CSV mais recente no diretório data/
-                return self._detect_most_recent_csv()
+            # ÚNICA FONTE DE DADOS: Tabela embeddings do Supabase
+            # O método get_data_from_embeddings() já parseia chunk_text automaticamente
+            df = self.get_data_from_embeddings(limit=None, parse_chunk_text=True)
             
-            # Analisar chunk_text para extrair informações estruturadas
-            sample_chunks = embeddings_df['chunk_text'].dropna().head(20)  # Aumentar amostra
+            if df is not None:
+                self.logger.info(f"✅ Dados reconstruídos: {len(df)} registros, {len(df.columns)} colunas (CONFORMIDADE TOTAL)")
+                return df
             
-            # Procurar por padrões nos chunks que indiquem arquivos CSV
-            csv_files_found = set()
-            
-            for chunk in sample_chunks:
-                # SISTEMA GENÉRICO: Buscar qualquer arquivo .csv mencionado
-                import re
-                csv_files = re.findall(r'(\w+\.csv)', chunk.lower())
-                if csv_files:
-                    csv_files_found.update(csv_files)
-                    
-                # Também procurar por nomes de arquivos sem extensão
-                potential_files = re.findall(r'arquivo[:\s]+(\w+)', chunk.lower())
-                for file in potential_files:
-                    csv_files_found.add(f"{file}.csv")
-            
-            # Tentar carregar os arquivos encontrados
-            if csv_files_found:
-                self.logger.info(f"Arquivos CSV detectados: {list(csv_files_found)}")
-                
-                for csv_file in csv_files_found:
-                    result = self._reconstruct_csv_data(csv_file)
-                    if result is not None:
-                        return result
-            
-            # Estratégia 3: Se nada foi encontrado, usar o arquivo mais recente
-            return self._detect_most_recent_csv()
+            # Se não há dados, retornar None - NUNCA ler CSV
+            self.logger.error(
+                f"❌ Nenhum dado encontrado na tabela embeddings do Supabase.\n"
+                f"⚠️ Sem fallback para CSV - APENAS embeddings permitido.\n"
+                f"Execute a ingestão de dados primeiro: python ingest_completo.py"
+            )
+            return None
             
         except Exception as e:
             self.logger.error(f"Erro ao reconstruir dados originais: {str(e)}")
             return None
             
     def _detect_most_recent_csv(self) -> Optional[pd.DataFrame]:
-        """Detecta dados via embeddings (CONFORMIDADE) ou fallback para ingestão."""
-        # Priorizar dados da tabela embeddings
+        """Retorna dados APENAS da tabela embeddings (CONFORMIDADE TOTAL).
+        
+        ⚠️ NENHUM FALLBACK PARA CSV - APENAS SUPABASE EMBEDDINGS.
+        """
+        # APENAS dados da tabela embeddings - SEM EXCEÇÕES
         embeddings_data = self.get_data_from_embeddings()
         if embeddings_data is not None:
-            self.logger.info("✅ Usando dados da tabela embeddings (CONFORMIDADE)")
+            self.logger.info("✅ Dados recuperados da tabela embeddings (CONFORMIDADE TOTAL)")
             return embeddings_data
         
-        # Fallback apenas para agente de ingestão
-        if self.caller_agent == 'ingestion_agent':
-            try:
-                from pathlib import Path
-                import os
-                
-                self.logger.warning(f"🚨 FALLBACK CSV para agente de ingestão: {self.caller_agent}")
-                
-                data_dir = Path("data/")
-                if not data_dir.exists():
-                    self.logger.warning("Diretório data/ não encontrado")
-                    return None
-                
-                # Buscar todos os arquivos .csv
-                csv_files = list(data_dir.glob("*.csv"))
-                
-                if not csv_files:
-                    self.logger.warning("Nenhum arquivo CSV encontrado em data/")
-                    return None
-                
-                # Ordenar por data de modificação (mais recente primeiro)
-                csv_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-                most_recent = csv_files[0]
-                
-                self.logger.info(f"Usando arquivo CSV mais recente: {most_recent.name}")
-                return pd.read_csv(most_recent)
-                
-            except Exception as e:
-                self.logger.error(f"Erro ao detectar CSV mais recente: {str(e)}")
-                return None
-        else:
-            # Bloquear acesso direto para outros agentes
-            error_msg = (
-                f"⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!\n"
-                f"Agente '{self.caller_agent}' tentou acessar CSV diretamente via _detect_most_recent_csv().\n"
-                f"Use get_data_from_embeddings() para acessar dados."
-            )
-            self.logger.error(error_msg)
-            raise UnauthorizedCSVAccessError(error_msg)
+        # Se não há dados em embeddings, retornar None - NUNCA ler CSV
+        self.logger.error(
+            f"❌ Nenhum dado encontrado na tabela embeddings do Supabase.\n"
+            f"⚠️ Sem fallback para CSV - APENAS embeddings permitido.\n"
+            f"Execute a ingestão de dados primeiro: python ingest_completo.py"
+        )
+        return None
     
     def _reconstruct_csv_data(self, csv_filename: str) -> Optional[pd.DataFrame]:
-        """Reconstrói dados via embeddings (CONFORMIDADE) ou fallback para ingestão.
+        """Reconstrói dados APENAS via embeddings do Supabase (CONFORMIDADE TOTAL).
         
         Args:
-            csv_filename: Nome do arquivo CSV (ex: 'creditcard.csv', 'sales.csv')
+            csv_filename: Nome do arquivo CSV (ex: 'creditcard.csv', 'sales.csv') - APENAS REFERÊNCIA
             
         Returns:
             DataFrame com dados da tabela embeddings ou None se falhar
+            
+        ⚠️ NENHUM FALLBACK PARA CSV - APENAS SUPABASE EMBEDDINGS.
         """
-        # Priorizar dados da tabela embeddings
+        # APENAS dados da tabela embeddings - SEM EXCEÇÕES - SEM FALLBACK
         embeddings_data = self.get_data_from_embeddings()
         if embeddings_data is not None:
-            self.logger.info(f"✅ Dados de {csv_filename} recuperados via embeddings (CONFORMIDADE)")
+            self.logger.info(f"✅ Dados de {csv_filename} recuperados via embeddings (CONFORMIDADE TOTAL)")
             return embeddings_data
         
-        # Fallback apenas para agente de ingestão
-        if self.caller_agent == 'ingestion_agent':
-            try:
-                self.logger.warning(f"🚨 FALLBACK CSV para agente de ingestão: {csv_filename}")
-                
-                # Tentar carregar arquivo original se disponível
-                csv_path = Path(f"data/{csv_filename}")
-                if csv_path.exists():
-                    self.logger.info(f"Carregando dados originais do {csv_filename}...")
-                    df = pd.read_csv(csv_path)
-                    return df
-                else:
-                    self.logger.warning(f"Arquivo {csv_filename} não encontrado em data/")
-                    
-                    # Estratégia alternativa: procurar na raiz do projeto
-                    root_csv_path = Path(csv_filename)
-                    if root_csv_path.exists():
-                        self.logger.info(f"Carregando dados do {csv_filename} na raiz...")
-                        df = pd.read_csv(root_csv_path)
-                        return df
-                    else:
-                        self.logger.warning(f"Arquivo {csv_filename} não encontrado")
-                        return None
-                        
-            except Exception as e:
-                self.logger.error(f"Erro ao carregar {csv_filename}: {str(e)}")
-                return None
-        else:
-            # Bloquear acesso direto para outros agentes
-            error_msg = (
-                f"⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!\n"
-                f"Agente '{self.caller_agent}' tentou acessar CSV '{csv_filename}' diretamente.\n"
-                f"Use get_data_from_embeddings() para acessar dados."
-            )
-            self.logger.error(error_msg)
-            raise UnauthorizedCSVAccessError(error_msg)
+        # Se não há dados em embeddings, retornar None - NUNCA ler CSV
+        self.logger.error(
+            f"❌ Nenhum dado encontrado na tabela embeddings para {csv_filename}.\n"
+            f"⚠️ Sem fallback para CSV - APENAS embeddings permitido.\n"
+            f"Execute a ingestão de dados primeiro: python ingest_completo.py"
+        )
+        return None
     
     def calculate_real_statistics(self, query_type: str = "tipos_dados") -> Dict[str, Any]:
         """Calcula estatísticas reais dos dados usando Python.
@@ -414,30 +476,35 @@ class PythonDataAnalyzer:
                 datetime_cols = []
                 
                 for col in df.columns:
-                    if df[col].dtype in ['int64', 'float64', 'int32', 'float32', 'int8', 'int16', 'float16']:
-                        numeric_cols.append(col)
-                    elif df[col].dtype == 'object':
-                        # Verificar se é categórico real (strings/texto) ou se deveria ser numérico
-                        try:
-                            # Tentar converter para numérico para detectar números como strings
-                            pd.to_numeric(df[col].dropna().head(100))
-                            # Se conseguiu converter, pode ser numérico mal formatado
+                    try:
+                        col_dtype = df[col].dtype
+                        
+                        if col_dtype in ['int64', 'float64', 'int32', 'float32', 'int8', 'int16', 'float16']:
                             numeric_cols.append(col)
-                        except (ValueError, TypeError):
-                            # Verificar se é categórico (poucos valores únicos) ou texto
-                            unique_ratio = df[col].nunique() / len(df)
-                            categorical_cols.append(col)
-                    elif 'datetime' in str(df[col].dtype).lower():
-                        datetime_cols.append(col)
-                    else:
-                        # Para tipos desconhecidos, tentar detectar se é numérico
-                        try:
-                            if df[col].dtype.kind in 'biufc':  # boolean, int, unsigned, float, complex
+                        elif col_dtype == 'object':
+                            # Verificar se é categórico real (strings/texto) ou se deveria ser numérico
+                            try:
+                                # Tentar converter para numérico para detectar números como strings
+                                pd.to_numeric(df[col].dropna().head(100))
+                                # Se conseguiu converter, pode ser numérico mal formatado
                                 numeric_cols.append(col)
-                            else:
+                            except (ValueError, TypeError):
+                                # Verificar se é categórico (poucos valores únicos) ou texto
                                 categorical_cols.append(col)
-                        except:
-                            categorical_cols.append(col)
+                        elif 'datetime' in str(col_dtype).lower():
+                            datetime_cols.append(col)
+                        else:
+                            # Para tipos desconhecidos, tentar detectar se é numérico
+                            try:
+                                if col_dtype.kind in 'biufc':  # boolean, int, unsigned, float, complex
+                                    numeric_cols.append(col)
+                                else:
+                                    categorical_cols.append(col)
+                            except:
+                                categorical_cols.append(col)
+                    except Exception as e:
+                        self.logger.warning(f"Erro ao analisar dtype da coluna '{col}': {str(e)}")
+                        categorical_cols.append(col)
                 
                 result.update({
                     "tipos_dados": {
@@ -469,14 +536,18 @@ class PythonDataAnalyzer:
                 
                 # Estatísticas para colunas categóricas
                 for col in df.select_dtypes(include=['object']).columns:
-                    value_counts = df[col].value_counts()
-                    if len(value_counts) <= 20:  # Só mostrar se não há muitas categorias
-                        estatisticas[col] = {
-                            "tipo": str(df[col].dtype),
-                            "unique_values": df[col].unique().tolist()[:10],  # Máximo 10 valores
-                            "value_counts": value_counts.head(10).to_dict(),
-                            "percentages": (value_counts.head(10) / len(df) * 100).round(2).to_dict()
-                        }
+                    try:
+                        value_counts = df[col].value_counts()
+                        if len(value_counts) <= 20:  # Só mostrar se não há muitas categorias
+                            estatisticas[col] = {
+                                "tipo": str(df[col].dtype),
+                                "unique_values": df[col].unique().tolist()[:10],  # Máximo 10 valores
+                                "value_counts": value_counts.head(10).to_dict(),
+                                "percentages": (value_counts.head(10) / len(df) * 100).round(2).to_dict()
+                            }
+                    except Exception as e:
+                        self.logger.warning(f"Erro ao calcular estatísticas para coluna categórica '{col}': {str(e)}")
+                        continue
                 
                 result.update({"estatisticas": estatisticas})
             
