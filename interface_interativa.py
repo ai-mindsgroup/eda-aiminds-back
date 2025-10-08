@@ -23,6 +23,22 @@ from src.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def safe_print(text: str, **kwargs):
+    """Print seguro que trata erros de encoding no Windows.
+    
+    Args:
+        text: Texto a ser impresso
+        **kwargs: Argumentos adicionais passados para print() (end, flush, etc)
+    """
+    try:
+        print(text, **kwargs)
+    except UnicodeEncodeError:
+        # Remove emojis e caracteres Unicode problemáticos
+        import re
+        text_ascii = re.sub(r'[^\x00-\x7F]+', '', text)
+        print(text_ascii, **kwargs)
+
+
 def print_banner():
     """Exibe banner inicial."""
     banner = """
@@ -48,7 +64,31 @@ def print_banner():
 
 ═══════════════════════════════════════════════════════════════
 """
-    print(banner)
+    # Garantir encoding correto no Windows
+    try:
+        print(banner)
+    except UnicodeEncodeError:
+        # Fallback para versão ASCII simples
+        print("""
+=================================================================
+           EDA AI MINDS - CHAT INTERATIVO V2.0
+=================================================================
+
+Sistema Multiagente com RAG Vetorial + Memoria
+LangChain Integrado (Google Gemini / OpenAI)
+Historico Conversacional Persistente
+
+Comandos Disponiveis:
+  * Digite sua pergunta normalmente
+  * 'status' - Verifica status do sistema
+  * 'limpar' - Limpa contexto e historico
+  * 'ajuda' - Mostra comandos disponiveis
+  * 'sair' ou 'quit' - Encerra o chat
+
+Dica: O sistema mantem historico conversacional!
+
+=================================================================
+""")
 
 
 def print_help():
@@ -93,7 +133,7 @@ def process_command(command: str, orchestrator: OrchestratorAgent, session_id: s
     cmd_lower = command.lower().strip()
     
     if cmd_lower in ['sair', 'quit', 'exit', 'q']:
-        print("\n👋 Encerrando chat. Até logo!\n")
+        safe_print("\n👋 Encerrando chat. Até logo!\n")
         return False
     
     elif cmd_lower in ['ajuda', 'help', '?']:
@@ -101,21 +141,21 @@ def process_command(command: str, orchestrator: OrchestratorAgent, session_id: s
         return True
     
     elif cmd_lower == 'status':
-        print("\n📊 STATUS DO SISTEMA:")
+        safe_print("\n📊 STATUS DO SISTEMA:")
         print(f"  • Agentes ativos: {len(orchestrator.agents)}")
         print(f"  • RAGDataAgent: V2.0 (memória + LangChain)")
         print(f"  • Sessão ID: {session_id}")
-        print(f"  • Memória persistente: {'✅ Ativa' if orchestrator.has_memory else '❌ Inativa'}")
+        safe_print(f"  • Memória persistente: {'✅ Ativa' if orchestrator.has_memory else '❌ Inativa'}")
         print(f"  • Busca: RAG Vetorial (Supabase embeddings)")
         print(f"  • Base de dados: PostgreSQL + pgvector")
-        print("\n💡 Para carregar novos dados CSV:")
+        safe_print("\n💡 Para carregar novos dados CSV:")
         print("     python load_csv_data.py [caminho_arquivo.csv]")
         print()
         return True
     
     elif cmd_lower in ['limpar', 'clear', 'reset']:
         orchestrator.clear_data_context()
-        print("\n✅ Contexto e histórico limpos!\n")
+        safe_print("\n✅ Contexto e histórico limpos!\n")
         return True
     
     return None  # Não é um comando especial
@@ -127,32 +167,32 @@ async def main():
     
     # Gerar session_id único para esta sessão de chat
     session_id = str(uuid4())
-    print(f"🔑 Sessão iniciada: {session_id[:8]}...\n")
+    safe_print(f"🔑 Sessão iniciada: {session_id[:8]}...\n")
 
     # INTEGRAÇÃO: Executar ingestão do dataset antes de inicializar orchestrador
-    print("🧹 Limpando base vetorial e carregando dataset...")
+    safe_print("🧹 Limpando base vetorial e carregando dataset...")
     from src.agent.data_ingestor import DataIngestor
     ingestor = DataIngestor()
     ingestor.ingest_csv('data/creditcard.csv')
-    print("✅ Dataset creditcard.csv carregado e base vetorial atualizada!\n")
+    safe_print("✅ Dataset creditcard.csv carregado e base vetorial atualizada!\n")
 
     # Inicializar orchestrador
-    print("🔧 Inicializando sistema multiagente...")
+    safe_print("🔧 Inicializando sistema multiagente...")
     try:
         orchestrator = OrchestratorAgent(
             enable_csv_agent=True,
             enable_rag_agent=True,
             enable_data_processor=True
         )
-        print("✅ Sistema inicializado com sucesso!")
-        print("✅ RAGDataAgent V2.0: Memória persistente + LangChain\n")
+        safe_print("✅ Sistema inicializado com sucesso!")
+        safe_print("✅ RAGDataAgent V2.0: Memória persistente + LangChain\n")
     except Exception as e:
-        print(f"❌ Erro ao inicializar sistema: {e}")
+        safe_print(f"❌ Erro ao inicializar sistema: {e}")
         logger.error(f"Erro na inicialização: {e}", exc_info=True)
         return
     
     # Loop do chat
-    print("💬 Chat pronto! Digite sua pergunta ou 'ajuda' para ver exemplos.\n")
+    safe_print("💬 Chat pronto! Digite sua pergunta ou 'ajuda' para ver exemplos.\n")
     print("═" * 63)
     
     while True:
@@ -171,7 +211,8 @@ async def main():
                 continue
             
             # Processar pergunta normal COM MEMÓRIA PERSISTENTE
-            print("\n🤖 Agente: Processando...", end="", flush=True)
+            safe_print("\n🤖 Agente: Processando...", end="")
+            sys.stdout.flush()
             
             try:
                 # USAR MÉTODO ASYNC COM MEMÓRIA PERSISTENTE
@@ -185,30 +226,30 @@ async def main():
                 print("\r" + " " * 50 + "\r", end="")
                 
                 if response and response.get('content'):
-                    print(f"🤖 Agente:\n{response['content']}\n")
+                    safe_print(f"🤖 Agente:\n{response['content']}\n")
                     
                     # Mostrar metadados se disponíveis
                     metadata = response.get('metadata', {})
                     if metadata.get('agent_used'):
-                        print(f"   📌 Agente usado: {metadata['agent_used']}")
+                        safe_print(f"   📌 Agente usado: {metadata['agent_used']}")
                     if metadata.get('session_id'):
-                        print(f"   📌 Sessão: {metadata['session_id'][:8]}...")
+                        safe_print(f"   📌 Sessão: {metadata['session_id'][:8]}...")
                     if metadata.get('previous_interactions') is not None:
-                        print(f"   📌 Interações anteriores: {metadata['previous_interactions']}")
+                        safe_print(f"   📌 Interações anteriores: {metadata['previous_interactions']}")
                 else:
-                    print("🤖 Agente: Desculpe, não consegui processar sua solicitação.\n")
+                    safe_print("🤖 Agente: Desculpe, não consegui processar sua solicitação.\n")
             
             except Exception as e:
                 print("\r" + " " * 50 + "\r", end="")
-                print(f"❌ Erro ao processar: {str(e)}\n")
+                safe_print(f"❌ Erro ao processar: {str(e)}\n")
                 logger.error(f"Erro no processamento: {e}", exc_info=True)
         
         except KeyboardInterrupt:
-            print("\n\n👋 Chat interrompido. Digite 'sair' para encerrar ou continue.\n")
+            safe_print("\n\n👋 Chat interrompido. Digite 'sair' para encerrar ou continue.\n")
             continue
         
         except EOFError:
-            print("\n\n👋 Encerrando chat. Até logo!\n")
+            safe_print("\n\n👋 Encerrando chat. Até logo!\n")
             break
 
 
@@ -217,4 +258,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n👋 Encerrando chat. Até logo!\n")
+        safe_print("\n\n👋 Encerrando chat. Até logo!\n")

@@ -195,22 +195,6 @@ class OrchestratorAgent(BaseAgent):
                 error_msg = f"RAG Data Agent: {str(e)}"
                 initialization_errors.append(error_msg)
                 self.logger.warning(f"⚠️ {error_msg}")
-
-    def _detect_visualization_type(self, query: str) -> Optional[str]:
-        """Detecta se a query solicita algum tipo de visualização.
-
-        Retorna o tipo identificado (ex: 'histogram', 'bar') ou None.
-        Método simples baseado em palavras-chave; mantém baixo custo e alta
-        previsibilidade.
-        """
-        if not query:
-            return None
-        q = query.lower()
-        for vtype, keywords in self._viz_keywords.items():
-            for kw in keywords:
-                if kw in q:
-                    return vtype
-        return None
         
         # RAG Agent (requer Supabase configurado)
         if enable_rag_agent and RAG_AGENT_AVAILABLE:
@@ -264,16 +248,16 @@ class OrchestratorAgent(BaseAgent):
             try:
                 self.semantic_router = SemanticRouter()
                 self.logger.info("✅ Semantic Router inicializado (classificação via embeddings)")
-                self.use_semantic_routing = True
+                # Removido: use_semantic_routing obsoleto
             except Exception as e:
                 error_msg = f"Semantic Router: {str(e)}"
                 initialization_errors.append(error_msg)
                 self.logger.warning(f"⚠️ {error_msg}")
                 self.semantic_router = None
-                self.use_semantic_routing = False
+                # Removido: use_semantic_routing obsoleto
         else:
             self.semantic_router = None
-            self.use_semantic_routing = False
+            # Removido: use_semantic_routing obsoleto
             self.logger.warning("⚠️ Semantic Router não disponível, usando roteamento estático")
         
         # Log do resultado da inicialização
@@ -288,6 +272,22 @@ class OrchestratorAgent(BaseAgent):
                     self.name, 
                     f"Falha na inicialização de todos os componentes: {'; '.join(initialization_errors)}"
                 )
+    
+    def _detect_visualization_type(self, query: str) -> Optional[str]:
+        """Detecta se a query solicita algum tipo de visualização.
+
+        Retorna o tipo identificado (ex: 'histogram', 'bar') ou None.
+        Método simples baseado em palavras-chave; mantém baixo custo e alta
+        previsibilidade.
+        """
+        if not query:
+            return None
+        q = query.lower()
+        for vtype, keywords in self._viz_keywords.items():
+            for kw in keywords:
+                if kw in q:
+                    return vtype
+        return None
     
     def _check_embeddings_data_availability(self) -> bool:
         """Verifica se existem dados na tabela embeddings (CONFORMIDADE)."""
@@ -605,7 +605,8 @@ class OrchestratorAgent(BaseAgent):
         # ========================================
         # ETAPA 1: TENTATIVA DE ROTEAMENTO SEMÂNTICO
         # ========================================
-        if self.use_semantic_routing and self.semantic_router:
+        # Removido: use_semantic_routing obsoleto
+        if self.semantic_router:
             try:
                 self.logger.info("🧠 Usando roteamento semântico via embeddings...")
                 
@@ -652,7 +653,6 @@ class OrchestratorAgent(BaseAgent):
         # ETAPA 2: FALLBACK - ROTEAMENTO ESTÁTICO
         # ========================================
         self.logger.info("📋 Usando roteamento estático por palavras-chave...")
-        query_lower = query.lower()
         
         # Verificar se é solicitação de visualização
         viz_type = self._detect_visualization_need(query)
@@ -671,7 +671,14 @@ class OrchestratorAgent(BaseAgent):
             'tipos de dados', 'numéricos', 'categóricos', 'distribuição',
             'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
             'variância', 'desvio', 'percentil', 'quartil', 'valores',
-            'variável', 'variáveis', 'features', 'atributos', 'estatísticas'
+            'variável', 'variáveis', 'features', 'atributos', 'estatísticas',
+            'padrão', 'padrões', 'tendência', 'tendências', 'temporal', 'temporais',
+            'tempo', 'série', 'séries', 'comportamento', 'anomalia', 'anômalo',
+            'frequente', 'frequentes', 'frequência', 'comum', 'raro', 'raros',
+            'moda', 'contagem', 'count', 'value_counts', 'top', 'bottom',
+            'cluster', 'clusters', 'agrupamento', 'agrupamentos', 'grupos',
+            'kmeans', 'k-means', 'dbscan', 'hierárquico', 'hierarquico',
+            'segmentação', 'segmentacao'
         ]
         
         rag_keywords = [
@@ -689,10 +696,10 @@ class OrchestratorAgent(BaseAgent):
             'explicar', 'explique', 'interpretar', 'interprete', 'insight', 'insights', 
             'conclusão', 'conclusões', 'recomendação', 'recomendações', 'recomende',
             'sugestão', 'sugestões', 'sugira', 'opinião', 'análise detalhada', 
-            'relatório', 'sumário', 'resume', 'resumo detalhado', 'padrão', 'padrões', 
-            'tendência', 'tendências', 'previsão', 'hipótese', 'teoria', 'tire', 'conclua',
-            'analise', 'avalie', 'considere', 'entenda', 'compreenda', 'descoberta',
-            'descobrimentos', 'comportamento', 'anomalia', 'anômalo', 'suspeito',
+            'relatório', 'sumário', 'resume', 'resumo detalhado', 
+            'previsão', 'hipótese', 'teoria', 'tire', 'conclua',
+            'avalie', 'considere', 'entenda', 'compreenda', 'descoberta',
+            'descobrimentos', 'suspeito',
             'detalhado', 'profundo', 'aprofunde', 'discuta', 'comente', 'o que',
             'quais', 'como', 'por que', 'porque'
         ]

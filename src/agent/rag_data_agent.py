@@ -725,7 +725,163 @@ class RAGDataAgent(BaseAgent):
                     "- Finalize com: 'Se precisar de mais detalhes ou quiser analisar outra variável, é só perguntar!'\n\n"
                     "**Resposta:**"
                 )
-            # TIPO 5: Query genérica - incluir histórico de conversa
+            # TIPO 5: Perguntas sobre FREQUÊNCIA (valores mais/menos frequentes)
+            elif any(term in query_lower for term in ['frequente', 'frequentes', 'frequência', 'comum', 'raro', 'raros', 'moda', 'contagem', 'value_counts', 'mais ocorre', 'menos ocorre']):
+                # Query sobre FREQUÊNCIA
+                system_prompt = (
+                    "Você é um agente EDA especializado em análise de frequência. "
+                    "Sua tarefa é identificar e reportar QUANTAS VEZES cada valor aparece no dataset. "
+                    "Use APENAS os dados fornecidos nos chunks analíticos. NÃO invente números. "
+                    "ATENÇÃO: Na tabela 'Colunas Categóricas', a coluna 'Frequência' contém o NÚMERO DE OCORRÊNCIAS do valor mais frequente. "
+                    "Exemplo: Se vir '| Class | 0 | 284315 |', significa que o valor '0' aparece 284.315 vezes no dataset."
+                )
+                user_prompt = (
+                    f"**Pergunta do Usuário:**\n{query}\n\n"
+                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
+                    "**INSTRUÇÕES CRÍTICAS DE INTERPRETAÇÃO:**\n"
+                    "1. **Leia a tabela 'Colunas Categóricas' corretamente**:\n"
+                    "   - Formato: | Coluna | Valor Mais Frequente | Frequência | Valores Únicos | Valores Nulos |\n"
+                    "   - A coluna 'Frequência' é o NÚMERO DE VEZES que o 'Valor Mais Frequente' aparece\n"
+                    "   - Exemplo: | Class | 0 | 284315 | → O valor '0' aparece 284.315 vezes\n\n"
+                    "2. **Calcule o valor menos frequente**:\n"
+                    "   - Se houver 2 valores únicos (ex: Class com valores 0 e 1)\n"
+                    "   - E o total de registros é conhecido (ex: 284.807)\n"
+                    "   - Menos frequente = Total de registros - Frequência do mais frequente\n"
+                    "   - Exemplo: Class valor '1' = 284.807 - 284.315 = 492 vezes\n\n"
+                    "3. **Para COLUNAS NUMÉRICAS**:\n"
+                    "   - Leia a tabela 'Colunas Numéricas' e encontre a coluna 'Moda'\n"
+                    "   - A moda é o valor numérico que mais se repete\n"
+                    "   - Explique que para variáveis contínuas, muitos valores aparecem apenas 1 vez\n\n"
+                    "**FORMATO DE RESPOSTA OBRIGATÓRIO:**\n"
+                    "Inicie com: 'Pergunta feita: [pergunta]'\n\n"
+                    "Adicione: 'Analisando a frequência dos valores no dataset:'\n\n"
+                    "**🔢 Colunas Categóricas:**\n\n"
+                    "Para cada coluna categórica encontrada, mostre:\n"
+                    "- **Coluna [Nome]**: \n"
+                    "  * Valor mais frequente: [valor] (aparece [X] vezes)\n"
+                    "  * Valor menos frequente: [valor] (aparece [Y] vezes) [SE PUDER CALCULAR]\n\n"
+                    "**📊 Colunas Numéricas:**\n\n"
+                    "Para colunas numéricas, mostre a moda estatística:\n"
+                    "- **Coluna [Nome]**: Moda = [valor] (valor que mais se repete)\n\n"
+                    "Adicione explicação:\n"
+                    "'Para variáveis numéricas contínuas (como V1-V28, Amount), a maioria dos valores aparece apenas 1 vez. "
+                    "A moda estatística indica o valor que mais se repete, mas para análise mais detalhada, considere perguntar sobre distribuição ou intervalos.'\n\n"
+                    "Finalize: 'Se precisar de mais detalhes ou análise de distribuição, é só perguntar!'\n\n"
+                    "**⚠️ REGRAS CRÍTICAS:**\n"
+                    "- NÃO diga 'aparece 0 vezes' quando o número na tabela é POSITIVO\n"
+                    "- NÃO confunda a coluna 'Frequência' com o valor da variável\n"
+                    "- NÃO mostre mínimo/máximo quando a pergunta é sobre frequência\n"
+                    "- USE os números EXATOS da tabela de chunks fornecidos\n\n"
+                    "**Resposta:**"
+                )
+            
+            # TIPO 6: Perguntas sobre CLUSTERING/AGRUPAMENTOS
+            elif any(term in query_lower for term in ['cluster', 'clusters', 'agrupamento', 'agrupamentos', 'grupos', 'kmeans', 'k-means', 'dbscan', 'hierárquico', 'hierarquico', 'segmentação', 'segmentacao']):
+                # 🔬 EXECUÇÃO REAL DE CLUSTERING usando PythonDataAnalyzer
+                self.logger.info("🔬 Detectada pergunta sobre clustering - executando análise KMeans real...")
+                
+                try:
+                    from src.tools.python_analyzer import python_analyzer
+                    
+                    # Executar clustering real nos dados
+                    clustering_result = python_analyzer.calculate_clustering_analysis(n_clusters=3)
+                    
+                    if "error" in clustering_result:
+                        # Se houve erro, informar ao usuário
+                        error_msg = clustering_result.get("error", "Erro desconhecido")
+                        suggestion = clustering_result.get("suggestion", "")
+                        
+                        return (
+                            f"Pergunta feita: {query}\n\n"
+                            f"❌ **Não foi possível realizar análise de clustering:**\n"
+                            f"{error_msg}\n\n"
+                            f"{suggestion}\n\n"
+                            "Se precisar de mais detalhes, é só perguntar!"
+                        )
+                    
+                    # Construir contexto enriquecido com resultados reais do clustering
+                    clustering_context = clustering_result.get("interpretation", "")
+                    cluster_distribution = clustering_result.get("cluster_distribution", {})
+                    cluster_percentages = clustering_result.get("cluster_percentages", {})
+                    numeric_vars = clustering_result.get("numeric_variables_used", [])
+                    is_balanced = clustering_result.get("is_balanced", False)
+                    
+                    # Construir prompt com dados REAIS do clustering
+                    system_prompt = (
+                        "Você é um agente EDA especializado em análise de clustering. "
+                        "Acabei de executar análise de clustering KMeans REAL nos dados. "
+                        "Sua tarefa é apresentar os resultados de forma clara e estruturada. "
+                        "Use APENAS os resultados reais fornecidos. NÃO invente números."
+                    )
+                    
+                    user_prompt = (
+                        f"**Pergunta do Usuário:**\n{query}\n\n"
+                        f"**RESULTADOS REAIS DO CLUSTERING EXECUTADO:**\n\n"
+                        f"**Algoritmo:** KMeans com {clustering_result.get('n_clusters', 3)} clusters\n"
+                        f"**Total de pontos analisados:** {clustering_result.get('total_points', 0):,}\n"
+                        f"**Variáveis numéricas utilizadas:** {len(numeric_vars)} variáveis\n"
+                        f"  - Exemplos: {', '.join(numeric_vars[:5])}{'...' if len(numeric_vars) > 5 else ''}\n\n"
+                        f"**Distribuição dos Clusters:**\n"
+                    )
+                    
+                    # Adicionar distribuição real dos clusters
+                    for cluster_id in sorted(cluster_distribution.keys()):
+                        count = cluster_distribution[cluster_id]
+                        pct = cluster_percentages[cluster_id]
+                        user_prompt += f"- Cluster {cluster_id}: {count:,} pontos ({pct:.1f}%)\n"
+                    
+                    user_prompt += f"\n**Balanceamento:** {'Clusters balanceados' if is_balanced else 'Clusters desbalanceados'}\n\n"
+                    
+                    user_prompt += (
+                        f"**CHUNKS ANALÍTICOS DO CSV (contexto adicional):**\n{context_data}\n\n"
+                        "**FORMATO DE RESPOSTA OBRIGATÓRIO:**\n"
+                        "Inicie com: 'Pergunta feita: [pergunta]'\n\n"
+                        "Adicione: 'Para responder se há agrupamentos (clusters) nos dados, executei análise de clustering KMeans:'\n\n"
+                        "**🔬 Análise de Clustering (KMeans):**\n\n"
+                        "**Variáveis Utilizadas:**\n"
+                        f"- {len(numeric_vars)} variáveis numéricas: {', '.join(numeric_vars[:8])}{'...' if len(numeric_vars) > 8 else ''}\n\n"
+                        "**Resultado do Clustering (k=3):**\n"
+                    )
+                    
+                    # Adicionar novamente para o LLM formatar
+                    for cluster_id in sorted(cluster_distribution.keys()):
+                        count = cluster_distribution[cluster_id]
+                        pct = cluster_percentages[cluster_id]
+                        user_prompt += f"- Cluster {cluster_id}: {count:,} pontos ({pct:.1f}%)\n"
+                    
+                    user_prompt += (
+                        "\n**✅ Conclusão:**\n"
+                        f"- SIM, os dados apresentam {len(cluster_distribution)} agrupamentos distintos\n"
+                        f"- Os clusters são {'balanceados' if is_balanced else 'desbalanceados'}\n"
+                        "- [Adicione insight interpretativo sobre o significado desses agrupamentos]\n\n"
+                        "**💡 Recomendações:**\n"
+                        "- Para visualizar os clusters, pergunte: 'mostre gráfico de dispersão dos clusters'\n"
+                        "- Para análise PCA 2D/3D, pergunte: 'aplique PCA nos dados'\n"
+                        "- Para estatísticas por cluster, pergunte: 'qual a média de cada cluster?'\n\n"
+                        "Finalize: 'Se desejar aprofundar na análise de clustering, é só perguntar!'\n\n"
+                        "**Resposta:**"
+                    )
+                    
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao executar clustering: {str(e)}", exc_info=True)
+                    # Fallback: usar prompt genérico informando limitação
+                    system_prompt = (
+                        "Você é um agente EDA especializado. "
+                        "Houve um erro técnico ao tentar executar análise de clustering real nos dados. "
+                        "Explique ao usuário que a análise de clustering requer execução de algoritmos específicos."
+                    )
+                    user_prompt = (
+                        f"**Pergunta do Usuário:**\n{query}\n\n"
+                        f"**STATUS:** Erro técnico ao executar KMeans: {str(e)}\n\n"
+                        "**INSTRUÇÕES DE RESPOSTA:**\n"
+                        "- Informe que houve uma limitação técnica temporária\n"
+                        "- Explique que clustering requer execução de algoritmos (KMeans, DBSCAN, etc.)\n"
+                        "- Sugira tentar novamente ou perguntar sobre outras análises\n\n"
+                        "**Resposta:**"
+                    )
+
+            
+            # TIPO 7: Query genérica - incluir histórico de conversa
             else:
                 # Query genérica - incluir histórico de conversa
                 system_prompt = (

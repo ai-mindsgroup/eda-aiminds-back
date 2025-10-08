@@ -245,27 +245,13 @@ class EmbeddingsAnalysisAgent(BaseAgent):
         Returns:
             Resposta com análise baseada em embeddings
         """
-        self._validate_embeddings_access_only()
-        
         try:
-            # Verificar se precisa carregar embeddings
-            if not self.current_embeddings:
-                dataset_filter = context.get('dataset_filter') if context else None
-                load_result = self.load_from_embeddings(dataset_filter=dataset_filter)
-                if 'error' in load_result.get('metadata', {}):
-                    return load_result
-            
-            if not self.current_embeddings:
-                return self._build_response(
-                    "❌ Nenhum embedding carregado. Verifique se há dados na tabela embeddings.",
-                    metadata={"error": True, "conformidade": "embeddings_only"}
-                )
-            
-            # ===================================================================
-            # CLASSIFICAÇÃO INTELIGENTE VIA RAG (substituiu keywords hardcoded)
-            # ===================================================================
+            self._validate_embeddings_access_only()
+            dataset_filter = context.get('dataset_filter') if context else None
+            load_result = self.load_from_embeddings(dataset_filter=dataset_filter)
+            if 'error' in load_result.get('metadata', {}):
+                return load_result
             self.logger.info(f"🔍 Classificando query via RAG: {query[:60]}...")
-            
             # Guard: query_classifier pode não existir (bug RAGQueryClassifier corrigido em 2025-01-06)
             if self.query_classifier is None:
                 # Fallback: classificação básica via keywords
@@ -280,12 +266,10 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 self.logger.warning("⚠️  query_classifier indisponível, usando fallback por keywords")
             else:
                 classification = self.query_classifier.classify_query(query)
-            
             self.logger.info(
                 f"📊 Query classificada como: {classification.query_type.value} "
                 f"(confiança: {classification.confidence:.2f})"
             )
-            
             # Adicionar metadados de classificação ao contexto
             if context is None:
                 context = {}
@@ -294,7 +278,6 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 'confidence': classification.confidence,
                 'method': classification.metadata.get('method', 'unknown')
             }
-            
             # Rotear para o handler apropriado baseado na classificação RAG
             handler_map = {
                 QueryType.VARIABILITY: self._handle_variability_query_from_embeddings,
@@ -310,7 +293,6 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 QueryType.COUNT: self._handle_count_query_from_embeddings,
                 QueryType.GENERAL: self._handle_general_query_from_embeddings,
             }
-            
             handler = handler_map.get(classification.query_type)
             
             if handler is None:
@@ -336,7 +318,7 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 self.logger.warning(f"Falha ao registrar aprendizado: {learn_error}")
             
             return response
-                
+
         except Exception as e:
             self.logger.error(f"Erro ao processar consulta via embeddings: {str(e)}")
             return self._build_response(
@@ -1215,7 +1197,7 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
         
         Args:
             query: Pergunta do usuário solicitando visualização
-            context: Contexto adicional
+            context: Contexto adicional (pode conter 'reconstructed_df' com DataFrame já carregado)
             
         Returns:
             Resposta com histogramas gerados e salvos em arquivos
@@ -1224,29 +1206,32 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             self.logger.info("📊 Processando solicitação de visualização...")
             
             # Importar módulos necessários
-            from src.tools.python_analyzer import PythonDataAnalyzer
             import matplotlib.pyplot as plt
             import seaborn as sns
-            import os
             from pathlib import Path
             
             # Configurar estilo dos gráficos
             sns.set_style("whitegrid")
             
-            # Inicializar analyzer
-            analyzer = PythonDataAnalyzer(caller_agent=self.name)
-            
-            # Reconstruir DataFrame a partir dos embeddings
-            self.logger.info("🔄 Reconstruindo DataFrame a partir dos embeddings...")
-            df = analyzer.reconstruct_original_data()
+            # **CORREÇÃO**: Usar DataFrame passado no contexto (já carregado pelo rag_data_agent)
+            df = None
+            if context and 'reconstructed_df' in context:
+                df = context['reconstructed_df']
+                self.logger.info(f"✅ Usando DataFrame pré-carregado: {df.shape[0]} linhas, {df.shape[1]} colunas")
+            else:
+                # Fallback: tentar reconstruir dos embeddings
+                self.logger.info("🔄 DataFrame não fornecido, tentando reconstruir dos embeddings...")
+                from src.tools.python_analyzer import PythonDataAnalyzer
+                analyzer = PythonDataAnalyzer(caller_agent=self.name)
+                df = analyzer.reconstruct_original_data()
             
             if df is None or df.empty:
                 return self._build_response(
-                    "❌ Não foi possível reconstruir os dados para gerar visualizações. Verifique se há dados na tabela embeddings.",
+                    "❌ Não foi possível obter dados para gerar visualizações. Verifique se há dados disponíveis.",
                     metadata={"error": True, "conformidade": "embeddings_only"}
                 )
             
-            self.logger.info(f"✅ DataFrame reconstruído: {df.shape[0]} linhas, {df.shape[1]} colunas")
+            self.logger.info(f"✅ DataFrame disponível: {df.shape[0]} linhas, {df.shape[1]} colunas")
             
             # Criar diretório de saída
             output_dir = Path('outputs/histogramas')
