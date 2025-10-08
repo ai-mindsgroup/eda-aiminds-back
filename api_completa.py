@@ -412,30 +412,32 @@ async def chat_with_ai(request: ChatRequest):
             logger.error("❌ Orquestrador não está disponível após tentativa de carregamento")
             raise HTTPException(status_code=503, detail="Orquestrador não disponível")
         
-        if not hasattr(orchestrator, 'process_query'):
-            logger.error("❌ Orquestrador não possui método process_query")
+        if not hasattr(orchestrator, 'process_with_persistent_memory'):
+            logger.error("❌ Orquestrador não possui método process_with_persistent_memory")
             raise HTTPException(status_code=503, detail="Orquestrador inválido")
         
         logger.info("🧠 Enviando query para o orquestrador...")
         try:
             # 🧠 Orquestrador consulta base de dados (embeddings) via RAG
-            result = orchestrator.process_query(
+            # Usar método assíncrono com memória persistente (igual interface_interativa.py)
+            result = await orchestrator.process_with_persistent_memory(
                 query=request.message,
-                session_id=session_id,
-                use_memory=request.use_memory
+                context={},
+                session_id=session_id
             )
-            logger.info(f"✅ Orquestrador retornou resposta: {result.get('agent_used', 'unknown')}")
+            logger.info(f"✅ Orquestrador retornou resposta: {result.get('metadata', {}).get('agent_used', 'unknown')}")
         except Exception as e:
             logger.error(f"❌ Erro ao processar query no orquestrador: {e}")
             import traceback
             logger.error(f"Stack trace: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar: {str(e)}")
         
-        # Extrai informações do resultado
-        response_text = result.get('response', 'Desculpe, não consegui processar sua solicitação.')
-        agent_used = result.get('agent_used', 'orchestrator')
-        analysis_type = result.get('analysis_type')
-        confidence = result.get('confidence')
+        # Extrai informações do resultado (compatível com interface_interativa.py)
+        response_text = result.get('content', result.get('response', 'Desculpe, não consegui processar sua solicitação.'))
+        metadata = result.get('metadata', {})
+        agent_used = metadata.get('agent_used', 'orchestrator')
+        analysis_type = metadata.get('analysis_type')
+        confidence = metadata.get('confidence')
         
         processing_time = (datetime.now() - start_time).total_seconds()
         
