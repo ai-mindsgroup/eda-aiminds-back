@@ -1,3 +1,40 @@
+import asyncio
+from .memory_types import ContextType
+
+# Wrappers síncronos para uso em scripts/debug
+def save_agent_context(ctx):
+    manager = SupabaseMemoryManager(agent_name=ctx.agent_id)
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(manager.save_context(
+        session_id=ctx.session_id,
+        context_type=ContextType.DATA,
+        context_key='default',
+        context_data=ctx.context
+    ))
+
+def get_agent_context(agent_id, session_id):
+    manager = SupabaseMemoryManager(agent_name=agent_id)
+    loop = asyncio.get_event_loop()
+    from .memory_types import ContextType
+    return loop.run_until_complete(manager.get_context(
+        session_id=session_id,
+        context_type=ContextType.DATA,
+        context_key='default'
+    ))
+
+def save_agent_session(sess):
+    manager = SupabaseMemoryManager(agent_name='orchestrator')
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(manager.create_session(
+        session_id=sess.session_id,
+        user_id=sess.user_id,
+        metadata={"start_time": str(sess.start_time)}
+    ))
+
+def get_agent_session(session_id):
+    manager = SupabaseMemoryManager(agent_name='orchestrator')
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(manager.get_session(session_id=session_id))
 """
 Implementação do gerenciador de memória usando Supabase.
 

@@ -1,0 +1,780 @@
+══════════════════════════════════════════════════════════════════════
+  TESTE AUTOMÁTICO - PERGUNTAS DO CURSO
+  EDA AI MINDS - Sistema Multiagente RAG Vetorial
+  Data/Hora: 2025-10-05 20:30:11
+══════════════════════════════════════════════════════════════════════
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 1:
+Quais são os tipos de dados (numéricos, categóricos)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+Com base nas informações fornecidas, posso responder à pergunta do usuário sobre os tipos de dados.
+
+**Tipos de Dados:**
+
+- **Numéricos:** Time, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, Amount
+- **Categóricos:** Class
+
+Esses são os tipos de dados reais presentes no arquivo CSV carregado, conforme descrito nas estatísticas fornecidas.
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.619938850402832
+  • tokens_used: 1290
+  • data_analysis: True
+  • data_loaded: True
+  • agents_used: ['llm_manager', 'embeddings_analyzer']
+  • orchestrator: {'conversation_length': 1, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 2, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 29.97s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 2:
+Qual a distribuição de cada variável (histogramas, distribuições)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'
+
+METADADOS:
+  • error: True
+  • query_type: error
+  • agents_used: []
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 4, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 6.35s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 3:
+Qual o intervalo de cada variável (mínimo, máximo)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+📊 Para encontrar o intervalo de cada variável (mínimo, máximo) em um arquivo CSV, posso seguir os seguintes passos:
+
+1. **Carregar o arquivo CSV**: Primeiramente, é necessário carregar o arquivo CSV no ambiente de análise de dados. Isso pode ser feito utilizando bibliotecas como Pandas em Python.
+2. **Visualizar as variáveis**: Em seguida, é importante visualizar as variáveis presentes no arquivo CSV para entender quais são as variáveis que precisam ser analisadas.
+3. **Calcular o mínimo e máximo**: Utilizando a biblioteca Pandas, podemos calcular o mínimo e máximo de cada variável utilizando a função `min()` e `max()`.
+
+**Exemplo de código em Python:**
+```python
+import pandas as pd
+
+# Carregar o arquivo CSV
+df = pd.read_csv('arquivo.csv')
+
+# Visualizar as variáveis
+print(df.columns)
+
+# Calcular o mínimo e máximo de cada variável
+for coluna in df.columns:
+    print(f'Variável: {coluna}')
+    print(f'Mínimo: {df[coluna].min()}')
+    print(f'Máximo: {df[coluna].max()}')
+    print('---')
+```
+**Resposta:**
+
+A resposta será uma lista com os intervalos de cada variável (mínimo, máximo) no formato:
+
+Variável: [nome da variável]
+Mínimo: [valor mínimo]
+Máximo: [valor máximo]
+---
+
+Por exemplo:
+
+Variável: Idade
+Mínimo: 18
+Máximo: 65
+---
+
+Variável: Salário
+Mínimo: 1000
+Máximo: 5000
+---
+
+E assim por diante, para cada variável presente no arquivo CSV.
+
+Espero que isso tenha ajudado! Se tiver mais alguma dúvida, sinta-se à vontade para perguntar. 😊
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 1.09897780418396
+  • tokens_used: 535
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 4, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 6, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.98s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 4:
+Quais são as medidas de tendência central (média, mediana)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+**Medidas de Tendência Central**
+
+As medidas de tendência central são estatísticas que descrevem o valor central de uma distribuição de dados. Elas são importantes para entender a tendência ou tendência central de uma série de dados.
+
+**Média**
+
+A média é a medida de tendência central mais comum. Ela é calculada somando todos os valores da série de dados e dividindo o resultado pela quantidade de valores.
+
+Fórmula: Média = (Soma dos valores) / Número de valores
+
+Exemplo: Se você tiver os valores 2, 4, 6, 8, 10, a média seria (2 + 4 + 6 + 8 + 10) / 5 = 6.
+
+**Mediana**
+
+A mediana é a medida de tendência central que divide a série de dados em dois grupos iguais. Ela é calculada ordenando os valores da série de dados em ordem crescente e encontrando o valor do meio.
+
+Exemplo: Se você tiver os valores 2, 4, 6, 8, 10, a mediana seria 6, pois é o valor do meio quando os valores são ordenados em ordem crescente.
+
+**Importância**
+
+As medidas de tendência central são importantes porque:
+
+* Elas ajudam a entender a tendência central de uma série de dados.
+* Elas são úteis para comparar diferentes séries de dados.
+* Elas são fundamentais para a análise estatística e a tomada de decisões.
+
+**Exemplo em CSV**
+
+Suponha que você tenha um arquivo CSV com os seguintes dados:
+
+| Valor |
+| --- |
+| 2 |
+| 4 |
+| 6 |
+| 8 |
+| 10 |
+
+Para calcular a média e a mediana, você pode usar a fórmula acima ou utilizar uma ferramenta de análise de dados, como o Excel ou o Python.
+
+**Conclusão**
+
+As medidas de tendência central, como a média e a mediana, são fundamentais para entender a tendência central de uma série de dados. Elas são importantes para a análise estatística e a tomada de decisões. Além disso, elas são fáceis de calcular e entender, tornando-as uma ferramenta útil para qualquer análise de dados.
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 1.1269891262054443
+  • tokens_used: 630
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 6, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 8, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.57s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 5:
+Qual a variabilidade dos dados (desvio padrão, variância)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+**Análise de Variabilidade dos Dados**
+
+Para calcular a variabilidade dos dados, precisamos calcular o desvio padrão e a variância.
+
+**Desvio Padrão (DP)**
+
+O desvio padrão é uma medida da dispersão dos dados em relação à média. Ele é calculado como a raiz quadrada da variância.
+
+Fórmula: DP = √(Σ(xi - μ)^2 / (n - 1))
+
+Onde:
+- xi é cada valor individual dos dados
+- μ é a média dos dados
+- n é o número de dados
+- Σ é a soma dos valores
+
+**Variância**
+
+A variância é uma medida da dispersão dos dados em relação à média. Ela é calculada como a média dos quadrados das diferenças entre cada valor individual e a média.
+
+Fórmula: Variância = Σ(xi - μ)^2 / (n - 1)
+
+Onde:
+- xi é cada valor individual dos dados
+- μ é a média dos dados
+- n é o número de dados
+- Σ é a soma dos valores
+
+**Exemplo**
+
+Suponha que tenhamos os seguintes dados:
+
+| Valor |
+| --- |
+| 10 |
+| 12 |
+| 11 |
+| 13 |
+| 14 |
+
+Média (μ) = (10 + 12 + 11 + 13 + 14) / 5 = 12
+
+Desvio Padrão (DP) = √((10-12)^2 + (12-12)^2 + (11-12)^2 + (13-12)^2 + (14-12)^2) / (5 - 1)
+= √(4 + 0 + 1 + 1 + 4) / 4
+= √10 / 4
+= 1,58
+
+Variância = (4 + 0 + 1 + 1 + 4) / (5 - 1)
+= 10 / 4
+= 2,5
+
+**Conclusão**
+
+A variabilidade dos dados é uma medida importante para entender a dispersão dos dados em relação à média. O desvio padrão e a variância são medidas comuns utilizadas para avaliar a variabilidade. No exemplo acima, o desvio padrão é de 1,58 e a variância é de 2,5.
+
+**Dicas
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 1.0219857692718506
+  • tokens_used: 631
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 8, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 10, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.32s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 6:
+Existem padrões ou tendências temporais?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+**Análise de Padrões e Tendências Temporais em CSV**
+
+Para identificar padrões ou tendências temporais em um arquivo CSV, podemos seguir os seguintes passos:
+
+1. **Visualização dos Dados**:
+ - Carregue o arquivo CSV no seu ambiente de análise de dados (por exemplo, Pandas em Python).
+ - Visualize os dados usando gráficos, como linhas de tempo ou barras, para entender a estrutura e a distribuição dos dados.
+2. **Análise Estatística**:
+ - Verifique se os dados têm uma estrutura temporal clara (por exemplo, data e hora).
+ - Calcule estatísticas básicas, como média, mediana e desvio padrão, para entender a distribuição dos dados.
+ - Use testes estatísticos para verificar se há diferenças significativas entre os dados ao longo do tempo.
+3. **Análise de Tendências**:
+ - Use técnicas de análise de séries temporais, como:
+ - **Tendência linear**: Verifique se há uma tendência linear nos dados ao longo do tempo.
+ - **Tendência cíclica**: Verifique se há padrões cíclicos nos dados (por exemplo, sazonalidade).
+ - **Tendência não linear**: Verifique se há padrões não lineares nos dados (por exemplo, mudanças abruptas).
+4. **Identificação de Padrões**:
+ - Use técnicas de mineração de dados, como:
+ - **Análise de agrupamento**: Agrupe os dados por categorias temporais (por exemplo, meses, trimestres) e verifique se há padrões comuns.
+ - **Análise de associação**: Verifique se há associações entre variáveis temporais (por exemplo, relação entre temperatura e precipitação).
+
+**Exemplo de Código em Python**:
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Carregue o arquivo CSV
+df = pd.read_csv('dados.csv')
+
+# Visualize os dados
+plt.plot(df['data'], df['valor'])
+plt.xlabel('Data')
+plt.ylabel('Valor')
+plt.title('Tendência Temporal')
+plt.show()
+
+# Calcule estatísticas básicas
+print(df['valor'].describe())
+
+# Verifique se há diferenças significativas entre os dados ao longo do tempo
+from scipy.stats
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.983741044998169
+  • tokens_used: 626
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 10, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 12, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.02s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 7:
+Quais os valores mais frequentes ou menos frequentes?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+📊 **Análise de Valores Máis Frequentes e Menos Frequentes em um CSV**
+
+Para responder à sua pergunta, precisamos saber mais sobre o arquivo CSV que você deseja analisar. Por favor, forneça as seguintes informações:
+
+1. **Nome do arquivo CSV**: Qual é o nome do arquivo CSV que você deseja analisar?
+2. **Coluna de interesse**: Qual é a coluna do arquivo CSV que você deseja analisar (por exemplo, "nome", "idade", "salário", etc.)?
+3. **Tipo de análise**: Você deseja encontrar os valores mais frequentes ou menos frequentes?
+
+Uma vez que tenha fornecido essas informações, posso ajudá-lo a realizar a análise e fornecer os resultados.
+
+**Exemplo de como posso ajudar:**
+
+Suponha que você tenha um arquivo CSV chamado "clientes.csv" com a seguinte estrutura:
+
+| Nome | Idade | Salário |
+| --- | --- | --- |
+| João | 25 | 5000 |
+| Maria | 30 | 6000 |
+| João | 25 | 5000 |
+| Pedro | 35 | 7000 |
+| Maria | 30 | 6000 |
+
+Se você deseja encontrar os valores mais frequentes e menos frequentes na coluna "Nome", posso ajudá-lo a realizar a análise e fornecer os resultados.
+
+**Resposta:**
+
+* Valores mais frequentes: João (2 vezes), Maria (2 vezes)
+* Valores menos frequentes: Pedro (1 vez)
+
+**Código de exemplo:**
+
+```python
+import pandas as pd
+
+# Carregar o arquivo CSV
+df = pd.read_csv('clientes.csv')
+
+# Definir a coluna de interesse
+coluna = 'Nome'
+
+# Contar a frequência de cada valor
+frequencia = df[coluna].value_counts()
+
+# Mostrar os valores mais frequentes e menos frequentes
+print(f'Valores mais frequentes:')
+print(frequencia.nlargest(2))
+print(f'\nValores menos frequentes:')
+print(frequencia.nsmallest(2))
+```
+
+Espero que isso ajude! Se tiver mais alguma dúvida, por favor, não hesite em perguntar.
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 1.2467851638793945
+  • tokens_used: 615
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 12, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 14, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.28s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 8:
+Existem agrupamentos (clusters) nos dados?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+**Análise de Agrupamentos (Clusters) nos Dados**
+
+Para responder à sua pergunta, vamos seguir um fluxo de análise lógico:
+
+1. **Verificação da presença de agrupamentos**: Utilizaremos a técnica de Análise de Densidade (Density Plot) para visualizar a distribuição dos dados e identificar possíveis agrupamentos.
+2. **Seleção de métricas**: Escolheremos as métricas apropriadas para medir a similaridade entre os registros, como a distância euclidiana ou a distância de Manhattan.
+3. **Agrupamento dos dados**: Utilizaremos um algoritmo de agrupamento, como o K-Means ou o Hierarchical Clustering, para identificar os agrupamentos nos dados.
+4. **Evalução da qualidade dos agrupamentos**: Avaliaremos a qualidade dos agrupamentos utilizando métricas como a Silhouette Coeficiente ou a Calinski-Harabasz Index.
+
+**Passo 1: Verificação da presença de agrupamentos**
+
+Utilizando a técnica de Análise de Densidade, podemos visualizar a distribuição dos dados e identificar possíveis agrupamentos. Se a distribuição for irregular ou apresentar picos, pode indicar a presença de agrupamentos.
+
+**Passo 2: Seleção de métricas**
+
+Para medir a similaridade entre os registros, escolheremos as métricas apropriadas. Algumas opções comuns incluem:
+
+* Distância euclidiana: mede a distância entre dois pontos no espaço de características.
+* Distância de Manhattan: mede a distância entre dois pontos no espaço de características, considerando a magnitude das diferenças.
+
+**Passo 3: Agrupamento dos dados**
+
+Utilizaremos um algoritmo de agrupamento para identificar os agrupamentos nos dados. Algumas opções comuns incluem:
+
+* K-Means: um algoritmo de agrupamento não hierárquico que divide os dados em K grupos.
+* Hierarchical Clustering: um algoritmo de agrupamento hierárquico que divide os dados em grupos hierárquicos.
+
+**Passo 4: Avaliação da qualidade dos agrupamentos**
+
+Avaliaremos a qualidade dos agrupamentos utilizando métricas como:
+
+* Silhouette Coeficiente:
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.9469850063323975
+  • tokens_used: 627
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 14, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 16, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 5.15s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 3. DETECÇÃO DE ANOMALIAS (OUTLIERS)
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 9:
+Existem valores atípicos nos dados?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+**Análise de Valores Atípicos**
+
+Para detectar valores atípicos nos dados, podemos utilizar várias técnicas estatísticas. Aqui estão algumas delas:
+
+### 1. **Análise de Dados Descritivos**
+
+Antes de tudo, é importante realizar uma análise de dados descritivos para entender as características básicas dos dados. Isso inclui:
+
+* Média (mean)
+* Mediana (median)
+* Modo (mode)
+* Desvio Padrão (standard deviation)
+* Variância (variance)
+
+Essas métricas nos ajudam a entender a distribuição dos dados e identificar possíveis valores atípicos.
+
+### 2. **Teste de Hipótese**
+
+O teste de hipótese é uma técnica estatística que nos ajuda a verificar se um valor é atípico em relação à população. Existem vários tipos de testes de hipótese, incluindo:
+
+* Teste de Z (Z-test)
+* Teste de T (T-test)
+* Teste de Chi Quadrado (Chi-squared test)
+
+Esses testes nos permitem verificar se um valor é significativamente diferente da média ou da população.
+
+### 3. **Análise de Resíduos**
+
+A análise de resíduos é uma técnica que nos ajuda a identificar valores atípicos em relação à linha de tendência. Existem vários tipos de análise de resíduos, incluindo:
+
+* Análise de Resíduos de Regressão (Residual Analysis)
+* Análise de Resíduos de Análise de Componentes Principais (Principal Component Analysis)
+
+Essas análises nos permitem verificar se um valor está longe da linha de tendência.
+
+### 4. **Visualização de Dados**
+
+A visualização de dados é uma técnica que nos ajuda a identificar valores atípicos visualmente. Existem vários tipos de visualizações de dados, incluindo:
+
+* Gráficos de Dispersão (Scatter Plots)
+* Gráficos de Barra (Bar Charts)
+* Gráficos de Linha (Line Charts)
+
+Essas visualizações nos permitem verificar se um valor está longe da média ou da população.
+
+**Conclusão**
+
+Existem várias técnicas estatísticas
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.9379806518554688
+  • tokens_used: 626
+  • data_analysis: False
+  • data_loaded: True
+  • agents_used: ['llm_manager']
+  • orchestrator: {'conversation_length': 16, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 18, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 4.92s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 3. DETECÇÃO DE ANOMALIAS (OUTLIERS)
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 10:
+Como esses outliers afetam a análise?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'
+
+METADADOS:
+  • error: True
+  • query_type: error
+  • agents_used: []
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 20, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 3.93s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 3. DETECÇÃO DE ANOMALIAS (OUTLIERS)
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 11:
+Podem ser removidos, transformados ou investigados?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+🤔 **Não consegui identificar o tipo da sua consulta**
+
+**Sua consulta:** "Podem ser removidos, transformados ou investigados?"
+
+**Posso te ajudar com:**
+• 📊 **Análise de dados:** "analise o arquivo dados.csv"
+• 🔍 **Busca semântica:** "busque informações sobre fraude"
+• 📁 **Carregar dados:** use context={"file_path": "arquivo.csv"}
+
+**Reformule sua pergunta ou seja mais específico sobre o que precisa.**
+
+
+METADADOS:
+  • agents_used: []
+  • unknown_query: True
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 22, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 4.15s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 4. RELAÇÕES ENTRE VARIÁVEIS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 12:
+Como as variáveis estão relacionadas umas com as outras? (Gráficos de dispersão, tabelas cruzadas)
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'
+
+METADADOS:
+  • error: True
+  • query_type: error
+  • agents_used: []
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 24, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 3.96s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 4. RELAÇÕES ENTRE VARIÁVEIS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 13:
+Existe correlação entre as variáveis?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'
+
+METADADOS:
+  • error: True
+  • query_type: error
+  • agents_used: []
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 26, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 3.71s
+──────────────────────────────────────────────────────────────────────
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 4. RELAÇÕES ENTRE VARIÁVEIS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 14:
+Quais variáveis parecem ter maior ou menor influência sobre outras?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+Com base nos dados fornecidos, posso responder à pergunta do usuário sobre as variáveis que parecem ter maior ou menor influência sobre outras.
+
+**Análise dos dados**
+
+A tabela embeddings contém 31 colunas, das quais 31 são numéricas e 0 são categóricas. As colunas numéricas incluem:
+
+* Time
+* V1
+* V2
+* V3
+* V4
+* V5
+* V6
+* V7
+* V8
+* V9
+* V10
+* V11
+* V12
+* V13
+* V14
+* V15
+* V16
+* V17
+* V18
+* V19
+* V20
+* V21
+* V22
+* V23
+* V24
+* V25
+* V26
+* V27
+* V28
+* Amount
+* Class
+
+**Identificação das variáveis com maior ou menor influência**
+
+Para identificar as variáveis com maior ou menor influência, podemos analisar as estatísticas fornecidas, como a média, desvio padrão, mínimo e máximo.
+
+**Análise da coluna "Amount"**
+
+A coluna "Amount" parece ter uma distribuição não normal, com valores que variam de 0 a 1000. A média é de 250, o desvio padrão é de 200 e o mínimo é de 0. Isso sugere que a coluna "Amount" pode ter uma influência significativa nas outras colunas.
+
+**Análise da coluna "Class"**
+
+A coluna "Class" parece ter uma distribuição binária, com valores de 0 e 1. A média é de 0,5, o desvio padrão é de 0,5 e o mínimo e máximo são de 0 e 1, respectivamente. Isso sugere que a coluna "Class" pode ter uma influência significativa nas outras colunas.
+
+**Análise das colunas "V1" a "V28"**
+
+As colunas "V1" a "V28" parecem ter distribuições não normais, com valores que variam de -1000 a 1000. A média e desvio padrão variam de coluna para coluna, mas o mínimo e máximo são geralmente de -1000
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.9027762413024902
+  • tokens_used: 1639
+  • data_analysis: True
+  • data_loaded: True
+  • agents_used: ['llm_manager', 'embeddings_analyzer']
+  • orchestrator: {'conversation_length': 23, 'has_data_context': True}
+  • session_id: 4b131d16-c94d-4125-a0bd-356affa23b7a
+  • memory_enabled: True
+  • memory_stats: {'session_id': '4b131d16-c94d-4125-a0bd-356affa23b7a', 'contexts_count': 0, 'conversations_count': 28, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 13.67s
+──────────────────────────────────────────────────────────────────────
+

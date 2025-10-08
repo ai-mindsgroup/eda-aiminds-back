@@ -35,7 +35,7 @@ except ImportError:
 
 from src.embeddings.chunker import TextChunk
 from src.utils.logging_config import get_logger
-from src.llm.manager import LLMManager
+from src.llm.manager import LLMManager, LLMConfig
 
 
 TARGET_EMBEDDING_DIMENSION = 384
@@ -219,7 +219,7 @@ class EmbeddingGenerator:
         try:
             # Estratégia: usar o LLM para análise semântica e gerar embedding baseado na resposta
             prompt = f"Analyze this text semantically and extract key concepts: {text[:200]}"
-            response = self._llm_manager.generate_response(prompt, temperature=0.1)
+            response = self._llm_manager.chat(prompt, config=LLMConfig(temperature=0.1))
             
             # Gerar embedding determinístico baseado no texto original + resposta do LLM
             combined_text = text + response.content[:100]
@@ -239,9 +239,9 @@ class EmbeddingGenerator:
         try:
             # Usar uma estratégia genérica via LLM Manager
             # Para embeddings, simularemos usando o LLM para análise de texto
-            response = self._llm_manager.generate_response(
+            response = self._llm_manager.chat(
                 "Analyze this text for semantic content: " + text[:100],  # Truncate para não exceder limite
-                temperature=0.1
+                config=LLMConfig(temperature=0.1)
             )
             # Como não temos embeddings diretos, criaremos um embedding mock baseado na resposta
             import hashlib
@@ -263,9 +263,9 @@ class EmbeddingGenerator:
         try:
             # Usar uma estratégia genérica via LLM Manager
             # Para embeddings, simularemos usando o LLM para análise de texto
-            response = self._llm_manager.generate_response(
+            response = self._llm_manager.chat(
                 "Analyze this text semantically: " + text[:100],  # Truncate para não exceder limite
-                temperature=0.1
+                config=LLMConfig(temperature=0.1)
             )
             # Como não temos embeddings diretos, criaremos um embedding baseado na resposta
             import hashlib
@@ -335,6 +335,9 @@ class EmbeddingGenerator:
                         "char_count": chunk.metadata.char_count,
                         "word_count": chunk.metadata.word_count
                     }
+                    # Copiar additional_info se existir (contém chunk_type, topic, etc.)
+                    if chunk.metadata.additional_info:
+                        result.chunk_metadata.update(chunk.metadata.additional_info)
                     batch_results.append(result)
                 except Exception as e:
                     self.logger.error(f"Erro no chunk {chunk.metadata.chunk_index}: {str(e)}")

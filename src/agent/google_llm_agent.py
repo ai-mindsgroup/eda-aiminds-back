@@ -376,7 +376,7 @@ Use linguagem acessível e evite jargão estatístico excessivo."""
         return None
     
     def _save_to_vector_store(self, query: str, response: str, context: Optional[Dict[str, Any]] = None) -> bool:
-        """Salva consulta e resposta no banco vetorial para cache futuro.
+        """Salva consulta e resposta no banco vetorial para cache futuro com metadata enriquecido.
         
         Args:
             query: Consulta original
@@ -390,19 +390,28 @@ Use linguagem acessível e evite jargão estatístico excessivo."""
             return False
             
         try:
-            # Preparar metadados
+            from datetime import datetime
+            
+            # Preparar metadados enriquecidos para busca contextual
             metadata = {
                 "agent": self.name,
                 "model": self.model_name,
-                "response_content": response,
-                "timestamp": self._get_timestamp(),
+                "response_content": response[:500],  # Truncar resposta longa
+                "timestamp": datetime.now().isoformat(),
+                "query_type": "llm_analysis",
+                "embedding_type": "conversation",
+                "session_id": getattr(self, '_current_session_id', None),
                 "context_keys": list(context.keys()) if context else [],
-                "query_type": "llm_analysis"
             }
             
-            # Se há contexto de arquivo, incluir  
-            if context and "file_path" in context:
-                metadata["source_file"] = context["file_path"]
+            # Adicionar contexto relevante se disponível
+            if context:
+                if "file_path" in context:
+                    metadata["source_file"] = context["file_path"]
+                if "data_info" in context:
+                    metadata["data_dimensions"] = f"{context['data_info'].get('rows', 0)}x{context['data_info'].get('columns', 0)}"
+                if "fraud_data" in context:
+                    metadata["fraud_count"] = context["fraud_data"].get("count", 0)
             
             # Gerar e salvar embedding
             query_result = self.embedding_generator.generate_embedding(query)
@@ -411,11 +420,12 @@ Use linguagem acessível e evite jargão estatístico excessivo."""
             result = self.vector_store.store_embedding(
                 query=query,
                 response=response,
-                embedding=query_embedding
+                embedding=query_embedding,
+                metadata=metadata  # Passar metadata enriquecido
             )
             
             if result:
-                self.logger.info(f"💾 Consulta salva no cache vetorial: {query[:50]}...")
+                self.logger.info(f"💾 Consulta salva no cache vetorial com metadata enriquecido: {list(metadata.keys())}")
                 return True
             else:
                 self.logger.warning("Falha ao salvar no cache vetorial")

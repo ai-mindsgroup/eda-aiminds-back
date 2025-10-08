@@ -1,0 +1,39 @@
+[
+  {
+    "numero": 1,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Quais são os tipos de dados (numéricos, categóricos)?",
+    "resposta": "Com base nos dados fornecidos, posso responder à pergunta do usuário sobre os tipos de dados, colunas numéricos e categóricos.\n\n**Tipos de dados:**\n\n- **Numéricos:** Time, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, Amount\n- **Categóricos:** Nenhum (a lista de colunas categóricas está vazia)\n\n**Colunas numéricos:**\n\n- Time\n- V1\n- V2\n- V3\n- V4\n- V5\n- V6\n- V7\n- V8\n- V9\n- V10\n- V11\n- V12\n- V13\n- V14\n- V15\n- V16\n- V17\n- V18\n- V19\n- V20\n- V21\n- V22\n- V23\n- V24\n- V25\n- V26\n- V27\n- V28\n- Amount\n\n**Colunas categóricos:**\n\n- Nenhum (a lista de colunas categóricas está vazia)\n\nLembre-se de que essas informações são baseadas nos dados fornecidos e podem variar dependendo do contexto específico do arquivo CSV carregado.",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.6849954128265381,
+      "tokens_used": 1486,
+      "data_analysis": true,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager",
+        "embeddings_analyzer"
+      ],
+      "orchestrator": {
+        "conversation_length": 1,
+        "has_data_context": true
+      },
+      "session_id": "855173be-46cc-46e6-adb8-3ed1cfeef86e",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "855173be-46cc-46e6-adb8-3ed1cfeef86e",
+        "contexts_count": 0,
+        "conversations_count": 2,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 34.042805,
+    "session_id": "855173be-46cc-46e6-adb8-3ed1cfeef86e",
+    "timestamp": "2025-10-06T17:47:27.715504"
+  }
+]

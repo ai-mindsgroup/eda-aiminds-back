@@ -1,49 +1,39 @@
 # Documentação - EDA AI Minds Backend
 
-Este diretório contém toda a documentação técnica e relatórios do projeto.
+Este diretório contém toda a documentação técnica, auditorias e relatórios do projeto.
 
-## 📚 **Documentação Técnica**
+## 📚 **Documentação Principal**
 
-### 🔧 **Sistema e Dependências**
-- [`DEPENDENCIES.md`](DEPENDENCIES.md) - Stack tecnológica e dependências detalhadas
-- [`sistema-carregamento-dados.md`](sistema-carregamento-dados.md) - Sistema de carregamento de dados
+### 🔧 **Arquitetura e Sistema**
+- [`ARQUITETURA-RAG-VETORIAL-CORRIGIDA.md`](ARQUITETURA-RAG-VETORIAL-CORRIGIDA.md) - Arquitetura final do sistema multiagente
+- [`STATUS-COMPLETO-PROJETO.md`](STATUS-COMPLETO-PROJETO.md) - Status consolidado do projeto
 
-### 🤖 **Agentes e Arquitetura**
-- [`agente-orquestrador-documentacao.md`](agente-orquestrador-documentacao.md) - Documentação do orquestrador
-- [`resumo-implementacao-orquestrador.md`](resumo-implementacao-orquestrador.md) - Resumo da implementação
-
-### 📊 **Relatórios de Desenvolvimento**
-- [`relatorio-final.md`](relatorio-final.md) - Relatório final consolidado
-- [`REORGANIZACAO_RELATORIO.md`](REORGANIZACAO_RELATORIO.md) - Relatório da reorganização estrutural
+### 📊 **Auditorias e Impacto**
+- [`ANALISE-IMPACTO-REMOCAO-HARDCODING.md`](ANALISE-IMPACTO-REMOCAO-HARDCODING.md) - Impacto da remoção de código hardcoded
+- [`auditoria/auditoria-2025-10-05.md`](auditoria/auditoria-2025-10-05.md) - Auditoria de documentação e obsolescência
 
 ### 📅 **Sessões de Desenvolvimento**
-- [`2025-09-28_0430_sessao-desenvolvimento.md`](2025-09-28_0430_sessao-desenvolvimento.md) - Sessão 28/09/2024 04:30
-- [`2025-01-28_0513_sessao-desenvolvimento.md`](2025-01-28_0513_sessao-desenvolvimento.md) - Sessão 28/01/2025 05:13
+- Arquivos no formato `YYYY-MM-DD_HHMM_sessao-desenvolvimento.md` para rastreabilidade
 
-## 🗂️ **Organização da Documentação**
+## 🗂️ **Organização Recomendada**
 
-### Por Tipo
 ```
 docs/
-├── 📋 Técnica/        # DEPENDENCIES.md, sistema-*.md
-├── 🤖 Agentes/        # agente-*.md, resumo-*.md  
-├── 📊 Relatórios/     # relatorio-*.md, REORGANIZACAO_*.md
-└── 📅 Sessões/        # YYYY-MM-DD_*.md
+├── ARQUITETURA-RAG-VETORIAL-CORRIGIDA.md
+├── STATUS-COMPLETO-PROJETO.md
+├── ANALISE-IMPACTO-REMOCAO-HARDCODING.md
+├── auditoria/
+│   └── auditoria-2025-10-05.md
+├── [sessões históricas]
 ```
-
-### Por Data
-- **2024-09-28**: Implementação do orquestrador e reorganização
-- **2025-01-28**: Sessão de desenvolvimento avançada
-
----
 
 ## 📖 **Como Usar Esta Documentação**
 
-1. **Para entender dependências**: Leia `DEPENDENCIES.md`
-2. **Para entender agentes**: Comece com `agente-orquestrador-documentacao.md`
-3. **Para ver progresso**: Consulte `relatorio-final.md`
-4. **Para histórico**: Veja as sessões por data
+1. **Para entender arquitetura:** Leia `ARQUITETURA-RAG-VETORIAL-CORRIGIDA.md`
+2. **Para status do projeto:** Consulte `STATUS-COMPLETO-PROJETO.md`
+3. **Para auditoria e impacto:** Veja `ANALISE-IMPACTO-REMOCAO-HARDCODING.md` e `auditoria/auditoria-2025-10-05.md`
+4. **Para histórico:** Consulte sessões por data
 
 ---
 
-**Última atualização:** 28/09/2025
+**Última atualização:** 05/10/2025
