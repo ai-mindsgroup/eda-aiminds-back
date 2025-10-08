@@ -36,6 +36,7 @@ if missing:
     import warnings
     warnings.warn(f"Variáveis ausentes: {', '.join(missing)}. Configure configs/.env ou variáveis de ambiente.")
 
+HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "outputs/histogramas")
 # Configurações de banco (Postgres/Supabase)
 DB_HOST: str | None = os.getenv("DB_HOST")
 DB_PORT: str = os.getenv("DB_PORT", "5432")

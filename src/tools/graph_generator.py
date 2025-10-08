@@ -50,10 +50,15 @@ class GraphGenerator:
     def __init__(self, output_dir: Optional[Path] = None):
         """
         Inicializa o gerador de gráficos.
-        
         Args:
-            output_dir: Diretório para salvar gráficos (None = apenas memória)
+            output_dir: Diretório para salvar gráficos (None = usa settings.HISTOGRAMS_DIR)
         """
+        if output_dir is None:
+            try:
+                from src.settings import HISTOGRAMS_DIR
+                output_dir = Path(HISTOGRAMS_DIR)
+            except Exception:
+                output_dir = Path("outputs/histogramas")
         self.output_dir = output_dir
         if output_dir:
             output_dir.mkdir(parents=True, exist_ok=True)
