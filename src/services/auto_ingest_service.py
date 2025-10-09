@@ -199,19 +199,48 @@ class AutoIngestService:
                 file_name = file_info['name']
                 
                 try:
-                    # Baixa arquivo para pasta data/
+                    # Baixa arquivo diretamente para pasta 'processando'
                     logger.info(f"  ⬇️ Baixando: {file_name}")
-                    download_path = EDA_DATA_DIR / file_name
-                    self.google_drive_client.download_file(file_id, download_path)
+                    from src.settings import EDA_DATA_DIR_PROCESSANDO
+                    download_path = EDA_DATA_DIR_PROCESSANDO / file_name
                     
-                    # Processa arquivo
-                    if self._process_file(download_path):
-                        files_processed += 1
-                        # Marca como processado no Google Drive client
-                        self.google_drive_client.mark_as_downloaded(file_id)
+                    # Garante que o diretório existe
+                    download_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    self.google_drive_client.download_file(file_id, download_path)
+                    logger.info(f"  ✅ Arquivo baixado para: {download_path}")
+                    
+                    # Processa arquivo (já está em 'processando', então vai fazer ingest + mover para 'processado')
+                    logger.info(f"  🔄 Iniciando processamento...")
+                    
+                    # 1. Executa ingestão (limpa base vetorial + análise + chunking + embeddings)
+                    logger.info("  → Executando ingestão no Supabase...")
+                    self.data_ingestor.ingest_csv(str(download_path))
+                    logger.info("  ✅ Ingestão concluída com sucesso")
+                    
+                    # 2. Move para pasta 'processado'
+                    logger.info("  → Movendo para pasta 'processado'...")
+                    processed_path = self.file_manager.move_to_processed(download_path)
+                    logger.info(f"  ✅ Movido para: {processed_path}")
+                    
+                    files_processed += 1
+                    self.stats["total_files_processed"] += 1
+                    self.stats["last_success"] = datetime.now().isoformat()
+                    
+                    # ✅ SUCESSO: Deleta arquivo do Google Drive
+                    try:
+                        logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name}")
+                        self.google_drive_client.delete_file(file_id)
+                        logger.info(f"  ✅ Arquivo removido do Google Drive com sucesso")
+                    except Exception as del_error:
+                        logger.error(f"  ⚠️ Erro ao deletar arquivo do Drive (processamento foi bem-sucedido): {del_error}")
+                    
+                    logger.info(f"✅ Arquivo processado completamente: {file_name}")
                     
                 except Exception as e:
                     logger.error(f"❌ Erro ao processar {file_name}: {e}")
+                    self.stats["total_files_failed"] += 1
+                    self.stats["last_error"] = str(e)
                     continue
             
             return files_processed

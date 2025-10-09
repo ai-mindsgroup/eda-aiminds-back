@@ -272,6 +272,34 @@ class GoogleDriveClient:
         except Exception as e:
             raise GoogleDriveClientError(f"Erro ao baixar arquivo: {e}")
     
+    def delete_file(self, file_id: str) -> None:
+        """Deleta arquivo do Google Drive.
+        
+        ATENÇÃO: Esta operação é PERMANENTE! O arquivo será movido para lixeira.
+        
+        Args:
+            file_id: ID do arquivo no Google Drive
+        
+        Raises:
+            GoogleDriveClientError: Se deleção falhar
+        """
+        if not self.service:
+            raise GoogleDriveClientError("Cliente não autenticado. Execute authenticate() primeiro.")
+        
+        try:
+            logger.info(f"🗑️ Deletando arquivo do Google Drive: {file_id}")
+            self.service.files().delete(fileId=file_id).execute()
+            logger.info(f"✅ Arquivo deletado com sucesso: {file_id}")
+            
+            # Remove do histórico também
+            if file_id in self._downloaded_files:
+                self._downloaded_files.remove(file_id)
+                
+        except HttpError as e:
+            raise GoogleDriveClientError(f"Erro HTTP ao deletar arquivo: {e}")
+        except Exception as e:
+            raise GoogleDriveClientError(f"Erro ao deletar arquivo: {e}")
+    
     def mark_as_downloaded(self, file_id: str) -> None:
         """Marca arquivo como já processado (sem baixar novamente).
         
