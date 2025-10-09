@@ -288,16 +288,34 @@ class GoogleDriveClient:
         
         try:
             logger.info(f"🗑️ Deletando arquivo do Google Drive: {file_id}")
+            
+            # Tenta obter informações do arquivo antes de deletar (para logging)
+            try:
+                file_info = self.service.files().get(
+                    fileId=file_id, 
+                    fields='name,mimeType,size'
+                ).execute()
+                file_name = file_info.get('name', 'Desconhecido')
+                logger.debug(f"   Arquivo a ser deletado: {file_name}")
+            except Exception as info_error:
+                logger.warning(f"   Não foi possível obter informações do arquivo: {info_error}")
+                file_name = "Desconhecido"
+            
+            # Executa a deleção
             self.service.files().delete(fileId=file_id).execute()
-            logger.info(f"✅ Arquivo deletado com sucesso: {file_id}")
+            logger.info(f"✅ Arquivo '{file_name}' deletado com sucesso do Google Drive (ID: {file_id})")
             
             # Remove do histórico também
             if file_id in self._downloaded_files:
                 self._downloaded_files.remove(file_id)
+                logger.debug(f"   Arquivo removido do histórico de downloads")
                 
         except HttpError as e:
+            error_details = e.content.decode('utf-8') if hasattr(e, 'content') else str(e)
+            logger.error(f"❌ Erro HTTP ao deletar arquivo {file_id}: {error_details}")
             raise GoogleDriveClientError(f"Erro HTTP ao deletar arquivo: {e}")
         except Exception as e:
+            logger.error(f"❌ Erro ao deletar arquivo {file_id}: {e}")
             raise GoogleDriveClientError(f"Erro ao deletar arquivo: {e}")
     
     def mark_as_downloaded(self, file_id: str) -> None:

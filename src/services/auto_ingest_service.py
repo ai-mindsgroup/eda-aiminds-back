@@ -229,11 +229,15 @@ class AutoIngestService:
                     
                     # ✅ SUCESSO: Deleta arquivo do Google Drive
                     try:
-                        logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name}")
+                        logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name} (ID: {file_id})")
                         self.google_drive_client.delete_file(file_id)
-                        logger.info(f"  ✅ Arquivo removido do Google Drive com sucesso")
+                        logger.info(f"  ✅ Arquivo {file_name} removido do Google Drive com sucesso")
+                        logger.info(f"  📋 Arquivo local salvo em: {processed_path}")
                     except Exception as del_error:
-                        logger.error(f"  ⚠️ Erro ao deletar arquivo do Drive (processamento foi bem-sucedido): {del_error}")
+                        logger.error(f"  ⚠️ AVISO: Erro ao deletar arquivo do Drive (processamento foi bem-sucedido)")
+                        logger.error(f"     Arquivo: {file_name} (ID: {file_id})")
+                        logger.error(f"     Erro: {del_error}")
+                        logger.warning(f"  ⚠️ O arquivo permanecerá no Google Drive e pode ser reprocessado no próximo ciclo")
                     
                     logger.info(f"✅ Arquivo processado completamente: {file_name}")
                     
