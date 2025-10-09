@@ -11,3 +11,16 @@ __pycache__/
 dist/
 build/
 data/creditcard.csv
+
+# Google Drive credentials e tokens (SENSÍVEL - NÃO COMMITAR)
+configs/google_drive_credentials.json
+configs/google_drive_token.json
+
+# Diretórios de processamento (arquivos grandes)
+data/processando/
+data/processado/
+data/*.csv
+
+# Logs do serviço de ingestão
+logs/auto_ingest.log
+logs/service-*.log
