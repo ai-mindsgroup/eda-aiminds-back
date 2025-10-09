@@ -71,7 +71,7 @@ CSV_AGENT_AVAILABLE = False
 print("🔧 Carregando sistema multiagente...")
 
 try:
-    from src.settings import GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_KEY
+    from src.settings import GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_KEY, API_HOST, API_PORT
     logger.info("✅ Configurações carregadas")
     
     if not GOOGLE_API_KEY:
@@ -107,8 +107,10 @@ if MULTIAGENT_AVAILABLE:
 
 # Configurações
 MAX_FILE_SIZE = 999 * 1024 * 1024  # 999MB
-PORT = 8001  # Porta diferente da API simples
 API_TIMEOUT = 120  # Timeout de 120 segundos para operações longas
+
+# HOST e PORT são importados de src.settings (configuráveis via .env)
+# Não definir PORT aqui - usar API_HOST e API_PORT de settings.py
 
 app = FastAPI(
     title="EDA AI Minds - API Completa",
@@ -978,9 +980,10 @@ def extract_recommendations(text: str) -> List[str]:
 if __name__ == "__main__":
     print("🚀 Iniciando API Completa - EDA AI Minds")
     print("=" * 50)
-    print(f"📍 URL: http://localhost:{PORT}")
-    print(f"📚 Docs: http://localhost:{PORT}/docs")
-    print(f"📋 ReDoc: http://localhost:{PORT}/redoc")
+    print(f"📍 URL: http://localhost:{API_PORT}")
+    print(f"📚 Docs: http://localhost:{API_PORT}/docs")
+    print(f"📋 ReDoc: http://localhost:{API_PORT}/redoc")
+    print(f"🌐 Host: {API_HOST} (aceita conexões {'externas' if API_HOST == '0.0.0.0' else 'apenas locais'})")
     print(f"🤖 Sistema Multiagente: {'✅ Ativo' if MULTIAGENT_AVAILABLE else '❌ Inativo'}")
     if MULTIAGENT_AVAILABLE:
         print("🧠 Agentes Disponíveis:")
@@ -993,8 +996,8 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "api_completa:app",
-        host="0.0.0.0",
-        port=PORT,
+        host=API_HOST,
+        port=API_PORT,
         reload=True,
         log_level="info"
     )
