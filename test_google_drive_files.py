@@ -37,7 +37,7 @@ def main():
         
         # Lista arquivos
         logger.info(f"📁 Listando arquivos na pasta: {GOOGLE_DRIVE_FOLDER_ID}")
-        files = client.list_files()
+        files = client.list_csv_files()
         
         if not files:
             logger.warning("⚠️ Nenhum arquivo encontrado no Google Drive")

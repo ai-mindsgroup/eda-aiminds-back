@@ -80,6 +80,12 @@ def run_once():
     
     try:
         service = create_auto_ingest_service()
+        
+        # Inicializa Google Drive client se habilitado (necessário antes de _polling_cycle)
+        if GOOGLE_DRIVE_ENABLED:
+            logger.info("📁 Inicializando Google Drive client...")
+            service._initialize_google_drive()
+        
         service._polling_cycle()
         service._print_stats()
         logger.info("✅ Ciclo único concluído com sucesso")

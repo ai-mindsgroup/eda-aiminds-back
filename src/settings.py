@@ -60,9 +60,25 @@ EDA_DATA_DIR_PROCESSADO: Path = Path(os.getenv("EDA_DATA_DIR_PROCESSADO", "data/
 
 # Google Drive API
 GOOGLE_DRIVE_ENABLED: bool = os.getenv("GOOGLE_DRIVE_ENABLED", "false").lower() == "true"
+
+# Modo de autenticação: "oauth" (padrão) ou "service_account"
+GOOGLE_DRIVE_AUTH_MODE: str = os.getenv("GOOGLE_DRIVE_AUTH_MODE", "oauth")
+
+# OAuth credentials (para modo "oauth")
 GOOGLE_DRIVE_CREDENTIALS_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_CREDENTIALS_FILE", "configs/google_drive_credentials.json"))
 GOOGLE_DRIVE_TOKEN_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_TOKEN_FILE", "configs/google_drive_token.json"))
+
+# Service Account credentials (para modo "service_account")
+GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE", "configs/google_drive_service_account.json"))
+
+# ID da pasta do Google Drive a monitorar
 GOOGLE_DRIVE_FOLDER_ID: str | None = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+
+# ID da pasta "processados" no Google Drive (criada automaticamente se não existir)
+GOOGLE_DRIVE_PROCESSED_FOLDER_ID: str | None = os.getenv("GOOGLE_DRIVE_PROCESSED_FOLDER_ID")
+
+# Comportamento após processamento: "delete" ou "move" (recomendado: move)
+GOOGLE_DRIVE_POST_PROCESS_ACTION: str = os.getenv("GOOGLE_DRIVE_POST_PROCESS_ACTION", "move")
 
 # Configurações de polling
 AUTO_INGEST_POLLING_INTERVAL: int = int(os.getenv("AUTO_INGEST_POLLING_INTERVAL", "300"))

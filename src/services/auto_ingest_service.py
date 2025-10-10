@@ -36,6 +36,9 @@ from src.agent.data_ingestor import DataIngestor
 from src.settings import (
     AUTO_INGEST_POLLING_INTERVAL,
     GOOGLE_DRIVE_ENABLED,
+    GOOGLE_DRIVE_FOLDER_ID,
+    GOOGLE_DRIVE_PROCESSED_FOLDER_ID,
+    GOOGLE_DRIVE_POST_PROCESS_ACTION,
     EDA_DATA_DIR,
     EDA_DATA_DIR_PROCESSADO
 )
@@ -79,6 +82,7 @@ class AutoIngestService:
         
         # Componentes
         self.google_drive_client = google_drive_client
+        self.google_drive_processed_folder_id = None  # ID da pasta "processados" no Drive
         self.file_manager = file_manager or create_csv_file_manager()
         self.data_ingestor = data_ingestor or DataIngestor()
         
@@ -129,10 +133,35 @@ class AutoIngestService:
                 logger.info("Criando e autenticando cliente Google Drive...")
                 self.google_drive_client = create_google_drive_client()
                 logger.info("✅ Cliente Google Drive autenticado com sucesso")
+            
+            # Configura pasta "processados" se usar ação "move"
+            if GOOGLE_DRIVE_POST_PROCESS_ACTION == "move":
+                self._setup_processed_folder()
+            
             return True
         except Exception as e:
             logger.error(f"❌ Erro ao inicializar Google Drive: {e}")
             return False
+    
+    def _setup_processed_folder(self) -> None:
+        """Configura pasta 'processados' no Google Drive."""
+        try:
+            # Usa ID fornecido ou cria/encontra pasta automaticamente
+            if GOOGLE_DRIVE_PROCESSED_FOLDER_ID:
+                self.google_drive_processed_folder_id = GOOGLE_DRIVE_PROCESSED_FOLDER_ID
+                logger.info(f"📁 Pasta processados configurada: {self.google_drive_processed_folder_id}")
+            else:
+                # Cria/encontra pasta "processados" dentro da pasta monitorada
+                folder_name = "processados"
+                logger.info(f"📁 Procurando/criando pasta '{folder_name}'...")
+                self.google_drive_processed_folder_id = self.google_drive_client.get_or_create_folder(
+                    folder_name=folder_name,
+                    parent_folder_id=GOOGLE_DRIVE_FOLDER_ID
+                )
+                logger.info(f"✅ Pasta processados pronta: {self.google_drive_processed_folder_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao configurar pasta processados: {e}")
+            logger.warning(f"   Arquivos serão deletados em vez de movidos")
     
     def _process_file(self, file_path: Path) -> bool:
         """Processa um único arquivo CSV.
@@ -227,14 +256,20 @@ class AutoIngestService:
                     self.stats["total_files_processed"] += 1
                     self.stats["last_success"] = datetime.now().isoformat()
                     
-                    # ✅ SUCESSO: Deleta arquivo do Google Drive
+                    # ✅ SUCESSO: Remove arquivo do Google Drive (delete ou move)
                     try:
-                        logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name} (ID: {file_id})")
-                        self.google_drive_client.delete_file(file_id)
-                        logger.info(f"  ✅ Arquivo {file_name} removido do Google Drive com sucesso")
+                        if GOOGLE_DRIVE_POST_PROCESS_ACTION == "move" and self.google_drive_processed_folder_id:
+                            logger.info(f"  📦 Movendo arquivo no Google Drive: {file_name} (ID: {file_id})")
+                            self.google_drive_client.move_file(file_id, self.google_drive_processed_folder_id)
+                            logger.info(f"  ✅ Arquivo movido para pasta 'processados' no Google Drive")
+                        else:
+                            logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name} (ID: {file_id})")
+                            self.google_drive_client.delete_file(file_id)
+                            logger.info(f"  ✅ Arquivo removido do Google Drive com sucesso")
+                        
                         logger.info(f"  📋 Arquivo local salvo em: {processed_path}")
                     except Exception as del_error:
-                        logger.error(f"  ⚠️ AVISO: Erro ao deletar arquivo do Drive (processamento foi bem-sucedido)")
+                        logger.error(f"  ⚠️ AVISO: Erro ao processar arquivo no Drive (processamento local foi bem-sucedido)")
                         logger.error(f"     Arquivo: {file_name} (ID: {file_id})")
                         logger.error(f"     Erro: {del_error}")
                         logger.warning(f"  ⚠️ O arquivo permanecerá no Google Drive e pode ser reprocessado no próximo ciclo")
