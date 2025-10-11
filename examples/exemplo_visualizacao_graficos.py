@@ -20,6 +20,7 @@ sys.path.insert(0, str(root_dir))
 import pandas as pd
 import numpy as np
 from src.tools.graph_generator import GraphGenerator, detect_visualization_need
+from src.settings import HISTOGRAMS_DIR
 from src.utils.logging_config import get_logger
 
 logger = get_logger("examples.visualizacao")
@@ -42,7 +43,7 @@ def exemplo_histograma():
     df = pd.read_csv(data_path)
     
     # Criar gerador
-    generator = GraphGenerator(output_dir=root_dir / "temp" / "visualizations")
+    generator = GraphGenerator(output_dir=Path(HISTOGRAMS_DIR))
     
     # Gerar histograma da coluna Amount
     print("Gerando histograma da coluna 'Amount'...")
@@ -87,7 +88,7 @@ def exemplo_scatter():
     
     df = pd.read_csv(data_path)
     
-    generator = GraphGenerator(output_dir=root_dir / "temp" / "visualizations")
+    generator = GraphGenerator(output_dir=Path(HISTOGRAMS_DIR))
     
     # Gerar scatter plot entre V1 e V2
     print("Gerando scatter plot entre 'V1' e 'V2'...")
@@ -128,7 +129,7 @@ def exemplo_boxplot():
     
     df = pd.read_csv(data_path)
     
-    generator = GraphGenerator(output_dir=root_dir / "temp" / "visualizations")
+    generator = GraphGenerator(output_dir=Path(HISTOGRAMS_DIR))
     
     # Gerar boxplot da coluna Time
     print("Gerando boxplot da coluna 'Time'...")
@@ -167,7 +168,7 @@ def exemplo_bar_chart():
     
     df = pd.read_csv(data_path)
     
-    generator = GraphGenerator(output_dir=root_dir / "temp" / "visualizations")
+    generator = GraphGenerator(output_dir=Path(HISTOGRAMS_DIR))
     
     # Contar transações por classe
     class_counts = df['Class'].value_counts().to_dict()
@@ -211,7 +212,7 @@ def exemplo_heatmap():
     
     df = pd.read_csv(data_path)
     
-    generator = GraphGenerator(output_dir=root_dir / "temp" / "visualizations")
+    generator = GraphGenerator(output_dir=Path(HISTOGRAMS_DIR))
     
     # Selecionar apenas algumas colunas para visualização
     columns_to_plot = ['Time', 'Amount', 'V1', 'V2', 'V3', 'V4', 'V5']

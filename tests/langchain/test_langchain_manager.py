@@ -90,7 +90,7 @@ class TestLangChainLLMManager:
         openai_model = manager._get_default_model(LLMProvider.OPENAI)
         
         assert groq_model == "llama-3.1-8b-instant"
-        assert google_model == "models/gemini-2.0-flash"
+        assert google_model == "gemini-pro"
         assert openai_model == "gpt-3.5-turbo"
     
     def test_response_metadata(self):

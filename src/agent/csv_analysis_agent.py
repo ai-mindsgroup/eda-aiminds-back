@@ -1,3 +1,25 @@
+"""
+⚠️  ⚠️  ⚠️  DEPRECATION WARNING  ⚠️  ⚠️  ⚠️
+
+ESTE ARQUIVO ESTÁ OBSOLETO E SERÁ REMOVIDO EM VERSÕES FUTURAS.
+
+Use src/agent/rag_data_agent.py ao invés deste arquivo.
+
+MOTIVO DA DEPRECAÇÃO:
+- rag_data_agent.py implementa busca vetorial PURA sem keywords hardcoded
+- csv_analysis_agent.py viola princípios RAG com detecção por palavras-chave
+- Sistema deve ser 100% genérico e agnóstico ao dataset
+
+IMPACTO:
+- Este arquivo ainda funciona mas NÃO deve ser usado em novos desenvolvimentos
+- Testes que usam EmbeddingsAnalysisAgent devem migrar para RAGDataAgent
+- A remoção definitiva está planejada para próxima versão major
+
+DATA DE DEPRECAÇÃO: 05/10/2025
+⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️  ⚠️
+"""
+from __future__ import annotations
+
 """Agente especializado em análise de dados via tabela embeddings.
 
 Este agente combina:
@@ -9,7 +31,6 @@ Este agente combina:
 NOTA CRÍTICA: Este agente NÃO acessa arquivos CSV diretamente.
 Todos os dados vêm da tabela embeddings do Supabase.
 """
-from __future__ import annotations
 import json
 import pandas as pd
 import numpy as np
@@ -25,6 +46,9 @@ except (ImportError, RuntimeError) as e:
     print(f"⚠️ Supabase não disponível: {str(e)[:100]}...")
 
 from src.agent.base_agent import BaseAgent, AgentError
+# query_classifier removido - arquivo obsoleto deletado
+# ⚠️ NOTA: Este arquivo está DEPRECATED e contém código quebrado (referências a QueryType)
+# Mantido apenas para compatibilidade temporária. Use RAGDataAgent ao invés.
 
 
 class EmbeddingsAnalysisAgent(BaseAgent):
@@ -47,6 +71,10 @@ class EmbeddingsAnalysisAgent(BaseAgent):
         self._analysis_cache: Dict[str, Any] = {}
         self._patterns_cache: Dict[str, Any] = {}
         
+        # REMOVED: RAGQueryClassifier não existe no codebase (corrigido em 2025-01-06)
+        # self.query_classifier = RAGQueryClassifier()
+        self.query_classifier = None  # Fallback seguro para permitir inicialização
+        
         if not SUPABASE_AVAILABLE:
             raise AgentError(self.name, "Supabase não disponível - necessário para acesso a embeddings")
         
@@ -59,6 +87,40 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 self.name, 
                 "VIOLAÇÃO CRÍTICA: Tentativa de acesso direto a CSV detectada"
             )
+    
+    def _classify_query_by_keywords(self, query: str):
+        """Classificação básica via keywords (fallback quando RAGQueryClassifier indisponível).
+        
+        Args:
+            query: Pergunta do usuário
+            
+        Returns:
+            QueryType correspondente
+        """
+        from src.agent.orchestrator_agent import QueryType
+        
+        query_lower = query.lower()
+        
+        # Mapeamento de keywords para tipos
+        keywords_map = {
+            QueryType.VISUALIZATION: ['gráfico', 'grafico', 'histograma', 'distribuição', 'plot', 'visualizar', 'mostrar'],
+            QueryType.CORRELATION: ['correlação', 'correlacao', 'relação', 'relacao', 'associação', 'associacao'],
+            QueryType.VARIABILITY: ['variabilidade', 'variação', 'variacao', 'desvio', 'dispersão', 'dispersao'],
+            QueryType.CENTRAL_TENDENCY: ['média', 'media', 'mediana', 'moda', 'central'],
+            QueryType.DISTRIBUTION: ['distribuição', 'distribuicao', 'frequência', 'frequencia'],
+            QueryType.OUTLIERS: ['outlier', 'discrepante', 'anômalo', 'anomalo', 'fora da curva'],
+            QueryType.INTERVAL: ['intervalo', 'faixa', 'range', 'mínimo', 'minimo', 'máximo', 'maximo'],
+            QueryType.COUNT: ['quantos', 'quantas', 'quantidade', 'contar', 'número', 'numero'],
+            QueryType.SUMMARY: ['resumo', 'visão geral', 'visao geral', 'overview', 'sumário', 'sumario'],
+        }
+        
+        # Procurar palavras-chave
+        for qtype, keywords in keywords_map.items():
+            if any(kw in query_lower for kw in keywords):
+                return qtype
+        
+        # Fallback para ANALYSIS se não encontrar match específico
+        return QueryType.ANALYSIS
     
     def load_from_embeddings(self, 
                            dataset_filter: Optional[str] = None,
@@ -183,55 +245,80 @@ class EmbeddingsAnalysisAgent(BaseAgent):
         Returns:
             Resposta com análise baseada em embeddings
         """
-        self._validate_embeddings_access_only()
-        
         try:
-            # Verificar se precisa carregar embeddings
-            if not self.current_embeddings:
-                dataset_filter = context.get('dataset_filter') if context else None
-                load_result = self.load_from_embeddings(dataset_filter=dataset_filter)
-                if 'error' in load_result.get('metadata', {}):
-                    return load_result
-            
-            if not self.current_embeddings:
-                return self._build_response(
-                    "❌ Nenhum embedding carregado. Verifique se há dados na tabela embeddings.",
-                    metadata={"error": True, "conformidade": "embeddings_only"}
-                )
-            
-            # Determinar tipo de consulta
-            query_lower = query.lower()
-            
-            # NOVO: Detectar solicitações de visualização (histogramas, gráficos, distribuição)
-            viz_keywords = ['histograma', 'histogram', 'distribuição', 'distribuicao', 'gráfico', 'grafico', 
-                           'visualização', 'visualizacao', 'plotar', 'plot', 'mostre graficamente']
-            if any(word in query_lower for word in viz_keywords):
-                return self._handle_visualization_query(query, context)
-            
-            # NOVO: Detectar perguntas sobre medidas de tendência central (média, mediana, moda)
-            central_tendency_keywords = ['média', 'media', 'mediana', 'median', 'mean', 
-                                        'tendência central', 'tendencia central', 'moda', 'mode',
-                                        'medidas de tendência']
-            if any(word in query_lower for word in central_tendency_keywords):
-                return self._handle_central_tendency_query_from_embeddings(query, context)
-            
-            # NOVO: Detectar perguntas sobre intervalos e estatísticas (min, max, range)
-            stats_keywords = ['intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
-                            'variância', 'desvio', 'percentil', 'quartil', 'valores']
-            if any(word in query_lower for word in stats_keywords):
-                return self._handle_statistics_query_from_embeddings(query, context)
-            
-            if any(word in query_lower for word in ['resumo', 'describe', 'info', 'overview', 'summary']):
-                return self._handle_summary_query_from_embeddings(query, context)
-            elif any(word in query_lower for word in ['análise', 'analyze', 'estatística', 'statistics']):
-                return self._handle_analysis_query_from_embeddings(query, context)
-            elif any(word in query_lower for word in ['busca', 'search', 'procura', 'find']):
-                return self._handle_search_query_from_embeddings(query, context)
-            elif any(word in query_lower for word in ['contagem', 'count', 'quantos', 'quantidade']):
-                return self._handle_count_query_from_embeddings(query, context)
+            self._validate_embeddings_access_only()
+            dataset_filter = context.get('dataset_filter') if context else None
+            load_result = self.load_from_embeddings(dataset_filter=dataset_filter)
+            if 'error' in load_result.get('metadata', {}):
+                return load_result
+            self.logger.info(f"🔍 Classificando query via RAG: {query[:60]}...")
+            # Guard: query_classifier pode não existir (bug RAGQueryClassifier corrigido em 2025-01-06)
+            if self.query_classifier is None:
+                # Fallback: classificação básica via keywords
+                from src.agent.orchestrator_agent import QueryType
+                classification_type = self._classify_query_by_keywords(query)
+                class FallbackClassification:
+                    def __init__(self, qtype):
+                        self.query_type = qtype
+                        self.confidence = 0.7
+                        self.metadata = {'method': 'keyword_fallback'}
+                classification = FallbackClassification(classification_type)
+                self.logger.warning("⚠️  query_classifier indisponível, usando fallback por keywords")
             else:
-                return self._handle_general_query_from_embeddings(query, context)
-                
+                classification = self.query_classifier.classify_query(query)
+            self.logger.info(
+                f"📊 Query classificada como: {classification.query_type.value} "
+                f"(confiança: {classification.confidence:.2f})"
+            )
+            # Adicionar metadados de classificação ao contexto
+            if context is None:
+                context = {}
+            context['classification'] = {
+                'type': classification.query_type.value,
+                'confidence': classification.confidence,
+                'method': classification.metadata.get('method', 'unknown')
+            }
+            # Rotear para o handler apropriado baseado na classificação RAG
+            handler_map = {
+                QueryType.VARIABILITY: self._handle_variability_query_from_embeddings,
+                QueryType.INTERVAL: self._handle_statistics_query_from_embeddings,
+                QueryType.CENTRAL_TENDENCY: self._handle_central_tendency_query_from_embeddings,
+                QueryType.CORRELATION: self._handle_correlation_query_from_embeddings,
+                QueryType.DISTRIBUTION: self._handle_distribution_query_from_embeddings,
+                QueryType.OUTLIERS: self._handle_outliers_query_from_embeddings,
+                QueryType.VISUALIZATION: self._handle_visualization_query,
+                QueryType.SUMMARY: self._handle_summary_query_from_embeddings,
+                QueryType.ANALYSIS: self._handle_analysis_query_from_embeddings,
+                QueryType.SEARCH: self._handle_search_query_from_embeddings,
+                QueryType.COUNT: self._handle_count_query_from_embeddings,
+                QueryType.GENERAL: self._handle_general_query_from_embeddings,
+            }
+            handler = handler_map.get(classification.query_type)
+            
+            if handler is None:
+                self.logger.warning(f"Handler não encontrado para tipo: {classification.query_type}")
+                handler = self._handle_general_query_from_embeddings
+            
+            # Executar handler
+            response = handler(query, context)
+            
+            # Aprender com a query processada (melhoria contínua)
+            try:
+                # Guard: query_classifier pode não existir
+                if self.query_classifier is not None:
+                    self.query_classifier.learn_from_query(
+                        query=query,
+                        correct_type=classification.query_type,
+                        response=response.get('response', ''),
+                        metadata={'confidence': classification.confidence}
+                    )
+                else:
+                    self.logger.debug("query_classifier indisponível, pulando learn_from_query")
+            except Exception as learn_error:
+                self.logger.warning(f"Falha ao registrar aprendizado: {learn_error}")
+            
+            return response
+
         except Exception as e:
             self.logger.error(f"Erro ao processar consulta via embeddings: {str(e)}")
             return self._build_response(
@@ -457,41 +544,34 @@ class EmbeddingsAnalysisAgent(BaseAgent):
         })
     
     def _handle_analysis_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Processa consultas de análise usando embeddings."""
+        """Processa consultas de análise usando embeddings.
+        
+        ⚠️ DEPRECATION: Este método está obsoleto. Use RAGDataAgent ao invés.
+        """
         if not self.current_embeddings:
             return self._build_response("❌ Nenhum embedding disponível para análise")
         
-        # Análise baseada no conteúdo dos chunks
+        # Análise genérica baseada no conteúdo dos chunks (SEM detecção de fraude)
         chunk_texts = [emb['chunk_text'] for emb in self.current_embeddings]
         
-        # Tentar detectar padrões de fraude nos chunks
-        fraud_indicators = 0
-        transaction_indicators = 0
-        
-        for chunk_text in chunk_texts:
-            chunk_lower = chunk_text.lower()
-            if any(word in chunk_lower for word in ['fraud', 'fraude', 'suspeit', 'anormal']):
-                fraud_indicators += 1
-            if any(word in chunk_lower for word in ['transação', 'transaction', 'valor', 'amount']):
-                transaction_indicators += 1
+        # Estatísticas genéricas sobre chunks
+        total_chunks = len(chunk_texts)
+        avg_length = sum(len(text) for text in chunk_texts) / total_chunks if total_chunks > 0 else 0
         
         response = f"""🔍 **Análise de Dados (via Embeddings)**
         
-**Indicadores Encontrados:**
-• Chunks com indicadores de fraude: {fraud_indicators}
-• Chunks com indicadores de transação: {transaction_indicators}
-• Total de chunks analisados: {len(chunk_texts)}
+**Estatísticas Gerais:**
+• Total de chunks analisados: {total_chunks}
+• Tamanho médio dos chunks: {avg_length:.0f} caracteres
 
-**Padrões Detectados:**
-• {(fraud_indicators/len(chunk_texts)*100):.1f}% dos chunks contêm indicadores de fraude
-• {(transaction_indicators/len(chunk_texts)*100):.1f}% dos chunks contêm dados transacionais
+⚠️ **AVISO:** Para análises detalhadas, use RAGDataAgent com busca vetorial.
         """
         
         return self._build_response(response, metadata={
-            'fraud_indicators': fraud_indicators,
-            'transaction_indicators': transaction_indicators,
-            'total_chunks': len(chunk_texts),
-            'conformidade': 'embeddings_only'
+            'total_chunks': total_chunks,
+            'avg_chunk_length': avg_length,
+            'conformidade': 'embeddings_only',
+            'deprecation_warning': 'Use RAGDataAgent instead'
         })
     
     def _handle_search_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -642,6 +722,112 @@ class EmbeddingsAnalysisAgent(BaseAgent):
                 metadata={"error": True, "conformidade": "embeddings_only"}
             )
     
+    def _handle_variability_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre VARIABILIDADE/DISPERSÃO (desvio padrão, variância) usando dados REAIS dos embeddings.
+        
+        Este método é GENÉRICO e funciona com qualquer CSV carregado nos embeddings.
+        
+        Args:
+            query: Pergunta do usuário sobre variabilidade (ex: "Qual a variabilidade dos dados?")
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com desvio padrão, variância e coeficiente de variação calculados
+        """
+        try:
+            self.logger.info("📊 Calculando VARIABILIDADE (desvio padrão, variância) dos dados via embeddings...")
+            
+            # Importar Python Analyzer para processar chunk_text
+            try:
+                from src.tools.python_analyzer import PythonDataAnalyzer
+                analyzer = PythonDataAnalyzer()
+            except ImportError as e:
+                self.logger.error(f"Erro ao importar PythonDataAnalyzer: {e}")
+                return self._build_response(
+                    "❌ Erro: PythonDataAnalyzer não disponível para calcular variabilidade",
+                    metadata={"error": True}
+                )
+            
+            # Obter DataFrame real dos chunks (GENÉRICO - qualquer CSV)
+            df = analyzer.get_data_from_embeddings(limit=None, parse_chunk_text=True)
+            
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível obter dados dos embeddings para calcular variabilidade",
+                    metadata={"error": True}
+                )
+            
+            self.logger.info(f"✅ DataFrame carregado: {len(df)} registros, {len(df.columns)} colunas")
+            
+            # Calcular VARIABILIDADE para TODAS as colunas numéricas (GENÉRICO)
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if not numeric_cols:
+                return self._build_response(
+                    "❌ Nenhuma coluna numérica encontrada nos dados",
+                    metadata={"error": True}
+                )
+            
+            # Calcular medidas de DISPERSÃO
+            variability_data = []
+            for col in numeric_cols:
+                col_std = df[col].std()  # Desvio padrão
+                col_var = df[col].var()  # Variância
+                col_mean = df[col].mean()
+                col_cv = (col_std / col_mean) * 100 if col_mean != 0 else 0  # Coeficiente de Variação
+                
+                variability_data.append({
+                    'variavel': col,
+                    'desvio_padrao': col_std,
+                    'variancia': col_var,
+                    'coeficiente_variacao': col_cv
+                })
+            
+            # Formatar resposta
+            response = f"""📊 **Variabilidade dos Dados (Desvio Padrão e Variância)**
+
+**Fonte:** Dados reais extraídos da tabela embeddings (coluna chunk_text parseada)
+**Total de registros analisados:** {len(df):,}
+**Total de variáveis numéricas:** {len(numeric_cols)}
+
+"""
+            
+            # Adicionar tabela formatada
+            response += "| Variável | Desvio Padrão | Variância | Coef. Variação (%) |\n"
+            response += "|----------|---------------|-----------|--------------------| \n"
+            
+            # Mostrar TODAS as variáveis
+            for stat in variability_data:
+                var_name = stat['variavel']
+                var_std = stat['desvio_padrao']
+                var_var = stat['variancia']
+                var_cv = stat['coeficiente_variacao']
+                
+                # Formatar valores com precisão adequada
+                response += f"| {var_name} | {var_std:.6f} | {var_var:.6f} | {var_cv:.2f} |\n"
+            
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+            response += f"✅ **Método:** Parsing de chunk_text + cálculo std() e var() com pandas\n"
+            response += f"\n**Interpretação:**\n"
+            response += f"- **Desvio Padrão:** Mede a dispersão dos dados em relação à média\n"
+            response += f"- **Variância:** Quadrado do desvio padrão (mesma medida, escala diferente)\n"
+            response += f"- **Coef. Variação:** Percentual de dispersão relativa (útil para comparar variáveis)\n"
+            
+            return self._build_response(response, metadata={
+                'total_records': len(df),
+                'total_numeric_columns': len(numeric_cols),
+                'variability_data': variability_data,
+                'conformidade': 'embeddings_only',
+                'query_type': 'variability'
+            })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao calcular variabilidade: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao calcular variabilidade dos dados: {str(e)}",
+                metadata={"error": True, "conformidade": "embeddings_only"}
+            )
+    
     def _handle_central_tendency_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa consultas sobre medidas de tendência central (média, mediana, moda) usando dados REAIS dos embeddings.
         
@@ -762,12 +948,256 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
                 metadata={"error": True, "conformidade": "embeddings_only"}
             )
     
+    def _handle_correlation_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre correlação entre variáveis usando dados dos embeddings.
+        
+        Args:
+            query: Pergunta sobre correlação
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com matriz de correlação
+        """
+        try:
+            self.logger.info("📊 Calculando correlações entre variáveis...")
+            
+            from src.tools.python_analyzer import PythonDataAnalyzer
+            analyzer = PythonDataAnalyzer()
+            
+            # Parsing dos chunks para DataFrame
+            # Primeiro, tentar reconstruir dados via Supabase embeddings (método público recomendado)
+            df = analyzer.reconstruct_original_data()
+
+            # Se não conseguiu (ex: ambiente de testes sem Supabase), tentar parsear current_embeddings diretamente
+            if df is None:
+                full_text = "\n".join([emb.get('chunk_text', '') for emb in self.current_embeddings])
+                import pandas as pd
+                embeddings_df = pd.DataFrame([{'chunk_text': full_text}])
+                df = analyzer._parse_chunk_text_to_dataframe(embeddings_df=embeddings_df)
+
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível extrair dados dos embeddings",
+                    metadata={"error": True}
+                )
+            
+            # Selecionar apenas colunas numéricas
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            if len(numeric_cols) < 2:
+                return self._build_response(
+                    "❌ É necessário pelo menos 2 variáveis numéricas para calcular correlação",
+                    metadata={"error": True}
+                )
+            
+            # Calcular matriz de correlação
+            corr_matrix = df[numeric_cols].corr()
+            
+            response = f"## 🔗 Matriz de Correlação\n\n"
+            response += f"**Total de variáveis analisadas:** {len(numeric_cols)}\n\n"
+            
+            # Formatar matriz
+            response += "| Variáveis |"
+            for col in numeric_cols[:10]:  # Limitar para não ficar muito grande
+                response += f" {col} |"
+            response += "\n|"
+            response += "---|" * (len(numeric_cols[:10]) + 1)
+            response += "\n"
+            
+            for idx in numeric_cols[:10]:
+                response += f"| {idx} |"
+                for col in numeric_cols[:10]:
+                    corr_val = corr_matrix.loc[idx, col]
+                    response += f" {corr_val:.3f} |"
+                response += "\n"
+            
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+            
+            return self._build_response(response, metadata={
+                'total_variables': len(numeric_cols),
+                'correlation_matrix': corr_matrix.to_dict(),
+                'conformidade': 'embeddings_only',
+                'query_type': 'correlation'
+            })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao calcular correlação: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao calcular correlação: {str(e)}",
+                metadata={"error": True}
+            )
+    
+    def _handle_distribution_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre distribuição de dados usando embeddings.
+        
+        Args:
+            query: Pergunta sobre distribuição
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com análise de distribuição
+        """
+        try:
+            self.logger.info("📊 Analisando distribuição dos dados...")
+            
+            from src.tools.python_analyzer import PythonDataAnalyzer
+            from scipy import stats
+            analyzer = PythonDataAnalyzer()
+            
+            # Tentar reconstruir via método público
+            df = analyzer.reconstruct_original_data()
+
+            # Se não conseguiu (ambiente de testes), tentar parsear current_embeddings diretamente
+            if df is None:
+                full_text = "\n".join([emb.get('chunk_text', '') for emb in self.current_embeddings])
+                import pandas as pd
+                embeddings_df = pd.DataFrame([{'chunk_text': full_text}])
+                df = analyzer._parse_chunk_text_to_dataframe(embeddings_df=embeddings_df)
+
+            if df is None or df.empty:
+                return self._build_response(
+                    "❌ Não foi possível extrair dados dos embeddings",
+                    metadata={"error": True}
+                )
+            
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            # Construir sumário estatístico (texto)
+            response = f"## 📊 Análise de Distribuição\n\n"
+            response += f"**Total de variáveis numéricas:** {len(numeric_cols)}\n\n"
+
+            stats_summary = {}
+            for col in numeric_cols[:10]:  # Limitar
+                try:
+                    if len(df[col].dropna()) > 3:
+                        stat, pvalue = stats.shapiro(df[col].dropna()[:5000])  # Max 5000 amostras
+                        is_normal = "Sim" if pvalue > 0.05 else "Não"
+                        skewness = df[col].skew()
+                        kurtosis_val = df[col].kurtosis()
+
+                        response += f"### {col}\n"
+                        response += f"- **Normal?** {is_normal} (p-value: {pvalue:.4f})\n"
+                        response += f"- **Assimetria (skewness):** {skewness:.3f}\n"
+                        response += f"- **Curtose (kurtosis):** {kurtosis_val:.3f}\n\n"
+
+                        stats_summary[col] = {
+                            'normal': is_normal,
+                            'pvalue': float(pvalue),
+                            'skewness': float(skewness),
+                            'kurtosis': float(kurtosis_val)
+                        }
+                except Exception as e:
+                    self.logger.warning(f"Falha ao calcular estatísticas para {col}: {e}")
+
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+
+            # Delegar geração de gráficos para o handler de visualização para garantir que os PNGs sejam criados
+            try:
+                vis_result = self._handle_visualization_query(query, context)
+                # Mesclar metadados e resposta textual
+                metadata = vis_result.get('metadata', {}) if isinstance(vis_result, dict) else {}
+                # Garantir campos estatísticos incluso
+                metadata.setdefault('distribution_stats', stats_summary)
+
+                # Se a visualização gerou gráficos, anexar ao texto
+                if metadata.get('visualization_success'):
+                    response += f"\n📈 Gráficos gerados: {len(metadata.get('graficos_gerados', []))}\n"
+
+                return self._build_response(response, metadata={
+                    'total_variables': len(numeric_cols),
+                    'conformidade': 'embeddings_only',
+                    'query_type': 'distribution',
+                    **metadata
+                })
+            except Exception as e:
+                self.logger.warning(f"Falha ao gerar visualizações a partir de distribuição: {e}")
+                return self._build_response(response, metadata={
+                    'total_variables': len(numeric_cols),
+                    'conformidade': 'embeddings_only',
+                    'query_type': 'distribution',
+                    'visualization_error': str(e)
+                })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao analisar distribuição: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao analisar distribuição: {str(e)}",
+                metadata={"error": True}
+            )
+    
+    def _handle_outliers_query_from_embeddings(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processa consultas sobre outliers usando dados dos embeddings.
+        
+        Args:
+            query: Pergunta sobre outliers
+            context: Contexto adicional
+            
+        Returns:
+            Resposta com detecção de outliers
+        """
+        try:
+            self.logger.info("📊 Detectando outliers nos dados...")
+            
+            from src.tools.python_analyzer import PythonDataAnalyzer
+            analyzer = PythonDataAnalyzer()
+            
+            full_text = "\n".join([emb.get('chunk_text', '') for emb in self.current_embeddings])
+            df = analyzer.parse_chunk_text(full_text)
+            
+            if df.empty:
+                return self._build_response(
+                    "❌ Não foi possível extrair dados dos embeddings",
+                    metadata={"error": True}
+                )
+            
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            response = f"## 🔍 Detecção de Outliers (Método IQR)\n\n"
+            response += f"**Método:** Interquartile Range (IQR)\n"
+            response += f"**Critério:** Valores abaixo de Q1 - 1.5*IQR ou acima de Q3 + 1.5*IQR\n\n"
+            
+            response += "| Variável | Outliers Inferiores | Outliers Superiores | Total Outliers | % do Total |\n"
+            response += "|----------|---------------------|---------------------|----------------|------------|\n"
+            
+            total_records = len(df)
+            
+            for col in numeric_cols[:15]:  # Limitar
+                Q1 = df[col].quantile(0.25)
+                Q3 = df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                lower_outliers = (df[col] < lower_bound).sum()
+                upper_outliers = (df[col] > upper_bound).sum()
+                total_outliers = lower_outliers + upper_outliers
+                pct_outliers = (total_outliers / total_records) * 100
+                
+                response += f"| {col} | {lower_outliers} | {upper_outliers} | {total_outliers} | {pct_outliers:.2f}% |\n"
+            
+            response += f"\n✅ **Conformidade:** Dados obtidos exclusivamente da tabela embeddings\n"
+            
+            return self._build_response(response, metadata={
+                'total_variables': len(numeric_cols),
+                'total_records': total_records,
+                'conformidade': 'embeddings_only',
+                'query_type': 'outliers'
+            })
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao detectar outliers: {str(e)}")
+            return self._build_response(
+                f"❌ Erro ao detectar outliers: {str(e)}",
+                metadata={"error": True}
+            )
+    
     def _handle_visualization_query(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa consultas que solicitam visualizações (histogramas, gráficos, distribuição).
         
         Args:
             query: Pergunta do usuário solicitando visualização
-            context: Contexto adicional
+            context: Contexto adicional (pode conter 'reconstructed_df' com DataFrame já carregado)
             
         Returns:
             Resposta com histogramas gerados e salvos em arquivos
@@ -776,32 +1206,36 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             self.logger.info("📊 Processando solicitação de visualização...")
             
             # Importar módulos necessários
-            from src.tools.python_analyzer import PythonDataAnalyzer
             import matplotlib.pyplot as plt
             import seaborn as sns
-            import os
             from pathlib import Path
             
             # Configurar estilo dos gráficos
             sns.set_style("whitegrid")
             
-            # Inicializar analyzer
-            analyzer = PythonDataAnalyzer(caller_agent=self.name)
-            
-            # Reconstruir DataFrame a partir dos embeddings
-            self.logger.info("🔄 Reconstruindo DataFrame a partir dos embeddings...")
-            df = analyzer.reconstruct_original_data()
+            # **CORREÇÃO**: Usar DataFrame passado no contexto (já carregado pelo rag_data_agent)
+            df = None
+            if context and 'reconstructed_df' in context:
+                df = context['reconstructed_df']
+                self.logger.info(f"✅ Usando DataFrame pré-carregado: {df.shape[0]} linhas, {df.shape[1]} colunas")
+            else:
+                # Fallback: tentar reconstruir dos embeddings
+                self.logger.info("🔄 DataFrame não fornecido, tentando reconstruir dos embeddings...")
+                from src.tools.python_analyzer import PythonDataAnalyzer
+                analyzer = PythonDataAnalyzer(caller_agent=self.name)
+                df = analyzer.reconstruct_original_data()
             
             if df is None or df.empty:
                 return self._build_response(
-                    "❌ Não foi possível reconstruir os dados para gerar visualizações. Verifique se há dados na tabela embeddings.",
+                    "❌ Não foi possível obter dados para gerar visualizações. Verifique se há dados disponíveis.",
                     metadata={"error": True, "conformidade": "embeddings_only"}
                 )
             
-            self.logger.info(f"✅ DataFrame reconstruído: {df.shape[0]} linhas, {df.shape[1]} colunas")
+            self.logger.info(f"✅ DataFrame disponível: {df.shape[0]} linhas, {df.shape[1]} colunas")
             
-            # Criar diretório de saída
-            output_dir = Path('outputs/histogramas')
+            # Criar diretório de saída usando settings
+            from src.settings import HISTOGRAMS_DIR
+            output_dir = Path(HISTOGRAMS_DIR)
             output_dir.mkdir(parents=True, exist_ok=True)
             
             # Separar variáveis numéricas e categóricas
@@ -909,24 +1343,31 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             
             # Construir resposta
             if graficos_gerados:
+                # Converte caminhos para URLs
+                from src.settings import API_HOST, API_PORT
+                base_url = f"http://localhost:{API_PORT}" if API_HOST == "0.0.0.0" else f"http://{API_HOST}:{API_PORT}"
+                graficos_urls = []
+                for grafico in graficos_gerados:
+                    filename = Path(grafico).name
+                    url = f"{base_url}/files/histogramas/{filename}"
+                    graficos_urls.append(url)
+                
                 response = f"""📊 **Visualizações Geradas com Sucesso!**
 
 ✅ Total de gráficos gerados: {len(graficos_gerados)}
    • Histogramas (variáveis numéricas): {len([g for g in graficos_gerados if 'hist_' in g])}
    • Gráficos de barras (variáveis categóricas): {len([g for g in graficos_gerados if 'bar_' in g])}
 
-📁 **Local dos arquivos:**
-   {output_dir.absolute()}
-
-📈 **Gráficos salvos:**
+ **Gráficos disponíveis:**
 """
-                for i, grafico in enumerate(graficos_gerados, 1):
-                    response += f"   {i}. {Path(grafico).name}\n"
+                for i, url in enumerate(graficos_urls, 1):
+                    response += f"   {i}. {url}\n"
                 
-                response += f"\n💡 **Dica:** Você pode visualizar os gráficos abrindo os arquivos PNG no diretório indicado."
+                response += f"\n💡 **Dica:** Clique nos links acima para visualizar os gráficos no navegador."
                 
                 return self._build_response(response, metadata={
-                    'graficos_gerados': graficos_gerados,
+                    'graficos_gerados': graficos_urls,
+                    'graficos_locais': graficos_gerados,
                     'estatisticas': estatisticas_geradas,
                     'output_dir': str(output_dir.absolute()),
                     'numeric_cols': numeric_cols,

@@ -188,12 +188,32 @@ class RAGAgent(BaseAgent):
         self.logger.info(f"✅ INGESTÃO AUTORIZADA: RAGAgent processando CSV: {source_id}")
         self.logger.info("✅ CONFORMIDADE: Agente de ingestão tem permissão para ler CSV")
         
-        return self.ingest_text(
+        # Primeiro, ingestar dados normais
+        result = self.ingest_text(
             text=csv_text,
             source_id=source_id,
             source_type="csv",
             chunk_strategy=ChunkStrategy.CSV_ROW
         )
+        
+        # Se ingestão foi bem-sucedida, adicionar chunks de metadados
+        if not result.get("metadata", {}).get("error"):
+            try:
+                self.logger.info("📊 Gerando chunks de metadados do dataset...")
+                metadata_chunks = self._generate_metadata_chunks(csv_text, source_id)
+                if metadata_chunks:
+                    # Gerar embeddings para chunks de metadados
+                    metadata_embeddings = self.embedding_generator.generate_embeddings_batch(metadata_chunks)
+                    if metadata_embeddings:
+                        # Armazenar embeddings de metadados
+                        metadata_stored_ids = self.vector_store.store_embeddings(metadata_embeddings, "csv")
+                        self.logger.info(f"✅ {len(metadata_chunks)} chunks de metadados criados e armazenados")
+                    else:
+                        self.logger.warning("⚠️ Falha ao gerar embeddings para chunks de metadados")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Falha ao gerar chunks de metadados: {e}")
+        
+        return result
 
     def _enrich_csv_chunks_light(self, chunks: List[TextChunk]) -> List[TextChunk]:
         """VERSÃO BALANCEADA - Enriquecimento leve que mantém precisão sem comprometer velocidade."""
@@ -210,12 +230,12 @@ class RAGAgent(BaseAgent):
             header_line = lines[0] if lines else ""
             data_lines = [line for line in lines[1:] if line.strip()]
             
-            # Extrair nome do arquivo CSV do metadata ou do chunk
-            csv_filename = metadata.get('source_file', 'dataset.csv')
+            # Extrair nome do arquivo CSV do metadata do chunk
+            csv_filename = chunk.metadata.additional_info.get('source_file', 'dataset.csv') if chunk.metadata.additional_info else 'dataset.csv'
             if not csv_filename.endswith('.csv'):
-                # Tentar extrair do chunk_text
+                # Tentar extrair do conteúdo do chunk
                 import re
-                csv_match = re.search(r'([\w-]+\.csv)', chunk_text)
+                csv_match = re.search(r'([\w-]+\.csv)', chunk.content)
                 if csv_match:
                     csv_filename = csv_match.group(1)
             
@@ -278,6 +298,304 @@ class RAGAgent(BaseAgent):
             enriched_chunks.append(TextChunk(content=enriched_content, metadata=chunk.metadata))
 
         return enriched_chunks
+
+    def _generate_metadata_chunks(self, csv_text: str, source_id: str) -> List[TextChunk]:
+        """Gera chunks adicionais sobre metadados do dataset para melhorar RAG.
+        
+        Cria chunks específicos para responder perguntas sobre:
+        1. Tipos de dados (numéricos, categóricos)
+        2. Distribuição das variáveis (histogramas, quartis, percentis)
+        3. Intervalos (min, max)
+        4. Medidas de tendência central (média, mediana)
+        5. Variabilidade (desvio padrão, variância, IQR)
+        6. Valores frequentes/raros
+        7. Outliers e anomalias
+        8. Correlações entre variáveis
+        9. Padrões temporais (se houver)
+        10. Estrutura e informações gerais
+        
+        Sistema genérico para QUALQUER CSV.
+        """
+        from src.embeddings.chunker import ChunkMetadata, ChunkStrategy
+        import pandas as pd
+        import numpy as np
+        import io
+        
+        chunks = []
+        self.logger.info(f"📊 Gerando chunks de metadados analíticos para {source_id}...")
+        
+        try:
+            # Ler CSV completo para análise robusta
+            df = pd.read_csv(io.StringIO(csv_text))
+            total_rows = len(df)
+            
+            # Identificar colunas numéricas e categóricas
+            numeric_cols_raw = df.select_dtypes(include=[np.number]).columns.tolist()
+            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            datetime_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+            
+            # 🔍 DETECÇÃO INTELIGENTE: Colunas numéricas com poucos valores únicos são CATEGÓRICAS
+            # Heurística: Se tem <= 10 valores únicos OU <= 0.5% de cardinalidade, é categórico
+            categorical_from_numeric = []
+            truly_numeric = []
+            
+            for col in numeric_cols_raw:
+                n_unique = df[col].nunique()
+                cardinality_ratio = n_unique / total_rows if total_rows > 0 else 0
+                
+                # Critério: <= 10 valores únicos OU cardinalidade < 0.5% (Ex: Class com 2 valores)
+                if n_unique <= 10 or cardinality_ratio < 0.005:
+                    categorical_from_numeric.append(col)
+                else:
+                    truly_numeric.append(col)
+            
+            # Consolidar categóricos
+            categorical_cols.extend(categorical_from_numeric)
+            numeric_cols = truly_numeric
+            
+            # === CHUNK 1: TIPOS DE DADOS E ESTRUTURA ===
+            types_content = f"""ANÁLISE DE TIPOLOGIA E ESTRUTURA - DATASET: {source_id.upper()}
+
+ESTRUTURA GERAL:
+- Total de registros: {total_rows:,}
+- Total de colunas: {len(df.columns)}
+- Colunas numéricas: {len(numeric_cols)}
+- Colunas categóricas: {len(categorical_cols)}
+- Colunas temporais: {len(datetime_cols)}
+
+COLUNAS NUMÉRICAS ({len(numeric_cols)}):
+{chr(10).join([f"  • {col} ({df[col].dtype})" for col in numeric_cols]) or "  Nenhuma"}
+
+COLUNAS CATEGÓRICAS ({len(categorical_cols)}):
+{chr(10).join([f"  • {col} ({df[col].nunique()} valores únicos)" for col in categorical_cols]) or "  Nenhuma"}
+
+COLUNAS TEMPORAIS ({len(datetime_cols)}):
+{chr(10).join([f"  • {col}" for col in datetime_cols]) or "  Nenhuma"}
+
+Este chunk contém informações completas sobre a tipologia e estrutura das colunas do dataset.
+"""
+            
+            chunks.append(TextChunk(
+                content=types_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=0, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(types_content), word_count=len(types_content.split()),
+                    start_position=0, end_position=len(types_content),
+                    additional_info={
+                        "chunk_type": "metadata_types",
+                        "topic": "data_types_structure"
+                    }
+                )
+            ))
+            
+            # === CHUNK 2: DISTRIBUIÇÕES E INTERVALOS ===
+            dist_content = f"""ANÁLISE DE DISTRIBUIÇÕES E INTERVALOS - DATASET: {source_id.upper()}
+
+ESTATÍSTICAS DESCRITIVAS (TODAS AS COLUNAS NUMÉRICAS):
+"""
+            if numeric_cols:
+                desc = df[numeric_cols].describe(percentiles=[.25, .50, .75, .90, .95, .99])
+                dist_content += desc.to_string()
+                
+                dist_content += "\n\nINTERVALOS (MIN-MAX) POR COLUNA:\n"
+                for col in numeric_cols:
+                    min_val = df[col].min()
+                    max_val = df[col].max()
+                    dist_content += f"  • {col}: [{min_val:.2f}, {max_val:.2f}]\n"
+                
+                dist_content += "\n\nQUARTIS E PERCENTIS:\n"
+                for col in numeric_cols[:5]:  # Primeiras 5 colunas
+                    q25, q50, q75 = df[col].quantile([0.25, 0.50, 0.75])
+                    dist_content += f"  • {col}: Q1={q25:.2f}, Mediana={q50:.2f}, Q3={q75:.2f}\n"
+            
+            dist_content += "\n\nEste chunk contém distribuições estatísticas completas, intervalos (min-max), quartis e percentis de todas as variáveis numéricas."
+            
+            chunks.append(TextChunk(
+                content=dist_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=1, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(dist_content), word_count=len(dist_content.split()),
+                    start_position=0, end_position=len(dist_content),
+                    additional_info={
+                        "chunk_type": "metadata_distribution",
+                        "topic": "distributions_intervals"
+                    }
+                )
+            ))
+            
+            # === CHUNK 3: TENDÊNCIA CENTRAL E VARIABILIDADE ===
+            central_content = f"""ANÁLISE ESTATÍSTICA: TENDÊNCIA CENTRAL E VARIABILIDADE - DATASET: {source_id.upper()}
+
+MEDIDAS DE TENDÊNCIA CENTRAL:
+"""
+            if numeric_cols:
+                central_content += "COLUNA | MÉDIA | MEDIANA | MODA\n"
+                central_content += "-" * 60 + "\n"
+                for col in numeric_cols:
+                    mean_val = df[col].mean()
+                    median_val = df[col].median()
+                    mode_val = df[col].mode()[0] if len(df[col].mode()) > 0 else "N/A"
+                    central_content += f"{col} | {mean_val:.2f} | {median_val:.2f} | {mode_val}\n"
+                
+                central_content += "\n\nMEDIDAS DE VARIABILIDADE:\n"
+                central_content += "COLUNA | DESVIO PADRÃO | VARIÂNCIA | IQR (Intervalo Interquartil)\n"
+                central_content += "-" * 80 + "\n"
+                for col in numeric_cols:
+                    std_val = df[col].std()
+                    var_val = df[col].var()
+                    q1, q3 = df[col].quantile([0.25, 0.75])
+                    iqr_val = q3 - q1
+                    central_content += f"{col} | {std_val:.2f} | {var_val:.2f} | {iqr_val:.2f}\n"
+            
+            central_content += "\n\nEste chunk contém todas as medidas de tendência central (média, mediana, moda) e variabilidade (desvio padrão, variância, IQR) para todas as colunas numéricas."
+            
+            chunks.append(TextChunk(
+                content=central_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=2, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(central_content), word_count=len(central_content.split()),
+                    start_position=0, end_position=len(central_content),
+                    additional_info={
+                        "chunk_type": "metadata_central_variability",
+                        "topic": "central_tendency_variability"
+                    }
+                )
+            ))
+            
+            # === CHUNK 4: VALORES FREQUENTES E OUTLIERS ===
+            freq_content = f"""ANÁLISE DE FREQUÊNCIA E DETECÇÃO DE OUTLIERS - DATASET: {source_id.upper()}
+
+VALORES MAIS FREQUENTES (TOP 5) POR COLUNA:
+"""
+            for col in categorical_cols[:5]:  # Primeiras 5 categóricas
+                top_values = df[col].value_counts().head(5)
+                freq_content += f"\n{col}:\n"
+                for val, count in top_values.items():
+                    pct = (count / total_rows) * 100
+                    freq_content += f"  • {val}: {count} ({pct:.2f}%)\n"
+            
+            freq_content += "\n\nOUTLIERS DETECTADOS (Método IQR):\n"
+            outliers_detected = False
+            if numeric_cols:
+                for col in numeric_cols[:10]:  # Primeiras 10 numéricas
+                    q1, q3 = df[col].quantile([0.25, 0.75])
+                    iqr = q3 - q1
+                    lower_bound = q1 - 1.5 * iqr
+                    upper_bound = q3 + 1.5 * iqr
+                    outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)][col]
+                    if len(outliers) > 0:
+                        outliers_detected = True
+                        pct_outliers = (len(outliers) / total_rows) * 100
+                        freq_content += f"  • {col}: {len(outliers)} outliers ({pct_outliers:.2f}%)\n"
+                        freq_content += f"    Intervalo normal: [{lower_bound:.2f}, {upper_bound:.2f}]\n"
+            
+            if not outliers_detected:
+                freq_content += "  Nenhum outlier significativo detectado nas primeiras colunas.\n"
+            
+            freq_content += "\n\nEste chunk identifica valores mais frequentes em colunas categóricas e detecta outliers usando o método IQR (1.5×IQR) com estatísticas de prevalência."
+            
+            chunks.append(TextChunk(
+                content=freq_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=3, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(freq_content), word_count=len(freq_content.split()),
+                    start_position=0, end_position=len(freq_content),
+                    additional_info={
+                        "chunk_type": "metadata_frequency_outliers",
+                        "topic": "frequent_values_outliers"
+                    }
+                )
+            ))
+            
+            # === CHUNK 5: CORRELAÇÕES ENTRE VARIÁVEIS ===
+            corr_content = f"""ANÁLISE DE CORRELAÇÕES E RELACIONAMENTOS - DATASET: {source_id.upper()}
+
+MATRIZ DE CORRELAÇÃO (Primeiras 15 colunas numéricas):
+"""
+            if len(numeric_cols) >= 2:
+                corr_matrix = df[numeric_cols[:15]].corr()
+                corr_content += corr_matrix.to_string()
+                
+                corr_content += "\n\nCORRELAÇÕES FORTES (|r| > 0.7):\n"
+                strong_corrs = []
+                for i in range(len(corr_matrix.columns)):
+                    for j in range(i+1, len(corr_matrix.columns)):
+                        corr_val = corr_matrix.iloc[i, j]
+                        if abs(corr_val) > 0.7:
+                            col1 = corr_matrix.columns[i]
+                            col2 = corr_matrix.columns[j]
+                            strong_corrs.append(f"  • {col1} <-> {col2}: {corr_val:.3f}")
+                
+                corr_content += "\n".join(strong_corrs) if strong_corrs else "  Nenhuma correlação forte detectada.\n"
+            else:
+                corr_content += "  Dataset possui menos de 2 colunas numéricas para análise de correlação.\n"
+            
+            corr_content += "\n\nEste chunk apresenta a matriz de correlação completa entre variáveis numéricas e destaca correlações fortes (|r| > 0.7) indicando relacionamentos significativos entre variáveis."
+            
+            chunks.append(TextChunk(
+                content=corr_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=4, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(corr_content), word_count=len(corr_content.split()),
+                    start_position=0, end_position=len(corr_content),
+                    additional_info={
+                        "chunk_type": "metadata_correlations",
+                        "topic": "correlations_relationships"
+                    }
+                )
+            ))
+            
+            # === CHUNK 6: PADRÕES TEMPORAIS E AGRUPAMENTOS ===
+            pattern_content = f"""ANÁLISE DE PADRÕES TEMPORAIS E AGRUPAMENTOS - DATASET: {source_id.upper()}
+
+ANÁLISE TEMPORAL:
+"""
+            if datetime_cols:
+                for col in datetime_cols:
+                    pattern_content += f"\nColuna temporal: {col}\n"
+                    pattern_content += f"  • Período: {df[col].min()} até {df[col].max()}\n"
+                    pattern_content += f"  • Intervalo: {(df[col].max() - df[col].min()).days} dias\n"
+            elif 'Time' in df.columns or 'time' in df.columns:
+                time_col = 'Time' if 'Time' in df.columns else 'time'
+                pattern_content += f"\nColuna temporal detectada: {time_col}\n"
+                pattern_content += f"  • Min: {df[time_col].min()}, Max: {df[time_col].max()}\n"
+                pattern_content += f"  • Valores crescentes: {'Sim' if df[time_col].is_monotonic_increasing else 'Não'}\n"
+            else:
+                pattern_content += "  Nenhuma coluna temporal explícita detectada.\n"
+            
+            pattern_content += "\n\nAGRUPAMENTOS NATURAIS:\n"
+            if categorical_cols:
+                for col in categorical_cols[:3]:
+                    groups = df[col].value_counts()
+                    pattern_content += f"\n{col} - {len(groups)} grupos distintos:\n"
+                    for group, count in groups.head(5).items():
+                        pct = (count / total_rows) * 100
+                        pattern_content += f"  • Grupo '{group}': {count} registros ({pct:.2f}%)\n"
+            else:
+                pattern_content += "  Dataset focado em variáveis contínuas sem agrupamentos categóricos óbvios.\n"
+            
+            pattern_content += "\n\nEste chunk analisa a presença de padrões temporais (se existirem colunas de data/tempo) e identifica agrupamentos naturais baseados em colunas categóricas com distribuição de grupos."
+            
+            chunks.append(TextChunk(
+                content=pattern_content,
+                metadata=ChunkMetadata(
+                    source=source_id, chunk_index=5, strategy=ChunkStrategy.CSV_ROW,
+                    char_count=len(pattern_content), word_count=len(pattern_content.split()),
+                    start_position=0, end_position=len(pattern_content),
+                    additional_info={
+                        "chunk_type": "metadata_patterns_clusters",
+                        "topic": "temporal_patterns_clustering"
+                    }
+                )
+            ))
+            
+            self.logger.info(f"✅ Criados {len(chunks)} chunks analíticos de metadados para {source_id}")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Falha ao gerar metadados para {source_id}: {e}")
+            return []
+        
+        return chunks
 
     def ingest_csv_file(self,
                         file_path: str,
@@ -421,7 +739,7 @@ class RAGAgent(BaseAgent):
         try:
             # Configurações da busca
             config = context or {}
-            similarity_threshold = config.get('similarity_threshold', 0.7)
+            similarity_threshold = config.get('similarity_threshold', 0.3)  # Reduzido de 0.7 para 0.3 (mais permissivo para chunks analíticos)
             max_results = config.get('max_results', 5)
             include_context = config.get('include_context', True)
             
@@ -458,88 +776,16 @@ class RAGAgent(BaseAgent):
                 source_results = [r for r in search_results if r.source == source]
                 source_info[source]["avg_similarity"] = sum(r.similarity_score for r in source_results) / len(source_results)
 
-            # 4. Gerar resposta contextualizada via LLM
-            if include_context:
-                context_text = "\n\n---\n\n".join(context_pieces)
-                # 📋 LOG DE AUDITORIA: Contexto completo enviado ao LLM
-                self.logger.info(f"📤 Enviando {len(context_pieces)} chunks ao LLM para interpretação semântica")
-                self.logger.debug(f"\n{'='*80}\n🤖 CONTEXTO COMPLETO ENVIADO AO LLM:\n{'='*80}\n{context_text[:1000]}...\n{'='*80}")
-
-                # Recuperar estatísticas do chunker para explicar diferença entre chunks e linhas do CSV
-                # CORREÇÃO: search_results são objetos VectorSearchResult, não TextChunk
-                # Não podemos usar get_stats() diretamente, precisamos calcular manualmente
-                total_chunks = len(search_results)
-                total_csv_rows = None
-                
-                # Tentar extrair total de linhas dos metadados dos chunks
-                for result in search_results:
-                    if hasattr(result, 'metadata') and isinstance(result.metadata, dict):
-                        if 'total_csv_rows' in result.metadata:
-                            total_csv_rows = result.metadata.get('total_csv_rows')
-                            break
-                
-                explain_chunk_vs_row = ""
-                if total_csv_rows is not None:
-                    explain_chunk_vs_row = (
-                        f"\n\n🟦 **Nota Importante:** O sistema divide o arquivo CSV em chunks para análise semântica. "
-                        f"O número de chunks ({total_chunks}) não corresponde ao total de linhas do CSV original. "
-                        f"O total de linhas processadas foi {total_csv_rows}. "
-                        f"Cada chunk pode conter múltiplas linhas, conforme configuração de chunking. "
-                        f"Para estatísticas precisas, sempre consulte o campo 'total_csv_rows' nas estatísticas."
-                    )
-
-                rag_prompt = f"""Você é um assistente especializado em análise de dados e datasets. Sua função é interpretar SEMANTICAMENTE o conteúdo textual dos chunks fornecidos abaixo para responder à pergunta do usuário.
-
-⚠️ DIRETRIZES OBRIGATÓRIAS:
-1. ANÁLISE SEMÂNTICA: Interprete o significado e contexto do texto nos chunks, não apenas repita informações literais
-2. DADOS DO DATASET: Os chunks contêm descrições de datasets reais. Extraia informações sobre:
-   - Tipos de dados (numéricos, categóricos, temporais)
-   - Estrutura das colunas e features
-   - Características dos dados (valores, distribuições, padrões)
-   - Exemplos e amostras presentes no texto
-3. FUNDAMENTAÇÃO: Base sua resposta EXCLUSIVAMENTE nas informações presentes nos chunks
-4. PRECISÃO: Se os chunks mencionam colunas, valores ou estatísticas, inclua-os explicitamente na resposta
-5. CONTEXTO: Considere que cada chunk pode conter descrições textuais, metadados e amostras de dados
-6. CLAREZA: Responda de forma estruturada, citando as informações específicas encontradas nos chunks
-
-{explain_chunk_vs_row}
-
-CONTEXTO RECUPERADO DA BASE DE DADOS (chunk_text da tabela embeddings):
-{context_text}
-
-PERGUNTA DO USUÁRIO: {query}
-
-INSTRUÇÕES DE RESPOSTA:
-- Leia e interprete SEMANTICAMENTE cada chunk fornecido
-- Extraia informações relevantes sobre o dataset descrito nos chunks
-- Se encontrar menções a tipos de dados, colunas ou features, liste-os explicitamente
-- Se houver exemplos de dados nos chunks, use-os para fundamentar sua resposta
-- Seja específico e detalhado, evitando respostas genéricas
-- Se não houver informação suficiente nos chunks, informe claramente
-
-RESPOSTA FUNDAMENTADA:"""
-
-                self.logger.info("🤖 Solicitando interpretação semântica ao LLM...")
-                llm_response = self._call_llm(rag_prompt, context)
-
-                # Extrair conteúdo da resposta
-                if llm_response and 'choices' in llm_response:
-                    content = llm_response['choices'][0]['message']['content']
-                    # 📋 LOG DE AUDITORIA: Resposta do LLM
-                    self.logger.info("✅ Resposta gerada pelo LLM com sucesso")
-                    self.logger.debug(f"\n{'='*80}\n📥 RESPOSTA DO LLM:\n{'='*80}\n{content[:500]}...\n{'='*80}")
-                else:
-                    content = "Erro ao gerar resposta contextualizada."
-                    self.logger.error("❌ Falha ao obter resposta do LLM")
-            
-            else:
-                # Apenas retornar informações dos resultados da busca
-                content = f"📄 Encontrados {len(search_results)} resultados relevantes na base de conhecimento.\n\n"
-                
-                for i, result in enumerate(search_results, 1):
-                    content += f"**Resultado {i}** (Similaridade: {result.similarity_score:.3f})\n"
-                    content += f"Fonte: {result.source}\n"
-                    content += f"Texto: {result.chunk_text[:200]}...\n\n"
+            # 4. Síntese da resposta via agente especializado
+            from src.agent.rag_synthesis_agent import synthesize_response
+            chunks = [result.chunk_text for result in search_results]
+            # Se LLM disponível, use síntese via LangChain; senão, fallback manual
+            try:
+                content = synthesize_response(chunks, query, use_llm=include_context)
+                self.logger.info("✅ Resposta consolidada gerada pelo agente de síntese")
+            except Exception as e:
+                self.logger.error(f"❌ Falha na síntese via LLM, usando fallback manual: {e}")
+                content = synthesize_response(chunks, query, use_llm=False)
             
             processing_time = time.perf_counter() - start_time
             

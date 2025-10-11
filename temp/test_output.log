@@ -1,0 +1,28 @@
+2025-10-06 16:52:34,516 | INFO | src.memory | M≤dulo de mem≤ria carregado - versπo 1.0.0
+2025-10-06 16:53:05,031 | INFO | src.tools.python_analyzer | PythonDataAnalyzer inicializado por: orchestrator_agent
+2025-10-06 16:53:05,055 | INFO | src.embeddings.generator | Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+2025-10-06 16:53:05,059 | INFO | sentence_transformers.SentenceTransformer | Use pytorch device_name: cpu
+2025-10-06 16:53:05,059 | INFO | sentence_transformers.SentenceTransformer | Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-10-06 16:53:07,139 | INFO | src.embeddings.generator | Sentence Transformer carregado com sucesso
+2025-10-06 16:53:08,349 | INFO | httpx | HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+2025-10-06 16:53:08,353 | INFO | src.embeddings.vector_store | Conexπo com vector store estabelecida
+Traceback (most recent call last):
+  File "C:\workstashion\eda-aiminds-i2a2-rb\scripts\run_interface_noninteractive.py", line 32, in <module>
+    asyncio.run(interface_interativa.main())
+  File "C:\Python312\Lib\asyncio\runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python312\Lib\asyncio\base_events.py", line 685, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\workstashion\eda-aiminds-i2a2-rb\interface_interativa.py", line 126, in main
+    print_banner()
+  File "C:\workstashion\eda-aiminds-i2a2-rb\interface_interativa.py", line 51, in print_banner
+    print(banner)
+  File "C:\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-65: character maps to <undefined>

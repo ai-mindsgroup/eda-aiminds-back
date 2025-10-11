@@ -89,6 +89,11 @@ google-ai-generativelanguage==0.6.18
 google-api-core==2.25.1
 google-auth==2.40.3
 
+# Google Drive API
+google-auth-oauthlib==1.2.2
+google-auth-httplib2==0.2.0
+google-api-python-client==2.184.0
+
 # ============================================================================
 # UTILITIES & HELPERS
 # ============================================================================
@@ -170,20 +175,11 @@ lxml>=5.0.0
 # Para instalar com AI/ML:
 # pip install sentence-transformers langchain openai
 #
-
+ 
 # ============================================================================
-# API REST DEPENDENCIES - Dependências para API FastAPI
+# API & SERVER DEPENDENCIES (Adicionados por integração FastAPI)
 # ============================================================================
-
-# FastAPI e servidor web
-fastapi==0.115.6
-uvicorn[standard]==0.33.0
-python-multipart==0.0.17
-
-# Middleware e utilitários da API
-slowapi==0.1.9
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-
-# Para executar a API:
-# python api_simple.py
+fastapi==0.111.0
+uvicorn==0.29.0
+python-multipart==0.0.7
+aiofiles==23.2.1

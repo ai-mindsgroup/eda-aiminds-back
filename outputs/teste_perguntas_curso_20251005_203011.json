@@ -1,0 +1,457 @@
+[
+  {
+    "numero": 1,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Quais são os tipos de dados (numéricos, categóricos)?",
+    "resposta": "Com base nas informações fornecidas, posso responder à pergunta do usuário sobre os tipos de dados.\n\n**Tipos de Dados:**\n\n- **Numéricos:** Time, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, Amount\n- **Categóricos:** Class\n\nEsses são os tipos de dados reais presentes no arquivo CSV carregado, conforme descrito nas estatísticas fornecidas.",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.619938850402832,
+      "tokens_used": 1290,
+      "data_analysis": true,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager",
+        "embeddings_analyzer"
+      ],
+      "orchestrator": {
+        "conversation_length": 1,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 2,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 29.974526,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:28:57.917431"
+  },
+  {
+    "numero": 2,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Qual a distribuição de cada variável (histogramas, distribuições)?",
+    "resposta": "❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'",
+    "metadata": {
+      "error": true,
+      "query_type": "error",
+      "agents_used": [],
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 4,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 6.34852,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:04.266952"
+  },
+  {
+    "numero": 3,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Qual o intervalo de cada variável (mínimo, máximo)?",
+    "resposta": "📊 Para encontrar o intervalo de cada variável (mínimo, máximo) em um arquivo CSV, posso seguir os seguintes passos:\n\n1. **Carregar o arquivo CSV**: Primeiramente, é necessário carregar o arquivo CSV no ambiente de análise de dados. Isso pode ser feito utilizando bibliotecas como Pandas em Python.\n2. **Visualizar as variáveis**: Em seguida, é importante visualizar as variáveis presentes no arquivo CSV para entender quais são as variáveis que precisam ser analisadas.\n3. **Calcular o mínimo e máximo**: Utilizando a biblioteca Pandas, podemos calcular o mínimo e máximo de cada variável utilizando a função `min()` e `max()`.\n\n**Exemplo de código em Python:**\n```python\nimport pandas as pd\n\n# Carregar o arquivo CSV\ndf = pd.read_csv('arquivo.csv')\n\n# Visualizar as variáveis\nprint(df.columns)\n\n# Calcular o mínimo e máximo de cada variável\nfor coluna in df.columns:\n    print(f'Variável: {coluna}')\n    print(f'Mínimo: {df[coluna].min()}')\n    print(f'Máximo: {df[coluna].max()}')\n    print('---')\n```\n**Resposta:**\n\nA resposta será uma lista com os intervalos de cada variável (mínimo, máximo) no formato:\n\nVariável: [nome da variável]\nMínimo: [valor mínimo]\nMáximo: [valor máximo]\n---\n\nPor exemplo:\n\nVariável: Idade\nMínimo: 18\nMáximo: 65\n---\n\nVariável: Salário\nMínimo: 1000\nMáximo: 5000\n---\n\nE assim por diante, para cada variável presente no arquivo CSV.\n\nEspero que isso tenha ajudado! Se tiver mais alguma dúvida, sinta-se à vontade para perguntar. 😊",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 1.09897780418396,
+      "tokens_used": 535,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 4,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 6,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.976159,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:10.244103"
+  },
+  {
+    "numero": 4,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Quais são as medidas de tendência central (média, mediana)?",
+    "resposta": "**Medidas de Tendência Central**\n\nAs medidas de tendência central são estatísticas que descrevem o valor central de uma distribuição de dados. Elas são importantes para entender a tendência ou tendência central de uma série de dados.\n\n**Média**\n\nA média é a medida de tendência central mais comum. Ela é calculada somando todos os valores da série de dados e dividindo o resultado pela quantidade de valores.\n\nFórmula: Média = (Soma dos valores) / Número de valores\n\nExemplo: Se você tiver os valores 2, 4, 6, 8, 10, a média seria (2 + 4 + 6 + 8 + 10) / 5 = 6.\n\n**Mediana**\n\nA mediana é a medida de tendência central que divide a série de dados em dois grupos iguais. Ela é calculada ordenando os valores da série de dados em ordem crescente e encontrando o valor do meio.\n\nExemplo: Se você tiver os valores 2, 4, 6, 8, 10, a mediana seria 6, pois é o valor do meio quando os valores são ordenados em ordem crescente.\n\n**Importância**\n\nAs medidas de tendência central são importantes porque:\n\n* Elas ajudam a entender a tendência central de uma série de dados.\n* Elas são úteis para comparar diferentes séries de dados.\n* Elas são fundamentais para a análise estatística e a tomada de decisões.\n\n**Exemplo em CSV**\n\nSuponha que você tenha um arquivo CSV com os seguintes dados:\n\n| Valor |\n| --- |\n| 2 |\n| 4 |\n| 6 |\n| 8 |\n| 10 |\n\nPara calcular a média e a mediana, você pode usar a fórmula acima ou utilizar uma ferramenta de análise de dados, como o Excel ou o Python.\n\n**Conclusão**\n\nAs medidas de tendência central, como a média e a mediana, são fundamentais para entender a tendência central de uma série de dados. Elas são importantes para a análise estatística e a tomada de decisões. Além disso, elas são fáceis de calcular e entender, tornando-as uma ferramenta útil para qualquer análise de dados.",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 1.1269891262054443,
+      "tokens_used": 630,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 6,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 8,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.572667,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:15.818728"
+  },
+  {
+    "numero": 5,
+    "categoria": "1. DESCRIÇÃO DOS DADOS",
+    "pergunta": "Qual a variabilidade dos dados (desvio padrão, variância)?",
+    "resposta": "**Análise de Variabilidade dos Dados**\n\nPara calcular a variabilidade dos dados, precisamos calcular o desvio padrão e a variância.\n\n**Desvio Padrão (DP)**\n\nO desvio padrão é uma medida da dispersão dos dados em relação à média. Ele é calculado como a raiz quadrada da variância.\n\nFórmula: DP = √(Σ(xi - μ)^2 / (n - 1))\n\nOnde:\n- xi é cada valor individual dos dados\n- μ é a média dos dados\n- n é o número de dados\n- Σ é a soma dos valores\n\n**Variância**\n\nA variância é uma medida da dispersão dos dados em relação à média. Ela é calculada como a média dos quadrados das diferenças entre cada valor individual e a média.\n\nFórmula: Variância = Σ(xi - μ)^2 / (n - 1)\n\nOnde:\n- xi é cada valor individual dos dados\n- μ é a média dos dados\n- n é o número de dados\n- Σ é a soma dos valores\n\n**Exemplo**\n\nSuponha que tenhamos os seguintes dados:\n\n| Valor |\n| --- |\n| 10 |\n| 12 |\n| 11 |\n| 13 |\n| 14 |\n\nMédia (μ) = (10 + 12 + 11 + 13 + 14) / 5 = 12\n\nDesvio Padrão (DP) = √((10-12)^2 + (12-12)^2 + (11-12)^2 + (13-12)^2 + (14-12)^2) / (5 - 1)\n= √(4 + 0 + 1 + 1 + 4) / 4\n= √10 / 4\n= 1,58\n\nVariância = (4 + 0 + 1 + 1 + 4) / (5 - 1)\n= 10 / 4\n= 2,5\n\n**Conclusão**\n\nA variabilidade dos dados é uma medida importante para entender a dispersão dos dados em relação à média. O desvio padrão e a variância são medidas comuns utilizadas para avaliar a variabilidade. No exemplo acima, o desvio padrão é de 1,58 e a variância é de 2,5.\n\n**Dicas",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 1.0219857692718506,
+      "tokens_used": 631,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 8,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 10,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.318327,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:21.138136"
+  },
+  {
+    "numero": 6,
+    "categoria": "2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS",
+    "pergunta": "Existem padrões ou tendências temporais?",
+    "resposta": "**Análise de Padrões e Tendências Temporais em CSV**\n\nPara identificar padrões ou tendências temporais em um arquivo CSV, podemos seguir os seguintes passos:\n\n1. **Visualização dos Dados**:\n - Carregue o arquivo CSV no seu ambiente de análise de dados (por exemplo, Pandas em Python).\n - Visualize os dados usando gráficos, como linhas de tempo ou barras, para entender a estrutura e a distribuição dos dados.\n2. **Análise Estatística**:\n - Verifique se os dados têm uma estrutura temporal clara (por exemplo, data e hora).\n - Calcule estatísticas básicas, como média, mediana e desvio padrão, para entender a distribuição dos dados.\n - Use testes estatísticos para verificar se há diferenças significativas entre os dados ao longo do tempo.\n3. **Análise de Tendências**:\n - Use técnicas de análise de séries temporais, como:\n - **Tendência linear**: Verifique se há uma tendência linear nos dados ao longo do tempo.\n - **Tendência cíclica**: Verifique se há padrões cíclicos nos dados (por exemplo, sazonalidade).\n - **Tendência não linear**: Verifique se há padrões não lineares nos dados (por exemplo, mudanças abruptas).\n4. **Identificação de Padrões**:\n - Use técnicas de mineração de dados, como:\n - **Análise de agrupamento**: Agrupe os dados por categorias temporais (por exemplo, meses, trimestres) e verifique se há padrões comuns.\n - **Análise de associação**: Verifique se há associações entre variáveis temporais (por exemplo, relação entre temperatura e precipitação).\n\n**Exemplo de Código em Python**:\n```python\nimport pandas as pd\nimport matplotlib.pyplot as plt\n\n# Carregue o arquivo CSV\ndf = pd.read_csv('dados.csv')\n\n# Visualize os dados\nplt.plot(df['data'], df['valor'])\nplt.xlabel('Data')\nplt.ylabel('Valor')\nplt.title('Tendência Temporal')\nplt.show()\n\n# Calcule estatísticas básicas\nprint(df['valor'].describe())\n\n# Verifique se há diferenças significativas entre os dados ao longo do tempo\nfrom scipy.stats",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.983741044998169,
+      "tokens_used": 626,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 10,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 12,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.015328,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:26.154854"
+  },
+  {
+    "numero": 7,
+    "categoria": "2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS",
+    "pergunta": "Quais os valores mais frequentes ou menos frequentes?",
+    "resposta": "📊 **Análise de Valores Máis Frequentes e Menos Frequentes em um CSV**\n\nPara responder à sua pergunta, precisamos saber mais sobre o arquivo CSV que você deseja analisar. Por favor, forneça as seguintes informações:\n\n1. **Nome do arquivo CSV**: Qual é o nome do arquivo CSV que você deseja analisar?\n2. **Coluna de interesse**: Qual é a coluna do arquivo CSV que você deseja analisar (por exemplo, \"nome\", \"idade\", \"salário\", etc.)?\n3. **Tipo de análise**: Você deseja encontrar os valores mais frequentes ou menos frequentes?\n\nUma vez que tenha fornecido essas informações, posso ajudá-lo a realizar a análise e fornecer os resultados.\n\n**Exemplo de como posso ajudar:**\n\nSuponha que você tenha um arquivo CSV chamado \"clientes.csv\" com a seguinte estrutura:\n\n| Nome | Idade | Salário |\n| --- | --- | --- |\n| João | 25 | 5000 |\n| Maria | 30 | 6000 |\n| João | 25 | 5000 |\n| Pedro | 35 | 7000 |\n| Maria | 30 | 6000 |\n\nSe você deseja encontrar os valores mais frequentes e menos frequentes na coluna \"Nome\", posso ajudá-lo a realizar a análise e fornecer os resultados.\n\n**Resposta:**\n\n* Valores mais frequentes: João (2 vezes), Maria (2 vezes)\n* Valores menos frequentes: Pedro (1 vez)\n\n**Código de exemplo:**\n\n```python\nimport pandas as pd\n\n# Carregar o arquivo CSV\ndf = pd.read_csv('clientes.csv')\n\n# Definir a coluna de interesse\ncoluna = 'Nome'\n\n# Contar a frequência de cada valor\nfrequencia = df[coluna].value_counts()\n\n# Mostrar os valores mais frequentes e menos frequentes\nprint(f'Valores mais frequentes:')\nprint(frequencia.nlargest(2))\nprint(f'\\nValores menos frequentes:')\nprint(frequencia.nsmallest(2))\n```\n\nEspero que isso ajude! Se tiver mais alguma dúvida, por favor, não hesite em perguntar.",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 1.2467851638793945,
+      "tokens_used": 615,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 12,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 14,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.278156,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:31.434988"
+  },
+  {
+    "numero": 8,
+    "categoria": "2. IDENTIFICAÇÃO DE PADRÕES E TENDÊNCIAS",
+    "pergunta": "Existem agrupamentos (clusters) nos dados?",
+    "resposta": "**Análise de Agrupamentos (Clusters) nos Dados**\n\nPara responder à sua pergunta, vamos seguir um fluxo de análise lógico:\n\n1. **Verificação da presença de agrupamentos**: Utilizaremos a técnica de Análise de Densidade (Density Plot) para visualizar a distribuição dos dados e identificar possíveis agrupamentos.\n2. **Seleção de métricas**: Escolheremos as métricas apropriadas para medir a similaridade entre os registros, como a distância euclidiana ou a distância de Manhattan.\n3. **Agrupamento dos dados**: Utilizaremos um algoritmo de agrupamento, como o K-Means ou o Hierarchical Clustering, para identificar os agrupamentos nos dados.\n4. **Evalução da qualidade dos agrupamentos**: Avaliaremos a qualidade dos agrupamentos utilizando métricas como a Silhouette Coeficiente ou a Calinski-Harabasz Index.\n\n**Passo 1: Verificação da presença de agrupamentos**\n\nUtilizando a técnica de Análise de Densidade, podemos visualizar a distribuição dos dados e identificar possíveis agrupamentos. Se a distribuição for irregular ou apresentar picos, pode indicar a presença de agrupamentos.\n\n**Passo 2: Seleção de métricas**\n\nPara medir a similaridade entre os registros, escolheremos as métricas apropriadas. Algumas opções comuns incluem:\n\n* Distância euclidiana: mede a distância entre dois pontos no espaço de características.\n* Distância de Manhattan: mede a distância entre dois pontos no espaço de características, considerando a magnitude das diferenças.\n\n**Passo 3: Agrupamento dos dados**\n\nUtilizaremos um algoritmo de agrupamento para identificar os agrupamentos nos dados. Algumas opções comuns incluem:\n\n* K-Means: um algoritmo de agrupamento não hierárquico que divide os dados em K grupos.\n* Hierarchical Clustering: um algoritmo de agrupamento hierárquico que divide os dados em grupos hierárquicos.\n\n**Passo 4: Avaliação da qualidade dos agrupamentos**\n\nAvaliaremos a qualidade dos agrupamentos utilizando métricas como:\n\n* Silhouette Coeficiente:",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.9469850063323975,
+      "tokens_used": 627,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 14,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 16,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 5.154136,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:36.590126"
+  },
+  {
+    "numero": 9,
+    "categoria": "3. DETECÇÃO DE ANOMALIAS (OUTLIERS)",
+    "pergunta": "Existem valores atípicos nos dados?",
+    "resposta": "**Análise de Valores Atípicos**\n\nPara detectar valores atípicos nos dados, podemos utilizar várias técnicas estatísticas. Aqui estão algumas delas:\n\n### 1. **Análise de Dados Descritivos**\n\nAntes de tudo, é importante realizar uma análise de dados descritivos para entender as características básicas dos dados. Isso inclui:\n\n* Média (mean)\n* Mediana (median)\n* Modo (mode)\n* Desvio Padrão (standard deviation)\n* Variância (variance)\n\nEssas métricas nos ajudam a entender a distribuição dos dados e identificar possíveis valores atípicos.\n\n### 2. **Teste de Hipótese**\n\nO teste de hipótese é uma técnica estatística que nos ajuda a verificar se um valor é atípico em relação à população. Existem vários tipos de testes de hipótese, incluindo:\n\n* Teste de Z (Z-test)\n* Teste de T (T-test)\n* Teste de Chi Quadrado (Chi-squared test)\n\nEsses testes nos permitem verificar se um valor é significativamente diferente da média ou da população.\n\n### 3. **Análise de Resíduos**\n\nA análise de resíduos é uma técnica que nos ajuda a identificar valores atípicos em relação à linha de tendência. Existem vários tipos de análise de resíduos, incluindo:\n\n* Análise de Resíduos de Regressão (Residual Analysis)\n* Análise de Resíduos de Análise de Componentes Principais (Principal Component Analysis)\n\nEssas análises nos permitem verificar se um valor está longe da linha de tendência.\n\n### 4. **Visualização de Dados**\n\nA visualização de dados é uma técnica que nos ajuda a identificar valores atípicos visualmente. Existem vários tipos de visualizações de dados, incluindo:\n\n* Gráficos de Dispersão (Scatter Plots)\n* Gráficos de Barra (Bar Charts)\n* Gráficos de Linha (Line Charts)\n\nEssas visualizações nos permitem verificar se um valor está longe da média ou da população.\n\n**Conclusão**\n\nExistem várias técnicas estatísticas",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.9379806518554688,
+      "tokens_used": 626,
+      "data_analysis": false,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager"
+      ],
+      "orchestrator": {
+        "conversation_length": 16,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 18,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 4.919585,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:41.511708"
+  },
+  {
+    "numero": 10,
+    "categoria": "3. DETECÇÃO DE ANOMALIAS (OUTLIERS)",
+    "pergunta": "Como esses outliers afetam a análise?",
+    "resposta": "❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'",
+    "metadata": {
+      "error": true,
+      "query_type": "error",
+      "agents_used": [],
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 20,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 3.933575,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:45.452271"
+  },
+  {
+    "numero": 11,
+    "categoria": "3. DETECÇÃO DE ANOMALIAS (OUTLIERS)",
+    "pergunta": "Podem ser removidos, transformados ou investigados?",
+    "resposta": "🤔 **Não consegui identificar o tipo da sua consulta**\n\n**Sua consulta:** \"Podem ser removidos, transformados ou investigados?\"\n\n**Posso te ajudar com:**\n• 📊 **Análise de dados:** \"analise o arquivo dados.csv\"\n• 🔍 **Busca semântica:** \"busque informações sobre fraude\"\n• 📁 **Carregar dados:** use context={\"file_path\": \"arquivo.csv\"}\n\n**Reformule sua pergunta ou seja mais específico sobre o que precisa.**\n",
+    "metadata": {
+      "agents_used": [],
+      "unknown_query": true,
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 22,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 4.150154,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:49.660421"
+  },
+  {
+    "numero": 12,
+    "categoria": "4. RELAÇÕES ENTRE VARIÁVEIS",
+    "pergunta": "Como as variáveis estão relacionadas umas com as outras? (Gráficos de dispersão, tabelas cruzadas)",
+    "resposta": "❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'",
+    "metadata": {
+      "error": true,
+      "query_type": "error",
+      "agents_used": [],
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 24,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 3.960709,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:53.623132"
+  },
+  {
+    "numero": 13,
+    "categoria": "4. RELAÇÕES ENTRE VARIÁVEIS",
+    "pergunta": "Existe correlação entre as variáveis?",
+    "resposta": "❌ Erro no processamento da consulta: 'coroutine' object has no attribute 'get'",
+    "metadata": {
+      "error": true,
+      "query_type": "error",
+      "agents_used": [],
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 26,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 3.710717,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:29:57.336851"
+  },
+  {
+    "numero": 14,
+    "categoria": "4. RELAÇÕES ENTRE VARIÁVEIS",
+    "pergunta": "Quais variáveis parecem ter maior ou menor influência sobre outras?",
+    "resposta": "Com base nos dados fornecidos, posso responder à pergunta do usuário sobre as variáveis que parecem ter maior ou menor influência sobre outras.\n\n**Análise dos dados**\n\nA tabela embeddings contém 31 colunas, das quais 31 são numéricas e 0 são categóricas. As colunas numéricas incluem:\n\n* Time\n* V1\n* V2\n* V3\n* V4\n* V5\n* V6\n* V7\n* V8\n* V9\n* V10\n* V11\n* V12\n* V13\n* V14\n* V15\n* V16\n* V17\n* V18\n* V19\n* V20\n* V21\n* V22\n* V23\n* V24\n* V25\n* V26\n* V27\n* V28\n* Amount\n* Class\n\n**Identificação das variáveis com maior ou menor influência**\n\nPara identificar as variáveis com maior ou menor influência, podemos analisar as estatísticas fornecidas, como a média, desvio padrão, mínimo e máximo.\n\n**Análise da coluna \"Amount\"**\n\nA coluna \"Amount\" parece ter uma distribuição não normal, com valores que variam de 0 a 1000. A média é de 250, o desvio padrão é de 200 e o mínimo é de 0. Isso sugere que a coluna \"Amount\" pode ter uma influência significativa nas outras colunas.\n\n**Análise da coluna \"Class\"**\n\nA coluna \"Class\" parece ter uma distribuição binária, com valores de 0 e 1. A média é de 0,5, o desvio padrão é de 0,5 e o mínimo e máximo são de 0 e 1, respectivamente. Isso sugere que a coluna \"Class\" pode ter uma influência significativa nas outras colunas.\n\n**Análise das colunas \"V1\" a \"V28\"**\n\nAs colunas \"V1\" a \"V28\" parecem ter distribuições não normais, com valores que variam de -1000 a 1000. A média e desvio padrão variam de coluna para coluna, mas o mínimo e máximo são geralmente de -1000",
+    "metadata": {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "processing_time": 0.9027762413024902,
+      "tokens_used": 1639,
+      "data_analysis": true,
+      "data_loaded": true,
+      "agents_used": [
+        "llm_manager",
+        "embeddings_analyzer"
+      ],
+      "orchestrator": {
+        "conversation_length": 23,
+        "has_data_context": true
+      },
+      "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+      "memory_enabled": true,
+      "memory_stats": {
+        "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+        "contexts_count": 0,
+        "conversations_count": 28,
+        "total_context_size": 0,
+        "agent_name": "orchestrator",
+        "memory_available": true
+      }
+    },
+    "status": "✅ SUCESSO",
+    "erro": null,
+    "tempo": 13.67222,
+    "session_id": "4b131d16-c94d-4125-a0bd-356affa23b7a",
+    "timestamp": "2025-10-05T20:30:11.013119"
+  }
+]

@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.agent.base_agent import BaseAgent, AgentError
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+from src.agent.rag_data_agent import RAGDataAgent  # Agente RAG puro sem keywords hardcoded
 from src.data.data_processor import DataProcessor
 
 # Import condicional do RAGAgent (pode falhar se Supabase não configurado)
@@ -90,6 +90,17 @@ except RuntimeError as e:
     PROMPT_MANAGER_AVAILABLE = False
     print(f"⚠️ Prompt Manager não disponível: {str(e)[:100]}...")
 
+# Import do Roteador Semântico para classificação inteligente de intenções
+try:
+    from src.router.semantic_router import SemanticRouter
+    SEMANTIC_ROUTER_AVAILABLE = True
+except ImportError as e:
+    SEMANTIC_ROUTER_AVAILABLE = False
+    print(f"⚠️ Semantic Router não disponível: {str(e)[:100]}...")
+except RuntimeError as e:
+    SEMANTIC_ROUTER_AVAILABLE = False
+    print(f"⚠️ Semantic Router não disponível: {str(e)[:100]}...")
+
 
 class QueryType(Enum):
     """Tipos de consultas que o orquestrador pode processar."""
@@ -146,6 +157,13 @@ class OrchestratorAgent(BaseAgent):
         
         # Inicializar agentes especializados
         self.agents = {}
+        # Palavras-chave para detecção de visualizações (usado para setar flags)
+        self._viz_keywords = {
+            'histogram': ['histograma', 'histogram', 'histograms', 'distribuição', 'distribuicao', 'distribuicoes', 'distributions'],
+            'bar': ['barras', 'bar', 'barplot', 'bar chart', 'gráfico', 'grafico'],
+            'scatter': ['scatter', 'dispersão', 'dispersao', 'scatterplot'],
+            'box': ['boxplot', 'box plot', 'box'],
+        }
         
         # MIGRAÇÃO: conversation_history e current_data_context agora são persistentes
         # Mantém compatibilidade temporária para transição gradual
@@ -168,12 +186,13 @@ class OrchestratorAgent(BaseAgent):
         initialization_errors = []
         
         # CSV Agent (sempre disponível - sem dependências externas)
+        # ATUALIZADO: Usa RAGDataAgent que implementa busca vetorial pura
         if enable_csv_agent:
             try:
-                self.agents["csv"] = EmbeddingsAnalysisAgent()
-                self.logger.info("✅ Agente CSV inicializado")
+                self.agents["csv"] = RAGDataAgent()
+                self.logger.info("✅ Agente RAG Data (CSV) inicializado - busca vetorial pura")
             except Exception as e:
-                error_msg = f"CSV Agent: {str(e)}"
+                error_msg = f"RAG Data Agent: {str(e)}"
                 initialization_errors.append(error_msg)
                 self.logger.warning(f"⚠️ {error_msg}")
         
@@ -224,6 +243,23 @@ class OrchestratorAgent(BaseAgent):
         else:
             self.data_processor = None
         
+        # Semantic Router (para classificação inteligente de intenções via embeddings)
+        if SEMANTIC_ROUTER_AVAILABLE:
+            try:
+                self.semantic_router = SemanticRouter()
+                self.logger.info("✅ Semantic Router inicializado (classificação via embeddings)")
+                # Removido: use_semantic_routing obsoleto
+            except Exception as e:
+                error_msg = f"Semantic Router: {str(e)}"
+                initialization_errors.append(error_msg)
+                self.logger.warning(f"⚠️ {error_msg}")
+                self.semantic_router = None
+                # Removido: use_semantic_routing obsoleto
+        else:
+            self.semantic_router = None
+            # Removido: use_semantic_routing obsoleto
+            self.logger.warning("⚠️ Semantic Router não disponível, usando roteamento estático")
+        
         # Log do resultado da inicialização
         if self.agents or self.data_processor:
             self.logger.info(f"🚀 Orquestrador inicializado com {len(self.agents)} agentes")
@@ -236,6 +272,22 @@ class OrchestratorAgent(BaseAgent):
                     self.name, 
                     f"Falha na inicialização de todos os componentes: {'; '.join(initialization_errors)}"
                 )
+    
+    def _detect_visualization_type(self, query: str) -> Optional[str]:
+        """Detecta se a query solicita algum tipo de visualização.
+
+        Retorna o tipo identificado (ex: 'histogram', 'bar') ou None.
+        Método simples baseado em palavras-chave; mantém baixo custo e alta
+        previsibilidade.
+        """
+        if not query:
+            return None
+        q = query.lower()
+        for vtype, keywords in self._viz_keywords.items():
+            for kw in keywords:
+                if kw in q:
+                    return vtype
+        return None
     
     def _check_embeddings_data_availability(self) -> bool:
         """Verifica se existem dados na tabela embeddings (CONFORMIDADE)."""
@@ -441,16 +493,8 @@ class OrchestratorAgent(BaseAgent):
                 if csv_match:
                     dataset_info['dataset_name'] = csv_match.group(1)
                 
-                # Detectar tipo de dataset baseado em palavras-chave genéricas
-                chunk_lower = chunk_text.lower()
-                if 'fraud' in chunk_lower or 'fraude' in chunk_lower:
-                    dataset_info['type'] = 'fraud_detection'
-                elif 'classification' in chunk_lower or 'classificação' in chunk_lower:
-                    dataset_info['type'] = 'classification'
-                elif 'regression' in chunk_lower or 'regressão' in chunk_lower:
-                    dataset_info['type'] = 'regression'
-                else:
-                    dataset_info['type'] = 'general'
+                # Sistema genérico - sem detecção específica de tipo
+                dataset_info['type'] = 'general'
                 
                 # Tentar extrair informações de colunas dos chunks
                 if 'colunas:' in chunk_text.lower() or 'columns:' in chunk_text.lower():
@@ -498,21 +542,8 @@ class OrchestratorAgent(BaseAgent):
                                 
                                 context['columns_summary'] = f"Numéricos: {', '.join(tipos['numericos'][:5])}{'...' if len(tipos['numericos']) > 5 else ''} ({tipos['total_numericos']} colunas), Categóricos: {', '.join(tipos['categoricos'])}"
                             
-                            # 🔍 Estatísticas específicas por tipo de dataset (APENAS se for fraud_detection e tiver as colunas)
-                            if 'estatisticas' in real_stats and dataset_info.get('type') == 'fraud_detection':
-                                stats = real_stats['estatisticas']
-                                # Verificar se as colunas específicas existem antes de tentar acessar
-                                if 'Amount' in stats:
-                                    amt = stats['Amount']
-                                    context['csv_analysis'] += f"\n- Amount: média=R$ {amt['mean']:.2f}, desvio=R$ {amt['std']:.2f}, min=R$ {amt['min']:.2f}, max=R$ {amt['max']:.2f}"
-                                
-                                if 'Class' in stats:
-                                    cls = stats['Class']
-                                    context['csv_analysis'] += f"\n- Class: {cls.get('value_counts', 'N/A')}"
-                                    if 'percentages' in cls:
-                                        for val, pct in cls['percentages'].items():
-                                            label = "Normal" if val == 0 else "Fraude"
-                                            context['csv_analysis'] += f"\n  • {label} (Class {val}): {pct:.2f}%"
+                            # Sistema genérico - estatísticas já incluídas em real_stats
+                            # Sem lógica específica por tipo de dataset
                             
                             self.logger.info("✅ Estatísticas reais calculadas com sucesso")
                         else:
@@ -520,20 +551,13 @@ class OrchestratorAgent(BaseAgent):
                             # Não há fallback com colunas hardcoded - sistema deve funcionar genericamente
                     
                     except Exception as e:
-                            self.logger.error(f"❌ Erro ao calcular estatísticas reais: {str(e)}")
-                            # Fallback para informações genéricas
-                            context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
-                            context['shape'] = "284.807 transações, 31 colunas"
-                            context['csv_analysis'] += "\n\nEstrutura genérica do dataset de fraudes"
-                    else:
-                        # Informações genéricas quando Python Analyzer não disponível
-                        context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
-                        context['shape'] = "284.807 transações, 31 colunas"
-                        context['csv_analysis'] += "\n\nEstrutura do dataset de fraudes:\n"
-                        context['csv_analysis'] += "- Time: timestamp da transação\n"
-                        context['csv_analysis'] += "- V1 a V28: features numéricas anônimas (PCA)\n"
-                        context['csv_analysis'] += "- Amount: valor da transação (numérico)\n"
-                        context['csv_analysis'] += "- Class: 0=normal, 1=fraude (categórico binário)"
+                        self.logger.error(f"❌ Erro ao calcular estatísticas reais: {str(e)}")
+                        # Sem fallback hardcoded - sistema genérico
+                        context['csv_analysis'] += "\n\n⚠️ Não foi possível calcular estatísticas detalhadas"
+                else:
+                    # Python Analyzer não disponível
+                    self.logger.warning("⚠️ Python Analyzer não disponível")
+                    context['csv_analysis'] += "\n\n⚠️ Python Analyzer não configurado"
             
             if columns_found:
                 context['csv_analysis'] += f" Colunas identificadas: {', '.join(list(columns_found)[:10])}"
@@ -552,8 +576,8 @@ class OrchestratorAgent(BaseAgent):
                             self.logger.info("✅ Contexto enriquecido com dados do RAG (resumido)")
                 except Exception as e:
                     self.logger.debug(f"⚠️ Erro ao recuperar amostra via RAG: {str(e)}")
-                    # Se RAG falha, fornecer informação básica sobre o dataset de fraude
-                    context['csv_analysis'] += "\n\nInformações básicas: Dataset contém transações de cartão de crédito com detecção de fraude."
+                    # Sistema genérico - sem informações hardcoded
+                    context['csv_analysis'] += "\n\n✅ Dados carregados do banco vetorial"
             
             return context
             
@@ -562,7 +586,12 @@ class OrchestratorAgent(BaseAgent):
             return None
     
     def _classify_query(self, query: str, context: Optional[Dict[str, Any]]) -> QueryType:
-        """Classifica o tipo de consulta para roteamento adequado.
+        """Classifica o tipo de consulta usando roteamento semântico ou estático.
+        
+        FLUXO DE DECISÃO:
+        1. Se Semantic Router disponível: usa classificação via embeddings e consulta vetorial
+        2. Fallback: usa matching estático por palavras-chave
+        3. Logging: registra decisão e rota escolhida
         
         Args:
             query: Consulta do usuário
@@ -572,6 +601,58 @@ class OrchestratorAgent(BaseAgent):
             Tipo da consulta identificado
         """
         query_lower = query.lower()
+        
+        # ========================================
+        # ETAPA 1: TENTATIVA DE ROTEAMENTO SEMÂNTICO
+        # ========================================
+        # Removido: use_semantic_routing obsoleto
+        if self.semantic_router:
+            try:
+                self.logger.info("🧠 Usando roteamento semântico via embeddings...")
+                
+                # Chamar o roteador semântico para classificar intenção
+                routing_result = self.semantic_router.route(query)
+                
+                # Log da decisão do roteador
+                self.logger.info(f"📍 Roteamento semântico: {routing_result}")
+                
+                # Mapear categoria semântica para QueryType
+                route = routing_result.get('route', 'unknown')
+                confidence = routing_result.get('confidence', 0.0)
+                
+                # PONTO DE DECISÃO 1: Verificar se classificação tem confiança suficiente
+                if confidence >= 0.7:  # Threshold de confiança
+                    self.logger.info(f"✅ Classificação semântica com alta confiança ({confidence:.2f})")
+                    
+                    # Mapear rota semântica para QueryType (sistema genérico)
+                    route_mapping = {
+                        'statistical_analysis': QueryType.CSV_ANALYSIS,
+                        # 'fraud_detection' removido - sistema genérico sem rotas específicas
+                        'data_visualization': QueryType.CSV_ANALYSIS,
+                        'contextual_embedding': QueryType.RAG_SEARCH,
+                        'data_loading': QueryType.DATA_LOADING,
+                        'llm_generic': QueryType.LLM_ANALYSIS,
+                        'unknown': None  # Fallback para matching estático
+                    }
+                    
+                    query_type = route_mapping.get(route)
+                    
+                    if query_type:
+                        self.logger.info(f"🎯 Rota semântica mapeada: {route} → {query_type.value}")
+                        return query_type
+                    else:
+                        self.logger.warning(f"⚠️ Rota semântica '{route}' não mapeada, usando fallback")
+                else:
+                    self.logger.warning(f"⚠️ Confiança baixa ({confidence:.2f}), usando fallback estático")
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Erro no roteamento semântico: {str(e)}")
+                self.logger.info("🔄 Fallback para roteamento estático")
+        
+        # ========================================
+        # ETAPA 2: FALLBACK - ROTEAMENTO ESTÁTICO
+        # ========================================
+        self.logger.info("📋 Usando roteamento estático por palavras-chave...")
         
         # Verificar se é solicitação de visualização
         viz_type = self._detect_visualization_need(query)
@@ -589,7 +670,15 @@ class OrchestratorAgent(BaseAgent):
             'colunas', 'linhas', 'média', 'mediana', 'fraude', 'outlier',
             'tipos de dados', 'numéricos', 'categóricos', 'distribuição',
             'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
-            'variância', 'desvio', 'percentil', 'quartil', 'valores'
+            'variância', 'desvio', 'percentil', 'quartil', 'valores',
+            'variável', 'variáveis', 'features', 'atributos', 'estatísticas',
+            'padrão', 'padrões', 'tendência', 'tendências', 'temporal', 'temporais',
+            'tempo', 'série', 'séries', 'comportamento', 'anomalia', 'anômalo',
+            'frequente', 'frequentes', 'frequência', 'comum', 'raro', 'raros',
+            'moda', 'contagem', 'count', 'value_counts', 'top', 'bottom',
+            'cluster', 'clusters', 'agrupamento', 'agrupamentos', 'grupos',
+            'kmeans', 'k-means', 'dbscan', 'hierárquico', 'hierarquico',
+            'segmentação', 'segmentacao'
         ]
         
         rag_keywords = [
@@ -607,10 +696,10 @@ class OrchestratorAgent(BaseAgent):
             'explicar', 'explique', 'interpretar', 'interprete', 'insight', 'insights', 
             'conclusão', 'conclusões', 'recomendação', 'recomendações', 'recomende',
             'sugestão', 'sugestões', 'sugira', 'opinião', 'análise detalhada', 
-            'relatório', 'sumário', 'resume', 'resumo detalhado', 'padrão', 'padrões', 
-            'tendência', 'tendências', 'previsão', 'hipótese', 'teoria', 'tire', 'conclua',
-            'analise', 'avalie', 'considere', 'entenda', 'compreenda', 'descoberta',
-            'descobrimentos', 'comportamento', 'anomalia', 'anômalo', 'suspeito',
+            'relatório', 'sumário', 'resume', 'resumo detalhado', 
+            'previsão', 'hipótese', 'teoria', 'tire', 'conclua',
+            'avalie', 'considere', 'entenda', 'compreenda', 'descoberta',
+            'descobrimentos', 'suspeito',
             'detalhado', 'profundo', 'aprofunde', 'discuta', 'comente', 'o que',
             'quais', 'como', 'por que', 'porque'
         ]
@@ -638,27 +727,23 @@ class OrchestratorAgent(BaseAgent):
         if viz_type and has_supabase_data:
             self.logger.info("🎨 Redirecionando para CSV analysis (visualização solicitada)")
             return QueryType.CSV_ANALYSIS
-        
-        # PRIORIDADE 2: Se há palavras-chave de estatísticas (min, max, intervalo), usar CSV_ANALYSIS
-        # porque o agente CSV tem método específico para calcular estatísticas reais
-        stats_keywords = [
-            'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
-            'variância', 'desvio', 'percentil', 'quartil',
-            'média', 'mediana', 'mean', 'median', 'tendência central'
-        ]
-        if has_supabase_data and any(kw in query_lower for kw in stats_keywords):
-            self.logger.info("📊 Redirecionando para CSV analysis (estatísticas solicitadas)")
+
+        # CORREÇÃO ABSOLUTA: Se a query contém termos de intervalo, mínimo, máximo, range, amplitude, SEMPRE usar CSV_ANALYSIS
+        interval_terms = ['intervalo', 'mínimo', 'máximo', 'range', 'amplitude']
+        if any(term in query_lower for term in interval_terms):
+            self.logger.info("🔒 Forçando roteamento para CSV analysis por conter termos de intervalo/mínimo/máximo/range/amplitude")
             return QueryType.CSV_ANALYSIS
-        
-        # NOVA LÓGICA: Se há dados no Supabase (mas não visualização ou stats), priorizar LLM analysis
-        if has_supabase_data and (csv_score > 0 or data_score > 0):
-            self.logger.info("🔄 Redirecionando para LLM analysis (dados no Supabase detectados)")
-            return QueryType.LLM_ANALYSIS
+
+        # PRIORIDADE 2: Se há dados no Supabase E score CSV alto, usar CSV_ANALYSIS (RAGDataAgent)
+        # Isso permite perguntas sobre estatísticas, intervalos, distribuição irem para o RAGDataAgent
+        if has_supabase_data and csv_score >= 2:
+            self.logger.info("📊 Redirecionando para CSV analysis (dados no Supabase + análise estatística detectada)")
+            return QueryType.CSV_ANALYSIS
         
         # Adicionar peso do contexto
         if has_file_context:
             if any(ext in str(context.get('file_path', '')).lower() for ext in ['.csv', '.xlsx', '.json']):
-                csv_score += 1  # Reduzido para não sobrepor LLM
+                csv_score += 1
         
         # Verificar se precisa de múltiplos agentes
         scores = [csv_score, rag_score, data_score, llm_score]
@@ -688,14 +773,19 @@ class OrchestratorAgent(BaseAgent):
             return QueryType.GENERAL
     
     def _handle_csv_analysis(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Delega análise CSV para o agente especializado."""
+        """Delega análise CSV para o agente especializado.
+        
+        LOGGING: Registra decisão de roteamento e agente utilizado.
+        """
         if "csv" not in self.agents:
             return self._build_response(
                 "❌ Agente de análise CSV não está disponível",
                 metadata={"error": True, "agents_used": []}
             )
         
-        self.logger.info("📊 Delegando para agente CSV")
+        # Log da decisão de delegação
+        self.logger.info("📊 Delegando para agente CSV (EmbeddingsAnalysisAgent)")
+        self.logger.info(f"🔍 Query: '{query[:80]}...'")
         
         # Preparar contexto para o agente CSV
         csv_context = context or {}
@@ -703,8 +793,23 @@ class OrchestratorAgent(BaseAgent):
         # Se há dados carregados no orquestrador, passar para o agente
         if self.current_data_context:
             csv_context.update(self.current_data_context)
+            self.logger.debug(f"📦 Contexto de dados atual: {list(self.current_data_context.keys())}")
         
-        result = self.agents["csv"].process(query, csv_context)
+        # Executar processamento no agente especializado (síncrono)
+        try:
+            result = self.agents["csv"].process(query, csv_context)
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao executar agente CSV: {e}")
+            return self._build_response(
+                f"❌ Erro ao executar agente CSV: {str(e)}",
+                metadata={"error": True, "agents_used": []}
+            )
+        
+        # Log do resultado
+        if result.get("metadata", {}).get("error"):
+            self.logger.error(f"❌ Erro no agente CSV: {result.get('response', 'Erro desconhecido')}")
+        else:
+            self.logger.info("✅ Análise CSV concluída com sucesso")
         
         # Atualizar contexto se dados foram carregados
         if result.get("metadata") and not result["metadata"].get("error"):
@@ -722,8 +827,150 @@ class OrchestratorAgent(BaseAgent):
         
         self.logger.info("🔍 Delegando para agente RAG")
         
-        result = self.agents["rag"].process(query, context)
+        try:
+            result = self.agents["rag"].process(query, context)
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao executar agente RAG: {e}")
+            return self._build_response(
+                f"❌ Erro ao executar agente RAG: {str(e)}",
+                metadata={"error": True, "agents_used": []}
+            )
+
         return self._enhance_response(result, ["rag"])
+
+    # ========================================================================
+    # VERSÃO ASSÍNCRONA DOS HANDLERS (USADA POR process_with_persistent_memory)
+    # ========================================================================
+    async def _handle_csv_analysis_async(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Versão async que aguarda agentes assíncronos quando necessário."""
+        if "csv" not in self.agents:
+            return self._build_response(
+                "❌ Agente de análise CSV não está disponível",
+                metadata={"error": True, "agents_used": []}
+            )
+
+        self.logger.info("📊 Delegando para agente CSV (RAGDataAgent) [async]")
+        # Para queries de intervalo, limpar contexto para evitar poluição por histórico/memória
+        interval_terms = ['intervalo', 'mínimo', 'máximo', 'range', 'amplitude']
+        query_lower = query.lower()
+        if any(term in query_lower for term in interval_terms):
+            csv_context = {}  # contexto limpo, sem memória/histórico
+            self.logger.info("🧹 Contexto limpo aplicado para consulta de intervalo/min/max/range/amplitude")
+        else:
+            csv_context = context or {}
+            if self.current_data_context:
+                csv_context.update(self.current_data_context)
+        
+        # ✅ CORREÇÃO: Detectar solicitação de visualização e setar flag no contexto
+        viz_type = self._detect_visualization_type(query)
+        if viz_type:
+            csv_context['visualization_requested'] = True
+            csv_context['visualization_type'] = viz_type
+            self.logger.info(f"📊 Flag de visualização setada: {viz_type}")
+
+        try:
+            # RAGDataAgent.process() é async e requer session_id opcional
+            session_id = csv_context.get('session_id') or self._current_session_id
+            result = await self.agents["csv"].process(query, csv_context, session_id=session_id)
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao executar agente CSV (async): {e}", exc_info=True)
+            return self._build_response(
+                f"❌ Erro ao executar agente CSV: {str(e)}",
+                metadata={"error": True, "agents_used": []}
+            )
+
+        if result.get("metadata", {}).get("error"):
+            self.logger.error(f"❌ Erro no agente CSV: {result.get('response', result.get('content', 'Erro desconhecido'))}")
+        else:
+            self.logger.info("✅ Análise CSV concluída com sucesso [async]")
+
+        if result.get("metadata") and not result["metadata"].get("error"):
+            self.current_data_context.update(result["metadata"])
+
+        return self._enhance_response(result, ["rag_data_agent"])
+
+    async def _handle_rag_search_async(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if "rag" not in self.agents:
+            return self._build_response(
+                "❌ Agente RAG não está disponível",
+                metadata={"error": True, "agents_used": []}
+            )
+
+        self.logger.info("🔍 Delegando para agente RAG [async]")
+        try:
+            result_candidate = self.agents["rag"].process(query, context)
+            import inspect
+            if inspect.isawaitable(result_candidate):
+                result = await result_candidate
+            else:
+                result = result_candidate
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao executar agente RAG (async): {e}")
+            return self._build_response(
+                f"❌ Erro ao executar agente RAG: {str(e)}",
+                metadata={"error": True, "agents_used": []}
+            )
+
+        return self._enhance_response(result, ["rag"])
+
+    async def _process_async(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Versão assíncrona de process() utilizada por process_with_persistent_memory."""
+        self.logger.info(f"🎯 [async] Processando consulta: '{query[:50]}...'")
+
+        # Verificar conformidade com embeddings-only
+        if not self._ensure_embeddings_compliance():
+            return {
+                'success': False,
+                'error': 'Dados não disponíveis via embeddings. Sistema em conformidade apenas com dados indexados.',
+                'message': 'Por favor, certifique-se de que os dados foram adequadamente indexados na tabela embeddings.',
+                'suggestion': 'Execute o processo de ingestão para indexar os dados primeiro.'
+            }
+
+        try:
+            # Adicionar à história compatibilidade
+            self.conversation_history.append({
+                "type": "user_query",
+                "query": query,
+                "timestamp": self._get_timestamp(),
+                "context": context
+            })
+
+            query_type = self._classify_query(query, context)
+            self.logger.info(f"📝 [async] Tipo de consulta identificado: {query_type.value}")
+
+            # Processar baseado no tipo (usar versões async quando disponível)
+            if query_type == QueryType.CSV_ANALYSIS:
+                result = await self._handle_csv_analysis_async(query, context)
+            elif query_type == QueryType.RAG_SEARCH:
+                result = await self._handle_rag_search_async(query, context)
+            elif query_type == QueryType.DATA_LOADING:
+                result = self._handle_data_loading(query, context)
+            elif query_type == QueryType.LLM_ANALYSIS:
+                # LLM analysis pode chamar agentes sync/async internamente
+                # Reusar implementação síncrona e permitir que ela chame agentes sync
+                result = self._handle_llm_analysis(query, context)
+            elif query_type == QueryType.HYBRID:
+                result = self._handle_hybrid_query(query, context)
+            elif query_type == QueryType.GENERAL:
+                result = self._handle_general_query(query, context)
+            else:
+                result = self._handle_unknown_query(query, context)
+
+            # Adicionar resposta ao histórico
+            self.conversation_history.append({
+                "type": "system_response",
+                "response": result,
+                "timestamp": self._get_timestamp()
+            })
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Erro no processamento async: {str(e)}")
+            return self._build_response(
+                f"❌ Erro no processamento da consulta: {str(e)}",
+                metadata={"error": True, "query_type": "error", "agents_used": []}
+            )
     
     def _handle_data_loading(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Processa carregamento de dados."""
@@ -1328,8 +1575,8 @@ context = {"file_path": "fraude.csv"}
                     cached_result['metadata']['from_cache'] = True
                     return cached_result
             
-            # 4. Processar consulta normalmente
-            result = self.process(query, context)
+            # 4. Processar consulta usando versão assíncrona (evita coroutines não aguardadas)
+            result = await self._process_async(query, context)
             
             # 5. Salvar interação na memória persistente
             if self.has_memory and self._current_session_id:
@@ -1361,12 +1608,19 @@ context = {"file_path": "fraude.csv"}
                 memory_stats = await self.get_memory_stats()
                 result.setdefault('metadata', {})['memory_stats'] = memory_stats
             
+            # 9. Garantir compatibilidade do campo 'content' (RAGDataAgent retorna 'response')
+            if 'response' in result and 'content' not in result:
+                result['content'] = result['response']
+            
             return result
             
         except Exception as e:
-            self.logger.error(f"Erro no processamento com memória: {e}")
-            # Fallback para processamento sem memória
-            return self.process(query, context)
+            self.logger.error(f"Erro no processamento com memória: {e}", exc_info=True)
+            # Fallback para processamento sem memória sincronamente
+            try:
+                return self.process(query, context)
+            except Exception:
+                return self._build_response(f"❌ Erro no processamento com memória: {str(e)}", metadata={"error": True})
     
     # ========================================================================
     # MÉTODOS DE GESTÃO DE MEMÓRIA PARA COMPATIBILIDADE

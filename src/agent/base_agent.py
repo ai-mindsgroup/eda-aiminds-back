@@ -24,11 +24,11 @@ except ImportError:
     LLMResponse = None
 
 try:
-    from src.memory.langchain_supabase_memory import LangChainSupabaseMemory
+    from src.memory.supabase_memory import SupabaseMemoryManager
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False
-    LangChainSupabaseMemory = None
+    SupabaseMemoryManager = None
 
 class AgentError(Exception):
     """Exceção específica para erros em agentes."""
@@ -57,10 +57,10 @@ class BaseAgent(ABC):
         
         if self._memory_enabled:
             try:
-                self._memory_manager = LangChainSupabaseMemory(agent_name=self.name)
+                self._memory_manager = SupabaseMemoryManager(agent_name=self.name)
                 self.logger.info(f"Memória LangChain+Supabase habilitada para agente {name}")
             except Exception as e:
-                self.logger.warning(f"Falha ao inicializar memória LangChainSupabase: {e}")
+                self.logger.warning(f"Falha ao inicializar memória Supabase: {e}")
                 self._memory_enabled = False
         
         self.logger.info(f"Agente {name} inicializado: {description}")
@@ -236,16 +236,36 @@ class BaseAgent(ABC):
             hours: Horas de contexto para recuperar
             
         Returns:
-            Contexto agregado da conversação
+            Contexto agregado da conversação com mensagens recentes
         """
         if not self.has_memory or not self._current_session_id:
             return {}
         
         try:
-            context = await self._memory_manager.get_recent_context(
-                self._current_session_id, hours
+            from datetime import datetime, timedelta
+            
+            # Recupera mensagens desde 'hours' atrás
+            since = datetime.now() - timedelta(hours=hours)
+            messages = await self._memory_manager.get_conversation_history(
+                self._current_session_id,
+                since=since
             )
-            self.logger.debug(f"Contexto recuperado: {hours}h de histórico")
+            
+            # Formata para estrutura esperada
+            context = {
+                'recent_messages': [
+                    {
+                        'type': msg.message_type.value,
+                        'content': msg.content,
+                        'timestamp': msg.timestamp.isoformat() if msg.timestamp else None
+                    }
+                    for msg in messages
+                ],
+                'message_count': len(messages),
+                'time_range_hours': hours
+            }
+            
+            self.logger.debug(f"Contexto recuperado: {len(messages)} mensagens das últimas {hours}h")
             return context
             
         except Exception as e:
@@ -270,6 +290,204 @@ class BaseAgent(ABC):
         except Exception as e:
             self.logger.error(f"Erro ao recuperar estatísticas: {e}")
             return {'memory_available': False, 'error': str(e)}
+    
+    async def save_conversation_embedding(self, conversation_summary: str,
+                                        embedding_vector: list,
+                                        metadata: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Salva embedding de conversação na tabela agent_memory_embeddings.
+        
+        Este método persiste embeddings da conversação para permitir busca semântica
+        em históricos de interações, mantendo contexto entre sessões.
+        
+        Args:
+            conversation_summary: Resumo textual da conversação
+            embedding_vector: Vetor de embedding (1536 dimensões)
+            metadata: Metadados contextuais (ex: session_id, timestamp, tópicos)
+            
+        Returns:
+            True se salvo com sucesso, False caso contrário
+        """
+        if not self.has_memory or not self._current_session_id:
+            self.logger.debug("Memória não disponível para salvar embedding")
+            return False
+        
+        try:
+            from src.memory.memory_types import MemoryEmbedding, EmbeddingType
+            from datetime import datetime
+            from uuid import UUID
+            
+            # Busca UUID da sessão
+            session_info = await self._memory_manager.get_session(self._current_session_id)
+            if not session_info:
+                self.logger.error(f"Sessão não encontrada: {self._current_session_id}")
+                return False
+            
+            # Prepara metadados enriquecidos
+            enriched_metadata = {
+                'agent_name': self.name,
+                'session_id': self._current_session_id,
+                'timestamp': datetime.now().isoformat(),
+                'conversation_length': len(conversation_summary),
+            }
+            if metadata:
+                enriched_metadata.update(metadata)
+            
+            # Cria objeto MemoryEmbedding
+            memory_embedding = MemoryEmbedding(
+                session_id=UUID(str(session_info.id)),
+                agent_name=self.name,
+                embedding_type=EmbeddingType.SUMMARY,  # SUMMARY para resumo de conversação
+                source_text=conversation_summary,
+                embedding=embedding_vector,
+                similarity_threshold=0.7,  # Threshold padrão para similaridade
+                created_at=datetime.now(),
+                metadata=enriched_metadata
+            )
+            
+            # Salva no Supabase
+            success = await self._memory_manager.save_embedding(memory_embedding)
+            
+            if success:
+                self.logger.info(f"Embedding de conversação salvo: session={self._current_session_id}")
+            else:
+                self.logger.warning("Falha ao salvar embedding de conversação")
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao salvar embedding de conversação: {e}")
+            return False
+    
+    async def generate_conversation_embedding(self, conversation_text: str) -> Optional[list]:
+        """
+        Gera embedding de um texto de conversação usando sentence-transformers.
+        
+        Normaliza o tamanho para 1536 dimensões (padrão esperado pelo sistema).
+        
+        Args:
+            conversation_text: Texto da conversação para gerar embedding
+            
+        Returns:
+            Lista com vetor de embedding (1536 dimensões) ou None se erro
+        """
+        try:
+            from sentence_transformers import SentenceTransformer
+            import numpy as np
+            
+            # Carrega modelo de embeddings (cache interno do sentence-transformers)
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            
+            # Gera embedding (384 dimensões)
+            embedding = model.encode(conversation_text, convert_to_numpy=True)
+            
+            # Normaliza para 1536 dimensões (padrão do sistema)
+            target_dim = 1536
+            current_dim = len(embedding)
+            
+            if current_dim < target_dim:
+                # Padding com zeros
+                padding = np.zeros(target_dim - current_dim)
+                normalized_embedding = np.concatenate([embedding, padding])
+                self.logger.debug(f"Embedding expandido de {current_dim} para {target_dim} dimensões")
+            elif current_dim > target_dim:
+                # Truncamento
+                normalized_embedding = embedding[:target_dim]
+                self.logger.debug(f"Embedding truncado de {current_dim} para {target_dim} dimensões")
+            else:
+                normalized_embedding = embedding
+            
+            # Converte para lista Python
+            embedding_list = normalized_embedding.tolist()
+            
+            self.logger.debug(f"Embedding gerado: {len(embedding_list)} dimensões (normalizado)")
+            return embedding_list
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao gerar embedding: {e}")
+            return None
+
+    
+    async def persist_conversation_memory(self, hours_back: int = 24) -> bool:
+        """
+        Persiste embeddings da conversação recente em agent_memory_embeddings.
+        
+        Este método é chamado periodicamente ou ao fim de uma sessão para garantir
+        que o histórico conversacional seja salvo como embeddings para busca futura.
+        
+        Args:
+            hours_back: Quantas horas de conversação incluir (padrão: 24h)
+            
+        Returns:
+            True se persistência bem-sucedida
+        """
+        if not self.has_memory or not self._current_session_id:
+            self.logger.debug("Memória não disponível para persistir conversação")
+            return False
+        
+        try:
+            from datetime import datetime, timedelta
+            
+            # Recupera contexto conversacional
+            conversation_context = await self.recall_conversation_context(hours=hours_back)
+            
+            if not conversation_context or not conversation_context.get('recent_messages'):
+                self.logger.debug("Nenhum contexto conversacional para persistir")
+                return False
+            
+            # Extrai histórico de mensagens
+            messages = conversation_context['recent_messages']
+            if not messages:
+                self.logger.debug("Nenhuma mensagem recente para persistir")
+                return False
+            
+            self.logger.debug(f"Persistindo {len(messages)} mensagens de conversação")
+            
+            # Cria resumo textual da conversação
+            conversation_summary = "\n".join([
+                f"[{msg.get('type', 'unknown')}] {msg.get('content', '')}"
+                for msg in messages
+            ])
+            
+            if len(conversation_summary) < 10:
+                self.logger.warning("Resumo de conversação muito curto, pulando persistência")
+                return False
+            
+            # Gera embedding da conversação
+            embedding = await self.generate_conversation_embedding(conversation_summary)
+            
+            if not embedding:
+                self.logger.error("Falha ao gerar embedding da conversação")
+                return False
+            
+            # Prepara metadados
+            metadata = {
+                'message_count': len(messages),
+                'time_range_hours': hours_back,
+                'summary_length': len(conversation_summary),
+                'first_message_time': messages[0].get('timestamp') if messages else None,
+                'last_message_time': messages[-1].get('timestamp') if messages else None,
+            }
+            
+            # Salva embedding no Supabase
+            success = await self.save_conversation_embedding(
+                conversation_summary=conversation_summary,
+                embedding_vector=embedding,
+                metadata=metadata
+            )
+            
+            if success:
+                self.logger.info(f"✅ Memória conversacional persistida: {len(messages)} mensagens")
+            else:
+                self.logger.error("❌ Falha ao salvar embedding no Supabase")
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao persistir memória conversacional: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     # ========================================================================
     # MÉTODOS DE VISUALIZAÇÃO
@@ -392,6 +610,16 @@ class BaseAgent(ABC):
                     model_used=response.get('metadata', {}).get('model_used'),
                     metadata=response.get('metadata', {})
                 )
+                
+                # Persiste embeddings de conversação periodicamente (a cada 5 interações)
+                # ou se explicitamente solicitado via metadata
+                should_persist = (
+                    response.get('metadata', {}).get('persist_conversation_memory', False)
+                )
+                
+                if should_persist:
+                    self.logger.debug("Persistindo embeddings de conversação...")
+                    await self.persist_conversation_memory(hours_back=24)
             
             # Adiciona informações de memória à resposta
             if self.has_memory:

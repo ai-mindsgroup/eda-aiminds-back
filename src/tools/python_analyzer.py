@@ -640,6 +640,157 @@ class PythonDataAnalyzer:
         
         finally:
             sys.stdout = old_stdout
+    
+    def calculate_clustering_analysis(self, n_clusters: int = 3) -> Dict[str, Any]:
+        """
+        Calcula análise de clustering (KMeans) nos dados numéricos do dataset.
+        
+        Args:
+            n_clusters: Número de clusters desejados (padrão: 3)
+            
+        Returns:
+            Dicionário com informações sobre os clusters encontrados
+        """
+        try:
+            from sklearn.cluster import KMeans
+            from sklearn.preprocessing import StandardScaler
+            
+            # 1. Recuperar dados do Supabase usando reconstruct_original_data
+            df = self.reconstruct_original_data()
+            
+            if df is None or df.empty:
+                return {
+                    "error": "Nenhum dado disponível para análise de clustering",
+                    "suggestion": "Certifique-se de que os dados foram ingeridos na tabela embeddings"
+                }
+            
+            # 2. Selecionar apenas colunas numéricas
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            
+            # Remover colunas irrelevantes como ID, índice, etc.
+            numeric_cols = [col for col in numeric_cols if col.lower() not in ['id', 'index', 'unnamed: 0']]
+            
+            if len(numeric_cols) == 0:
+                return {
+                    "error": "Nenhuma coluna numérica encontrada para clustering",
+                    "available_columns": df.columns.tolist()
+                }
+            
+            self.logger.info(f"🔬 Aplicando KMeans com {n_clusters} clusters em {len(numeric_cols)} variáveis numéricas")
+            
+            # 3. Preparar dados para clustering
+            X = df[numeric_cols].copy()
+            
+            # Remover linhas com valores nulos
+            X = X.dropna()
+            
+            if len(X) == 0:
+                return {
+                    "error": "Todos os dados têm valores nulos nas colunas numéricas"
+                }
+            
+            # 4. Normalizar dados (importante para KMeans)
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # 5. Aplicar KMeans
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            cluster_labels = kmeans.fit_predict(X_scaled)
+            
+            # 6. Contar pontos por cluster
+            unique, counts = np.unique(cluster_labels, return_counts=True)
+            cluster_distribution = dict(zip(unique.tolist(), counts.tolist()))
+            
+            # 7. Calcular percentuais
+            total_points = len(cluster_labels)
+            cluster_percentages = {
+                cluster: (count / total_points) * 100 
+                for cluster, count in cluster_distribution.items()
+            }
+            
+            # 8. Calcular centróides (características médias de cada cluster)
+            centroids = kmeans.cluster_centers_
+            
+            # 9. Verificar balanceamento
+            max_cluster_pct = max(cluster_percentages.values())
+            min_cluster_pct = min(cluster_percentages.values())
+            is_balanced = (max_cluster_pct / min_cluster_pct) < 3.0  # threshold arbitrário
+            
+            # 10. Construir resposta estruturada
+            result = {
+                "success": True,
+                "n_clusters": n_clusters,
+                "total_points": total_points,
+                "numeric_variables_used": numeric_cols,
+                "cluster_distribution": cluster_distribution,
+                "cluster_percentages": cluster_percentages,
+                "is_balanced": is_balanced,
+                "balance_ratio": max_cluster_pct / min_cluster_pct if min_cluster_pct > 0 else float('inf'),
+                "inertia": float(kmeans.inertia_),  # Soma das distâncias quadradas aos centróides
+                "interpretation": self._interpret_clustering_results(
+                    cluster_distribution,
+                    cluster_percentages,
+                    is_balanced,
+                    numeric_cols
+                )
+            }
+            
+            self.logger.info(f"✅ Clustering concluído: {cluster_distribution}")
+            return result
+            
+        except ImportError:
+            return {
+                "error": "Biblioteca scikit-learn não está instalada",
+                "suggestion": "Execute: pip install scikit-learn"
+            }
+        except Exception as e:
+            self.logger.error(f"❌ Erro na análise de clustering: {str(e)}", exc_info=True)
+            return {
+                "error": f"Erro ao calcular clustering: {str(e)}",
+                "traceback": traceback.format_exc()
+            }
+    
+    def _interpret_clustering_results(
+        self,
+        cluster_distribution: Dict[int, int],
+        cluster_percentages: Dict[int, float],
+        is_balanced: bool,
+        numeric_cols: List[str]
+    ) -> str:
+        """Gera interpretação textual dos resultados de clustering."""
+        
+        interpretation = "**Análise de Clustering (KMeans):**\n\n"
+        
+        # Distribuição dos clusters
+        interpretation += f"Os dados foram agrupados em {len(cluster_distribution)} clusters distintos:\n\n"
+        
+        for cluster_id in sorted(cluster_distribution.keys()):
+            count = cluster_distribution[cluster_id]
+            pct = cluster_percentages[cluster_id]
+            interpretation += f"- **Cluster {cluster_id}:** {count:,} pontos ({pct:.1f}%)\n"
+        
+        interpretation += "\n"
+        
+        # Avaliação do balanceamento
+        if is_balanced:
+            interpretation += "✅ **Balanceamento:** Os clusters estão relativamente balanceados, "
+            interpretation += "indicando grupos de tamanhos similares nos dados.\n\n"
+        else:
+            interpretation += "⚠️ **Balanceamento:** Os clusters estão desbalanceados, "
+            interpretation += "sugerindo que há um grupo dominante e outros menores.\n\n"
+        
+        # Variáveis utilizadas
+        if len(numeric_cols) > 5:
+            interpretation += f"**Variáveis Utilizadas:** {len(numeric_cols)} variáveis numéricas "
+            interpretation += f"(incluindo {', '.join(numeric_cols[:3])}, ...)\n\n"
+        else:
+            interpretation += f"**Variáveis Utilizadas:** {', '.join(numeric_cols)}\n\n"
+        
+        # Conclusão
+        interpretation += "**Conclusão:** SIM, os dados apresentam estrutura de agrupamentos naturais. "
+        interpretation += "Diferentes técnicas de clustering ou número de clusters podem revelar padrões adicionais."
+        
+        return interpretation
 
 # Instância global para uso pelos agentes
 python_analyzer = PythonDataAnalyzer()

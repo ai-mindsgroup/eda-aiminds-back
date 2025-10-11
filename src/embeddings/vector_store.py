@@ -2,10 +2,15 @@
 
 Este módulo gerencia o armazenamento e busca de embeddings no banco de dados,
 implementando funcionalidades de RAG (Retrieval Augmented Generation).
+
+IMPORTANTE: PostgREST/Supabase API retorna vetores (tipo VECTOR do PostgreSQL) 
+como strings ao invés de arrays. Este módulo implementa parsing defensivo para 
+garantir que todos os embeddings sejam listas de floats antes de operações vetoriais.
 """
 from __future__ import annotations
 import uuid
 import json
+import ast
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -20,6 +25,69 @@ logger = get_logger(__name__)
 VECTOR_DIMENSIONS = 384
 
 
+def parse_embedding_from_api(embedding: Any, expected_dim: int = VECTOR_DIMENSIONS) -> List[float]:
+    """Converte embedding da API Supabase para lista de floats.
+    
+    PostgREST/Supabase API retorna colunas do tipo VECTOR(n) como strings
+    ao invés de arrays nativos. Esta função garante parsing defensivo.
+    
+    Args:
+        embedding: Embedding retornado da API (pode ser string, lista ou None)
+        expected_dim: Dimensões esperadas do vetor (default: 384)
+    
+    Returns:
+        Lista de floats com o embedding
+    
+    Raises:
+        ValueError: Se o embedding não puder ser convertido ou tiver dimensões incorretas
+    
+    Exemplos:
+        >>> parse_embedding_from_api("[0.1, 0.2, 0.3]")
+        [0.1, 0.2, 0.3]
+        >>> parse_embedding_from_api([0.1, 0.2, 0.3])
+        [0.1, 0.2, 0.3]
+    """
+    if embedding is None:
+        raise ValueError("Embedding é None")
+    
+    # Caso 1: Já é uma lista
+    if isinstance(embedding, list):
+        parsed = embedding
+    
+    # Caso 2: É uma string (comportamento padrão do PostgREST com tipo VECTOR)
+    elif isinstance(embedding, str):
+        try:
+            # Tentar ast.literal_eval (mais seguro que eval)
+            parsed = ast.literal_eval(embedding)
+        except (ValueError, SyntaxError):
+            try:
+                # Fallback: json.loads
+                parsed = json.loads(embedding)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Não foi possível parsear embedding string: {str(e)}")
+    
+    else:
+        raise ValueError(f"Tipo de embedding não suportado: {type(embedding)}")
+    
+    # Validar que é uma lista
+    if not isinstance(parsed, list):
+        raise ValueError(f"Embedding parseado não é lista: {type(parsed)}")
+    
+    # Converter todos os elementos para float
+    try:
+        parsed_floats = [float(x) for x in parsed]
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Não foi possível converter elementos para float: {str(e)}")
+    
+    # Validar dimensões
+    if len(parsed_floats) != expected_dim:
+        raise ValueError(
+            f"Embedding tem {len(parsed_floats)} dimensões, esperado {expected_dim}"
+        )
+    
+    return parsed_floats
+
+
 @dataclass
 class VectorSearchResult:
     """Resultado de uma busca vetorial."""
@@ -29,6 +97,7 @@ class VectorSearchResult:
     embedding_id: str
     source: str
     chunk_index: int
+    embedding: Optional[List[float]] = None  # Campo para armazenar embedding parseado
 
 
 @dataclass
@@ -110,9 +179,13 @@ class VectorStore:
             if result.chunk_metadata:
                 metadata.update(result.chunk_metadata)
             
+            # Converter embedding para formato PostgreSQL vector
+            # O client Supabase requer string no formato "[1.0,2.0,3.0]"
+            embedding_str = "[" + ",".join(str(float(x)) for x in result.embedding) + "]"
+            
             insert_data.append({
                 "chunk_text": result.chunk_content,
-                "embedding": result.embedding,
+                "embedding": embedding_str,
                 "metadata": metadata
             })
         
@@ -250,6 +323,7 @@ class VectorStore:
             # Converter resultados
             results = []
             for row in response.data:
+                embedding_parsed = parse_embedding_from_api(row['embedding'])
                 result = VectorSearchResult(
                     chunk_text=row['chunk_text'],
                     similarity_score=float(row['similarity']),
@@ -258,6 +332,7 @@ class VectorStore:
                     source=row['metadata'].get('source', 'unknown'),
                     chunk_index=row['metadata'].get('chunk_index', 0)
                 )
+                result.embedding = embedding_parsed
                 results.append(result)
             
             self.logger.info(f"Encontrados {len(results)} resultados similares")
@@ -284,6 +359,7 @@ class VectorStore:
             for row in response.data:
                 # Similaridade mock baseada no comprimento do texto (apenas para fallback)
                 mock_similarity = min(0.9, len(row['chunk_text']) / 1000)
+                embedding_parsed = parse_embedding_from_api(row['embedding'])
                 
                 result = VectorSearchResult(
                     chunk_text=row['chunk_text'],
@@ -293,6 +369,7 @@ class VectorStore:
                     source=row['metadata'].get('source', 'unknown'),
                     chunk_index=row['metadata'].get('chunk_index', 0)
                 )
+                result.embedding = embedding_parsed
                 results.append(result)
             
             # Ordenar por similarity mock e limitar
@@ -312,10 +389,11 @@ class VectorStore:
                 return None
             
             row = response.data[0]
+            embedding_parsed = parse_embedding_from_api(row['embedding'])
             return StoredEmbedding(
                 id=row['id'],
                 chunk_text=row['chunk_text'],
-                embedding=row['embedding'],
+                embedding=embedding_parsed,
                 metadata=row['metadata'] or {},
                 created_at=datetime.fromisoformat(row['created_at'].replace('Z', '+00:00'))
             )

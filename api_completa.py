@@ -32,7 +32,7 @@ if MULTIAGENT_AVAILABLE:
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import uvicorn
 import sys
@@ -55,12 +55,12 @@ logging.basicConfig(level=logging.INFO)
 
 # Importa o LLM Router
 try:
-    from src.llm.llm_router import LLMRouter, create_llm_with_routing, ComplexityLevel
+    from src.llm.langchain_manager import LangChainLLMManager, get_langchain_llm_manager, LLMConfig, LLMProvider
     LLM_ROUTER_AVAILABLE = True
-    logger.info("✅ LLM Router carregado - roteamento inteligente ativo")
+    logger.info("✅ LangChainLLMManager carregado - roteamento inteligente ativo")
 except Exception as e:
     LLM_ROUTER_AVAILABLE = False
-    logger.warning(f"⚠️ LLM Router não disponível: {e}")
+    logger.warning(f"⚠️ LangChainLLMManager não disponível: {e}")
 
 # Flags de disponibilidade
 MULTIAGENT_AVAILABLE = False
@@ -71,7 +71,7 @@ CSV_AGENT_AVAILABLE = False
 print("🔧 Carregando sistema multiagente...")
 
 try:
-    from src.settings import GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_KEY
+    from src.settings import GOOGLE_API_KEY, SUPABASE_URL, SUPABASE_KEY, API_HOST, API_PORT
     logger.info("✅ Configurações carregadas")
     
     if not GOOGLE_API_KEY:
@@ -107,8 +107,10 @@ if MULTIAGENT_AVAILABLE:
 
 # Configurações
 MAX_FILE_SIZE = 999 * 1024 * 1024  # 999MB
-PORT = 8001  # Porta diferente da API simples
 API_TIMEOUT = 120  # Timeout de 120 segundos para operações longas
+
+# HOST e PORT são importados de src.settings (configuráveis via .env)
+# Não definir PORT aqui - usar API_HOST e API_PORT de settings.py
 
 app = FastAPI(
     title="EDA AI Minds - API Completa",
@@ -142,7 +144,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default"
     use_memory: Optional[bool] = True
-    file_id: Optional[str] = None
+    # Nota: file_id removido - sistema consulta base de dados diretamente
 
 class ChatResponse(BaseModel):
     response: str
@@ -159,6 +161,12 @@ class FraudDetectionRequest(BaseModel):
     transaction_data: Optional[Dict[str, Any]] = None
     analysis_depth: Optional[str] = "comprehensive"  # basic, comprehensive, advanced
 
+class FraudDetectionImage(BaseModel):
+    name: str  # Nome da variável/coluna
+    url: Optional[str] = None  # URL do arquivo PNG
+    base64: Optional[str] = None  # Imagem em base64 (opcional)
+    description: Optional[str] = None  # Descrição/metadados
+
 class FraudDetectionResponse(BaseModel):
     fraud_score: float
     risk_level: str  # low, medium, high, critical
@@ -166,6 +174,7 @@ class FraudDetectionResponse(BaseModel):
     recommendations: List[str]
     analysis_details: Dict[str, Any]
     processing_time: float
+    images: Optional[List[FraudDetectionImage]] = None  # Lista de imagens associadas
 
 class CSVUploadResponse(BaseModel):
     file_id: str
@@ -363,133 +372,80 @@ async def chat_with_ai(request: ChatRequest):
         
         # 🧠 ROTEAMENTO INTELIGENTE DE LLM
         llm_config = None
+        llm_model_used = None
+        complexity_detected = None
+        
         if LLM_ROUTER_AVAILABLE:
-            # Prepara contexto para roteamento
-            routing_context = {}
-            if request.file_id and request.file_id in uploaded_files:
-                file_info = uploaded_files[request.file_id]
-                routing_context["dataset_size"] = {
-                    "rows": file_info.get("rows", 0),
-                    "columns": file_info.get("columns", 0)
-                }
-            
-            # Detecta complexidade e seleciona modelo
-            llm_config = create_llm_with_routing(request.message, routing_context)
-            logger.info(f"🧠 LLM Router: {llm_config['model_name']} (Complexidade: {llm_config['complexity_name']})")
-            logger.info(f"   Temperature: {llm_config['temperature']}, Reasoning: {llm_config['reasoning']}")
+            try:
+                # Usa LangChainLLMManager para gerenciar LLMs
+                llm_manager = get_langchain_llm_manager()
+                llm_model_used = llm_manager.active_provider.value
+                logger.info(f"🧠 LLM Manager: {llm_model_used} ativo")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao inicializar LLM Manager: {e}")
+                llm_model_used = "fallback"
         
         # 🎯 ANÁLISE COM SISTEMA MULTIAGENTE
-        # Verifica se há file_id para análise contextual COM ORCHESTRATOR
-        if request.file_id:
-            if request.file_id not in uploaded_files:
-                raise HTTPException(status_code=404, detail="Arquivo CSV não encontrado")
-            
-            logger.info(f"🤖 Iniciando análise multiagente para file_id: {request.file_id}")
-            
-            # Carrega o DataFrame específico
-            df = load_csv_by_file_id(request.file_id)
-            if df is None:
-                raise HTTPException(status_code=500, detail="Erro ao carregar dados do CSV")
-            
-            file_info = uploaded_files[request.file_id]
-            
-            # 🚀 CHAMA O ORQUESTRADOR COM CONTEXTO DO CSV
-            if MULTIAGENT_AVAILABLE and ORCHESTRATOR_AVAILABLE:
-                try:
-                    # Carrega o orquestrador se ainda não foi carregado
-                    if orchestrator is None:
-                        logger.info("📦 Carregando orquestrador dinamicamente...")
-                        from src.agent.orchestrator_agent import OrchestratorAgent
-                        orchestrator = OrchestratorAgent()
-                        logger.info("✅ Orquestrador carregado com sucesso")
-                    
-                    # Cria contexto enriquecido com informações do CSV
-                    csv_context = f"""
-                    Arquivo CSV carregado: {file_info['filename']}
-                    Dimensões: {file_info['rows']} linhas x {file_info['columns']} colunas
-                    Colunas disponíveis: {', '.join(df.columns.tolist()[:10])}
-                    
-                    Pergunta do usuário: {request.message}
-                    
-                    Por favor, analise os dados usando todos os agentes disponíveis.
-                    """
-                    
-                    logger.info("🧠 Enviando para orquestrador com contexto CSV...")
-                    result = orchestrator.process_query(
-                        query=csv_context,
-                        session_id=session_id,
-                        use_memory=request.use_memory
-                    )
-                    
-                    response_text = result.get('response', 'Análise multiagente concluída')
-                    agent_used = result.get('agent_used', 'orchestrator')
-                    analysis_type = result.get('analysis_type', 'multiagent_csv_analysis')
-                    confidence = result.get('confidence', 0.95)
-                    
-                    logger.info(f"✅ Análise multiagente concluída: {agent_used}")
-                    
-                except Exception as e:
-                    logger.error(f"❌ Erro ao usar orquestrador: {e}")
-                    logger.info("⚠️ Fallback para análise básica")
-                    # Fallback para análise básica
-                    response_text = analyze_csv_data(df, file_info, request.message)
-                    agent_used = "csv_basic_analyzer"
-                    analysis_type = "csv_analysis_fallback"
-                    confidence = 0.80
-            else:
-                # Sem orquestrador disponível - usa análise básica
-                logger.info("⚠️ Orquestrador não disponível - usando análise básica")
-                response_text = analyze_csv_data(df, file_info, request.message)
-                agent_used = "csv_basic_analyzer"
-                analysis_type = "csv_analysis_basic"
-                confidence = 0.75
-            
-        else:
-            # Processamento sem arquivo específico
-            if not MULTIAGENT_AVAILABLE:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Sistema multiagente não disponível. Verifique configurações."
-                )
-            
-            logger.info("💬 Chat genérico sem file_id")
-            
-            # Carrega orquestrador dinamicamente se necessário
-            if orchestrator is None and ORCHESTRATOR_AVAILABLE:
-                try:
-                    logger.info("📦 Carregando orquestrador dinamicamente...")
-                    from src.agent.orchestrator_agent import OrchestratorAgent
-                    orchestrator = OrchestratorAgent()
-                    logger.info("✅ Orquestrador carregado")
-                except Exception as e:
-                    logger.error(f"❌ Erro ao carregar orquestrador: {e}")
-            
-            if orchestrator and hasattr(orchestrator, 'process_query'):
-                # Usa o orquestrador se disponível
-                result = orchestrator.process_query(
-                    query=request.message,
-                    session_id=session_id,
-                    use_memory=request.use_memory
-                )
-            else:
-                # Processa com lógica simplificada
-                result = process_message_simple(request.message, session_id)
-            
-            # Extrai informações do resultado
-            response_text = result.get('response', 'Desculpe, não consegui processar sua solicitação.')
-            agent_used = result.get('agent_used', 'orchestrator')
-            analysis_type = result.get('analysis_type')
-            confidence = result.get('confidence')
+        # SEMPRE usa o orquestrador que consulta a base de dados (Supabase/embeddings)
+        # NÃO carrega arquivo CSV - apenas consulta vetores
+        
+        if not MULTIAGENT_AVAILABLE:
+            raise HTTPException(
+                status_code=503,
+                detail="Sistema multiagente não disponível. Verifique configurações."
+            )
+        
+        logger.info(f"💬 Processando pergunta: {request.message[:100]}...")
+        
+        # Carrega orquestrador dinamicamente se necessário
+        if orchestrator is None and ORCHESTRATOR_AVAILABLE:
+            try:
+                logger.info("📦 Carregando orquestrador dinamicamente...")
+                from src.agent.orchestrator_agent import OrchestratorAgent
+                orchestrator = OrchestratorAgent()
+                logger.info("✅ Orquestrador carregado com sucesso")
+            except Exception as e:
+                logger.error(f"❌ Erro ao carregar orquestrador: {e}")
+                import traceback
+                logger.error(f"Stack trace: {traceback.format_exc()}")
+                raise HTTPException(status_code=503, detail=f"Orquestrador não disponível: {str(e)}")
+        
+        if not orchestrator:
+            logger.error("❌ Orquestrador não está disponível após tentativa de carregamento")
+            raise HTTPException(status_code=503, detail="Orquestrador não disponível")
+        
+        if not hasattr(orchestrator, 'process_with_persistent_memory'):
+            logger.error("❌ Orquestrador não possui método process_with_persistent_memory")
+            raise HTTPException(status_code=503, detail="Orquestrador inválido")
+        
+        logger.info("🧠 Enviando query para o orquestrador...")
+        try:
+            # 🧠 Orquestrador consulta base de dados (embeddings) via RAG
+            # Usar método assíncrono com memória persistente (igual interface_interativa.py)
+            result = await orchestrator.process_with_persistent_memory(
+                query=request.message,
+                context={},
+                session_id=session_id
+            )
+            logger.info(f"✅ Orquestrador retornou resposta: {result.get('metadata', {}).get('agent_used', 'unknown')}")
+        except Exception as e:
+            logger.error(f"❌ Erro ao processar query no orquestrador: {e}")
+            import traceback
+            logger.error(f"Stack trace: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"Erro ao processar: {str(e)}")
+        
+        # Extrai informações do resultado (compatível com interface_interativa.py)
+        response_text = result.get('content', result.get('response', 'Desculpe, não consegui processar sua solicitação.'))
+        metadata = result.get('metadata', {})
+        agent_used = metadata.get('agent_used', 'orchestrator')
+        analysis_type = metadata.get('analysis_type')
+        confidence = metadata.get('confidence')
         
         processing_time = (datetime.now() - start_time).total_seconds()
         
-        # Adiciona informações do LLM Router se disponível
-        llm_model_used = llm_config["model_name"] if llm_config else None
-        complexity_detected = llm_config["complexity_name"] if llm_config else None
-        
         logger.info(f"Chat processado em {processing_time:.2f}s por {agent_used}")
         if llm_model_used:
-            logger.info(f"   LLM: {llm_model_used} | Complexidade: {complexity_detected}")
+            logger.info(f"   LLM: {llm_model_used}")
         
         return ChatResponse(
             response=response_text,
@@ -555,7 +511,13 @@ async def upload_csv(file: UploadFile = File(...)):
                 logger.warning(f"Erro ao processar com sistema multiagente: {e}")
         
         logger.info(f"Upload concluído: {file.filename} ({len(df)} linhas, {len(df.columns)} colunas)")
-        
+        # Dispara ingestão automática em background
+        import subprocess
+        try:
+            subprocess.Popen(['python', 'run_auto_ingest.py', '--once'])
+            logger.info("Script run_auto_ingest.py --once disparado com sucesso.")
+        except Exception as e:
+            logger.error(f"Falha ao disparar run_auto_ingest.py: {e}")
         return CSVUploadResponse(
             file_id=file_id,
             filename=file.filename,
@@ -640,13 +602,13 @@ async def detect_fraud(request: FraudDetectionRequest):
         
         # Extrai informações estruturadas da resposta
         response_text = result.get('response', '')
-        
+
         # Analisa a resposta para extrair métricas estruturadas
         fraud_score = extract_fraud_score(response_text)
         risk_level = determine_risk_level(fraud_score)
         patterns_detected = extract_patterns(response_text)
         recommendations = extract_recommendations(response_text)
-        
+
         analysis_details = {
             'agent_used': result.get('agent_used', 'orchestrator'),
             'confidence': result.get('confidence', 0.8),
@@ -654,21 +616,71 @@ async def detect_fraud(request: FraudDetectionRequest):
             'full_analysis': response_text,
             'processing_time': processing_time
         }
-        
-        logger.info(f"Detecção de fraude concluída: score={fraud_score}, risco={risk_level}")
-        
+
+        # Novo: Adiciona imagens de histogramas do arquivo analisado
+        images = []
+        if request.file_id and request.file_id in uploaded_files:
+            file_info = uploaded_files[request.file_id]
+            filename_base = file_info['filename'].replace('.csv', '')
+            from src.settings import HISTOGRAMS_DIR
+            histogram_dir = os.path.join(root_dir, HISTOGRAMS_DIR)
+            if os.path.isdir(histogram_dir):
+                for col in file_info['dataframe'].columns:
+                    hist_name = f"hist_{col}.png"
+                    hist_path = os.path.join(histogram_dir, hist_name)
+                    if os.path.isfile(hist_path):
+                        # Gera URL relativa para frontend usando HISTOGRAMS_DIR
+                        from src.settings import HISTOGRAMS_DIR
+                        url = f"/files/histogramas/{hist_name}"  # Exemplo: endpoint para servir arquivos
+                        # Opcional: carrega base64 se desejado
+                        base64_img = None
+                        try:
+                            with open(hist_path, "rb") as f:
+                                import base64
+                                base64_img = base64.b64encode(f.read()).decode("utf-8")
+                        except Exception as e:
+                            logger.warning(f"Erro ao converter {hist_name} para base64: {e}")
+                        images.append(FraudDetectionImage(
+                            name=col,
+                            url=url,
+                            base64=None,  # Para evitar respostas muito grandes, só retorna base64 se solicitado
+                            description=f"Histograma da variável {col}"
+                        ))
+        logger.info(f"Detecção de fraude concluída: score={fraud_score}, risco={risk_level}, imagens={len(images)}")
+
         return FraudDetectionResponse(
             fraud_score=fraud_score,
             risk_level=risk_level,
             patterns_detected=patterns_detected,
             recommendations=recommendations,
             analysis_details=analysis_details,
-            processing_time=processing_time
+            processing_time=processing_time,
+            images=images if images else None
         )
         
     except Exception as e:
         logger.error(f"Erro na detecção de fraude: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+
+@app.get("/files/histogramas/{filename}")
+async def serve_histogram(filename: str):
+    """Serve arquivos PNG de histogramas do diretório configurado"""
+    from fastapi.responses import FileResponse
+    from src.settings import HISTOGRAMS_DIR
+    
+    # Valida nome do arquivo para evitar path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Nome de arquivo inválido")
+    
+    file_path = Path(HISTOGRAMS_DIR) / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Imagem não encontrada")
+    
+    if not file_path.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+        raise HTTPException(status_code=400, detail="Tipo de arquivo não suportado")
+    
+    return FileResponse(file_path, media_type="image/png")
 
 @app.get("/csv/files")
 async def list_files():
@@ -975,9 +987,10 @@ def extract_recommendations(text: str) -> List[str]:
 if __name__ == "__main__":
     print("🚀 Iniciando API Completa - EDA AI Minds")
     print("=" * 50)
-    print(f"📍 URL: http://localhost:{PORT}")
-    print(f"📚 Docs: http://localhost:{PORT}/docs")
-    print(f"📋 ReDoc: http://localhost:{PORT}/redoc")
+    print(f"📍 URL: http://localhost:{API_PORT}")
+    print(f"📚 Docs: http://localhost:{API_PORT}/docs")
+    print(f"📋 ReDoc: http://localhost:{API_PORT}/redoc")
+    print(f"🌐 Host: {API_HOST} (aceita conexões {'externas' if API_HOST == '0.0.0.0' else 'apenas locais'})")
     print(f"🤖 Sistema Multiagente: {'✅ Ativo' if MULTIAGENT_AVAILABLE else '❌ Inativo'}")
     if MULTIAGENT_AVAILABLE:
         print("🧠 Agentes Disponíveis:")
@@ -990,8 +1003,8 @@ if __name__ == "__main__":
     
     uvicorn.run(
         "api_completa:app",
-        host="0.0.0.0",
-        port=PORT,
+        host=API_HOST,
+        port=API_PORT,
         reload=True,
         log_level="info"
     )

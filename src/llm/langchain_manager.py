@@ -143,9 +143,6 @@ class LangChainLLMManager:
         Returns:
             Tuple[bool, str]: (disponível, mensagem)
         """
-        if not LANGCHAIN_AVAILABLE:
-            return False, "LangChain não disponível"
-            
         if provider == LLMProvider.GROQ:
             if not GROQ_API_KEY:
                 return False, "API key não configurada"
@@ -172,9 +169,6 @@ class LangChainLLMManager:
     
     def _get_client(self, provider: LLMProvider, config: LLMConfig):
         """Obtém ou cria cliente LangChain para o provedor especificado."""
-        if not LANGCHAIN_AVAILABLE:
-            raise RuntimeError("LangChain não está disponível")
-            
         cache_key = f"{provider.value}_{config.temperature}_{config.max_tokens}"
         
         if cache_key in self._clients:
@@ -184,15 +178,16 @@ class LangChainLLMManager:
         model = config.model or self._get_default_model(provider)
         
         # Justificativa: top_p = 0.25 reduz aleatoriedade, tornando respostas mais precisas e confiáveis para conteúdos técnicos.
-        if provider == LLMProvider.GROQ and ChatGroq is not None and GROQ_API_KEY:
+        if provider == LLMProvider.GROQ:
             client = ChatGroq(
                 api_key=GROQ_API_KEY,
                 model=model,
                 temperature=config.temperature,
-                model_kwargs={"top_p": config.top_p, "max_tokens": config.max_tokens}
+                max_tokens=config.max_tokens,
+                model_kwargs={"top_p": config.top_p}
             )
         
-        elif provider == LLMProvider.GOOGLE and ChatGoogleGenerativeAI is not None and GOOGLE_API_KEY:
+        elif provider == LLMProvider.GOOGLE:
             client = ChatGoogleGenerativeAI(
                 google_api_key=GOOGLE_API_KEY,
                 model=model,
@@ -201,7 +196,7 @@ class LangChainLLMManager:
                 top_p=config.top_p
             )
         
-        elif provider == LLMProvider.OPENAI and ChatOpenAI is not None and OPENAI_API_KEY:
+        elif provider == LLMProvider.OPENAI:
             client = ChatOpenAI(
                 api_key=OPENAI_API_KEY,
                 model=model,
@@ -219,7 +214,7 @@ class LangChainLLMManager:
         """Retorna o modelo padrão para cada provedor."""
         defaults = {
             LLMProvider.GROQ: "llama-3.1-8b-instant",
-            LLMProvider.GOOGLE: "models/gemini-2.0-flash",
+            LLMProvider.GOOGLE: "gemini-pro",
             LLMProvider.OPENAI: "gpt-3.5-turbo"
         }
         return defaults.get(provider, "unknown")
@@ -241,15 +236,6 @@ class LangChainLLMManager:
             config = LLMConfig()
         
         target_provider = provider or self.active_provider
-        
-        if target_provider is None:
-            return LLMResponse(
-                content="",
-                provider=LLMProvider.GOOGLE,  # fallback
-                model="unknown",
-                error="Nenhum provedor LLM disponível",
-                success=False
-            )
         
         try:
             return self._call_provider(target_provider, prompt, config, system_prompt)
@@ -280,23 +266,16 @@ class LangChainLLMManager:
     def _call_provider(self, provider: LLMProvider, prompt: str, 
                       config: LLMConfig, system_prompt: Optional[str]) -> LLMResponse:
         """Chama um provedor específico via LangChain."""
-        if not LANGCHAIN_AVAILABLE:
-            raise RuntimeError("LangChain não está disponível")
-            
         start_time = time.time()
         
         client = self._get_client(provider, config)
-        if client is None:
-            raise RuntimeError(f"Não foi possível criar cliente para {provider.value}")
-            
         model = config.model or self._get_default_model(provider)
         
         # Construir mensagens
         messages = []
-        if system_prompt and SystemMessage is not None:
+        if system_prompt:
             messages.append(SystemMessage(content=system_prompt))
-        if HumanMessage is not None:
-            messages.append(HumanMessage(content=prompt))
+        messages.append(HumanMessage(content=prompt))
         
         # Invocar LLM via LangChain
         response = client.invoke(messages)
@@ -309,18 +288,8 @@ class LangChainLLMManager:
             metadata = response.response_metadata
             tokens_used = metadata.get('token_usage', {}).get('total_tokens')
         
-        # Extrair conteúdo da resposta
-        content = ""
-        if hasattr(response, 'content'):
-            if isinstance(response.content, str):
-                content = response.content
-            elif isinstance(response.content, list):
-                content = str(response.content)
-            else:
-                content = str(response.content)
-        
         return LLMResponse(
-            content=content,
+            content=response.content,
             provider=provider,
             model=model,
             tokens_used=tokens_used,

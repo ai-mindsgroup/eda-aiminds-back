@@ -294,23 +294,40 @@ Diretrizes:
         return None
 
     def _save_to_vector_store(self, query: str, response: str, context: Optional[Dict[str, Any]]):
-        """Salva consulta e resposta no banco vetorial."""
+        """Salva consulta e resposta no banco vetorial com metadata enriquecido."""
         if not self.rag_enabled:
             return
             
         try:
+            from datetime import datetime
+            
             # Preparar dados para salvar
             combined_text = f"Consulta: {query}\nResposta: {response}"
             embedding = self.embedding_generator.generate_embedding(combined_text)
             
-            # Metadados
+            # Metadados enriquecidos para contexto de busca
             metadata = {
                 "query": query,
-                "response": response,
+                "response": response[:500],  # Truncar resposta longa
                 "model": self.model_name,
                 "agent": self.name,
-                "context": context or {}
+                "timestamp": datetime.now().isoformat(),
+                "query_type": "llm_analysis",
+                "embedding_type": "conversation",
+                "session_id": getattr(self, '_current_session_id', None),
             }
+            
+            # Adicionar contexto relevante se disponível
+            if context:
+                if "file_path" in context:
+                    metadata["source_file"] = context["file_path"]
+                if "data_info" in context:
+                    metadata["data_dimensions"] = f"{context['data_info'].get('rows', 0)}x{context['data_info'].get('columns', 0)}"
+                if "fraud_data" in context:
+                    metadata["fraud_count"] = context["fraud_data"].get("count", 0)
+                
+                # Adicionar palavras-chave do contexto para facilitar busca
+                metadata["context_keys"] = list(context.keys())
             
             # Salvar no banco vetorial
             self.vector_store.add_document(
@@ -319,7 +336,7 @@ Diretrizes:
                 metadata=metadata
             )
             
-            self.logger.debug("Resposta salva no banco vetorial")
+            self.logger.debug(f"Resposta salva no banco vetorial com metadata enriquecido: {list(metadata.keys())}")
             
         except Exception as e:
             self.logger.warning(f"Erro ao salvar no banco vetorial: {e}")

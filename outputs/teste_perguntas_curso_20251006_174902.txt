@@ -1,0 +1,80 @@
+══════════════════════════════════════════════════════════════════════
+  TESTE AUTOMÁTICO - PERGUNTAS DO CURSO
+  EDA AI MINDS - Sistema Multiagente RAG Vetorial
+  Data/Hora: 2025-10-06 17:49:02
+══════════════════════════════════════════════════════════════════════
+
+
+══════════════════════════════════════════════════════════════════════
+CATEGORIA: 1. DESCRIÇÃO DOS DADOS
+══════════════════════════════════════════════════════════════════════
+
+PERGUNTA 1:
+Quais são os tipos de dados (numéricos, categóricos)?
+
+──────────────────────────────────────────────────────────────────────
+RESPOSTA:
+Com base nos dados fornecidos, posso responder à pergunta do usuário sobre os tipos de dados, colunas numéricos e categóricos.
+
+**Tipos de dados:**
+
+- **Numéricos:** Time, V1, V2, V3, V4, V5, V6, V7, V8, V9, V10, V11, V12, V13, V14, V15, V16, V17, V18, V19, V20, V21, V22, V23, V24, V25, V26, V27, V28, Amount
+- **Categóricos:** Nenhum (a lista de colunas categóricas está vazia)
+
+**Colunas numéricos:**
+
+- Time
+- V1
+- V2
+- V3
+- V4
+- V5
+- V6
+- V7
+- V8
+- V9
+- V10
+- V11
+- V12
+- V13
+- V14
+- V15
+- V16
+- V17
+- V18
+- V19
+- V20
+- V21
+- V22
+- V23
+- V24
+- V25
+- V26
+- V27
+- V28
+- Amount
+
+**Colunas categóricos:**
+
+- Nenhum (a lista de colunas categóricas está vazia)
+
+Lembre-se de que essas informações são baseadas nos dados fornecidos e podem variar dependendo do contexto específico do arquivo CSV carregado.
+
+METADADOS:
+  • provider: groq
+  • model: llama-3.1-8b-instant
+  • processing_time: 0.6849954128265381
+  • tokens_used: 1486
+  • data_analysis: True
+  • data_loaded: True
+  • agents_used: ['llm_manager', 'embeddings_analyzer']
+  • orchestrator: {'conversation_length': 1, 'has_data_context': True}
+  • session_id: 855173be-46cc-46e6-adb8-3ed1cfeef86e
+  • memory_enabled: True
+  • memory_stats: {'session_id': '855173be-46cc-46e6-adb8-3ed1cfeef86e', 'contexts_count': 0, 'conversations_count': 2, 'total_context_size': 0, 'agent_name': 'orchestrator', 'memory_available': True}
+
+──────────────────────────────────────────────────────────────────────
+Status: ✅ SUCESSO
+Tempo: 34.04s
+──────────────────────────────────────────────────────────────────────
+

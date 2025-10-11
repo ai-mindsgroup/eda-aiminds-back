@@ -36,6 +36,60 @@ if missing:
     import warnings
     warnings.warn(f"Variáveis ausentes: {', '.join(missing)}. Configure configs/.env ou variáveis de ambiente.")
 
+HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "static/histogramas")
+
+# ========================================================================
+# CONFIGURAÇÕES DA API
+# ========================================================================
+
+# Host e Porta da API
+# API_HOST: 0.0.0.0 = aceita conexões de qualquer IP (incluindo IPs externos da VPS)
+#           127.0.0.1 = aceita apenas conexões locais
+# API_PORT: Use porta não comum para segurança (evita ataques em portas conhecidas)
+API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
+API_PORT: int = int(os.getenv("API_PORT", "8011"))
+
+# ========================================================================
+# CONFIGURAÇÕES DE INGESTÃO AUTOMÁTICA DE CSV
+# ========================================================================
+
+# Diretórios locais de gerenciamento de arquivos CSV
+
+EDA_DATA_DIR: Path = Path(os.getenv("EDA_DATA_DIR", "data"))
+EDA_DATA_DIR_PROCESSANDO: Path = Path(os.getenv("EDA_DATA_DIR_PROCESSANDO", "data/processando"))
+EDA_DATA_DIR_PROCESSADO: Path = Path(os.getenv("EDA_DATA_DIR_PROCESSADO", "data/processado"))
+EDA_DATA_DIR_HISTORICO: Path = Path(os.getenv("EDA_DATA_DIR_HISTORICO", "data/historico"))
+
+# Google Drive API
+GOOGLE_DRIVE_ENABLED: bool = os.getenv("GOOGLE_DRIVE_ENABLED", "false").lower() == "true"
+
+# Modo de autenticação: "oauth" (padrão) ou "service_account"
+GOOGLE_DRIVE_AUTH_MODE: str = os.getenv("GOOGLE_DRIVE_AUTH_MODE", "oauth")
+
+# OAuth credentials (para modo "oauth")
+GOOGLE_DRIVE_CREDENTIALS_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_CREDENTIALS_FILE", "configs/google_drive_credentials.json"))
+GOOGLE_DRIVE_TOKEN_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_TOKEN_FILE", "configs/google_drive_token.json"))
+
+# Service Account credentials (para modo "service_account")
+GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE: Path = Path(os.getenv("GOOGLE_DRIVE_SERVICE_ACCOUNT_FILE", "configs/google_drive_service_account.json"))
+
+# ID da pasta do Google Drive a monitorar
+GOOGLE_DRIVE_FOLDER_ID: str | None = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+
+# ID da pasta "processados" no Google Drive (criada automaticamente se não existir)
+GOOGLE_DRIVE_PROCESSED_FOLDER_ID: str | None = os.getenv("GOOGLE_DRIVE_PROCESSED_FOLDER_ID")
+
+# Comportamento após processamento: "delete" ou "move" (recomendado: move)
+GOOGLE_DRIVE_POST_PROCESS_ACTION: str = os.getenv("GOOGLE_DRIVE_POST_PROCESS_ACTION", "move")
+
+# Configurações de polling
+AUTO_INGEST_POLLING_INTERVAL: int = int(os.getenv("AUTO_INGEST_POLLING_INTERVAL", "300"))
+AUTO_INGEST_FILE_PATTERN: str = os.getenv("AUTO_INGEST_FILE_PATTERN", r".*\.csv$")
+
+# ========================================================================
+# CONFIGURAÇÕES DE BANCO (Postgres/Supabase)
+# ========================================================================
+
 # Configurações de banco (Postgres/Supabase)
 DB_HOST: str | None = os.getenv("DB_HOST")
 DB_PORT: str = os.getenv("DB_PORT", "5432")
