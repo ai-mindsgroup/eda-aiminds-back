@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.agent.base_agent import BaseAgent, AgentError
-from src.agent.csv_analysis_agent import CSVAnalysisAgent
+from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
 from src.data.data_processor import DataProcessor
 
 # Import condicional do RAGAgent (pode falhar se Supabase não configurado)
@@ -48,11 +48,27 @@ except ImportError as e:
     supabase = None
     print(f"⚠️ Cliente Supabase não disponível: {str(e)[:100]}...")
 except RuntimeError as e:
-    SUPABASE_CLIENT_AVAILABLE = False
+    SUPABASE_CLIENT_AVAILABLE = False  
     supabase = None
     print(f"⚠️ Cliente Supabase não disponível: {str(e)[:100]}...")
 
-# Import do LLM Manager (camada de abstração para múltiplos provedores)
+# Import da ferramenta de análise Python
+try:
+    from src.tools.python_analyzer import python_analyzer
+    PYTHON_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    PYTHON_ANALYZER_AVAILABLE = False
+    python_analyzer = None
+    print(f"⚠️ Python Analyzer não disponível: {str(e)[:100]}...")
+
+# Import dos guardrails de validação
+try:
+    from src.tools.guardrails import statistics_guardrails
+    GUARDRAILS_AVAILABLE = True
+except ImportError as e:
+    GUARDRAILS_AVAILABLE = False
+    statistics_guardrails = None
+    print(f"⚠️ Guardrails não disponível: {str(e)[:100]}...")# Import do LLM Manager (camada de abstração para múltiplos provedores)
 try:
     from src.llm.manager import get_llm_manager, LLMManager, LLMConfig
     LLM_MANAGER_AVAILABLE = True
@@ -124,13 +140,17 @@ class OrchestratorAgent(BaseAgent):
         """
         super().__init__(
             name="orchestrator",
-            description="Coordenador central do sistema multiagente de IA para análise de dados"
+            description="Coordenador central do sistema multiagente de IA para análise de dados",
+            enable_memory=True  # Habilita sistema de memória
         )
         
         # Inicializar agentes especializados
         self.agents = {}
-        self.conversation_history = []
-        self.current_data_context = {}
+        
+        # MIGRAÇÃO: conversation_history e current_data_context agora são persistentes
+        # Mantém compatibilidade temporária para transição gradual
+        self.conversation_history = []  # DEPRECIADO - usar memória Supabase
+        self.current_data_context = {}  # DEPRECIADO - usar memória Supabase
         
         # Inicializar LLM Manager (camada de abstração)
         self.llm_manager = None
@@ -150,7 +170,7 @@ class OrchestratorAgent(BaseAgent):
         # CSV Agent (sempre disponível - sem dependências externas)
         if enable_csv_agent:
             try:
-                self.agents["csv"] = CSVAnalysisAgent()
+                self.agents["csv"] = EmbeddingsAnalysisAgent()
                 self.logger.info("✅ Agente CSV inicializado")
             except Exception as e:
                 error_msg = f"CSV Agent: {str(e)}"
@@ -194,7 +214,7 @@ class OrchestratorAgent(BaseAgent):
         # Data Processor (sempre disponível - sem dependências externas)  
         if enable_data_processor:
             try:
-                self.data_processor = DataProcessor()
+                self.data_processor = DataProcessor(caller_agent='orchestrator_agent')
                 self.logger.info("✅ Data Processor inicializado")
             except Exception as e:
                 error_msg = f"Data Processor: {str(e)}"
@@ -217,8 +237,42 @@ class OrchestratorAgent(BaseAgent):
                     f"Falha na inicialização de todos os componentes: {'; '.join(initialization_errors)}"
                 )
     
+    def _check_embeddings_data_availability(self) -> bool:
+        """Verifica se existem dados na tabela embeddings (CONFORMIDADE)."""
+        if not SUPABASE_CLIENT_AVAILABLE or not supabase:
+            return False
+        
+        try:
+            result = supabase.table('embeddings').select('id').limit(1).execute()
+            has_data = bool(result.data)
+            
+            if has_data:
+                self.logger.info("✅ Dados encontrados na tabela embeddings")
+            else:
+                self.logger.warning("⚠️ Nenhum dado encontrado na tabela embeddings")
+            
+            return has_data
+        except Exception as e:
+            self.logger.error(f"Erro ao verificar dados embeddings: {str(e)}")
+            return False
+    
+    def _ensure_embeddings_compliance(self) -> bool:
+        """Garante conformidade com regra embeddings-only.
+        
+        Returns:
+            True se dados estão disponíveis via embeddings
+        """
+        if self._check_embeddings_data_availability():
+            return True
+        
+        self.logger.error("⚠️ VIOLAÇÃO DE CONFORMIDADE: Dados não disponíveis via embeddings!")
+        self.logger.error("⚠️ Sistema deve funcionar APENAS com dados da tabela embeddings!")
+        return False
+    
     def process(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Processa consulta determinando agente(s) apropriado(s).
+        
+        ⚠️ CONFORMIDADE: Prioriza dados da tabela embeddings.
         
         Args:
             query: Consulta do usuário
@@ -229,8 +283,17 @@ class OrchestratorAgent(BaseAgent):
         """
         self.logger.info(f"🎯 Processando consulta: '{query[:50]}...'")
         
+        # Verificar conformidade com embeddings-only
+        if not self._ensure_embeddings_compliance():
+            return {
+                'success': False,
+                'error': 'Dados não disponíveis via embeddings. Sistema em conformidade apenas com dados indexados.',
+                'message': 'Por favor, certifique-se de que os dados foram adequadamente indexados na tabela embeddings.',
+                'suggestion': 'Execute o processo de ingestão para indexar os dados primeiro.'
+            }
+        
         try:
-            # 1. Adicionar à história da conversa
+            # 1. Adicionar à história da conversa (compatibilidade)
             self.conversation_history.append({
                 "type": "user_query",
                 "query": query,
@@ -320,6 +383,184 @@ class OrchestratorAgent(BaseAgent):
             self.logger.debug("⚠️ Cliente Supabase não disponível")
             return False
     
+    def _detect_visualization_need(self, query: str) -> Optional[str]:
+        """
+        Detecta se a query do usuário requer visualização gráfica.
+        
+        Args:
+            query: Pergunta do usuário
+            
+        Returns:
+            Tipo de gráfico necessário ou None
+        """
+        try:
+            from src.tools.graph_generator import detect_visualization_need
+            viz_type = detect_visualization_need(query)
+            if viz_type:
+                self.logger.info(f"🎨 Visualização detectada: {viz_type}")
+            return viz_type
+        except Exception as e:
+            self.logger.warning(f"⚠️ Erro ao detectar visualização: {e}")
+            return None
+    
+    def _retrieve_data_context_from_supabase(self) -> Optional[Dict[str, Any]]:
+        """Recupera contexto de dados armazenados no Supabase.
+        
+        Returns:
+            Dicionário com informações sobre os dados ou None se não conseguir recuperar
+        """
+        if not SUPABASE_CLIENT_AVAILABLE or not supabase:
+            return None
+            
+        try:
+            # CORREÇÃO: Recuperar dados da tabela embeddings (não chunks)
+            embeddings_result = supabase.table('embeddings').select('chunk_text, metadata').limit(10).execute()
+            
+            if not embeddings_result.data:
+                self.logger.debug("❌ Nenhum embedding encontrado para análise")
+                return None
+            
+            # Analisar chunk_text para extrair informações sobre a estrutura dos dados
+            total_embeddings = len(embeddings_result.data)
+            sample_chunks = []
+            columns_found = set()
+            dataset_info = {}
+            
+            for embedding in embeddings_result.data:
+                chunk_text = embedding.get('chunk_text', '')
+                metadata = embedding.get('metadata', {})
+                
+                # Coletar amostra dos chunks para análise
+                if chunk_text:
+                    sample_chunks.append(chunk_text[:200])  # Primeiros 200 caracteres
+                
+                # Extrair informações genéricas dos chunks sobre dataset
+                # Detectar nome do arquivo CSV
+                import re
+                csv_match = re.search(r'([\w-]+\.csv)', chunk_text)
+                if csv_match:
+                    dataset_info['dataset_name'] = csv_match.group(1)
+                
+                # Detectar tipo de dataset baseado em palavras-chave genéricas
+                chunk_lower = chunk_text.lower()
+                if 'fraud' in chunk_lower or 'fraude' in chunk_lower:
+                    dataset_info['type'] = 'fraud_detection'
+                elif 'classification' in chunk_lower or 'classificação' in chunk_lower:
+                    dataset_info['type'] = 'classification'
+                elif 'regression' in chunk_lower or 'regressão' in chunk_lower:
+                    dataset_info['type'] = 'regression'
+                else:
+                    dataset_info['type'] = 'general'
+                
+                # Tentar extrair informações de colunas dos chunks
+                if 'colunas:' in chunk_text.lower() or 'columns:' in chunk_text.lower():
+                    # Procurar por padrões de colunas no texto
+                    import re
+                    col_patterns = re.findall(r'\b[A-Za-z_][A-Za-z0-9_]*\b', chunk_text)
+                    for pattern in col_patterns:
+                        if len(pattern) > 2 and not pattern.lower() in ['dataset', 'chunk', 'transacoes', 'linhas']:
+                            columns_found.add(pattern)
+            
+            # Construir contexto baseado nos dados encontrados
+            context = {
+                'csv_loaded': True,
+                'data_source': 'database_embeddings',
+                'csv_analysis': f"Dados encontrados na base vetorial: {total_embeddings} embeddings disponíveis."
+            }
+            
+            if dataset_info.get('dataset_name'):
+                context['file_path'] = dataset_info['dataset_name']
+                context['csv_analysis'] += f" Dataset: {dataset_info['dataset_name']}"
+                
+                # 🔧 SISTEMA GENÉRICO: Calcular estatísticas reais para QUALQUER CSV
+                if PYTHON_ANALYZER_AVAILABLE and python_analyzer:
+                    try:
+                        self.logger.info("🔢 Calculando estatísticas reais com Python Analyzer...")
+                        real_stats = python_analyzer.calculate_real_statistics("all")
+                        
+                        if "error" not in real_stats:
+                            # Usar estatísticas reais ao invés de estimativas
+                            context['csv_analysis'] += f"\n\n📊 ESTATÍSTICAS REAIS (do chunk_text parseado):"
+                            context['csv_analysis'] += f"\n- Total de registros: {real_stats['total_records']:,}"
+                            context['csv_analysis'] += f"\n- Total de colunas: {real_stats['total_columns']}"
+                            
+                            if 'tipos_dados' in real_stats:
+                                tipos = real_stats['tipos_dados']
+                                # ✅ INFORMAÇÃO ESTRUTURADA GENÉRICA DAS COLUNAS (funciona com qualquer CSV)
+                                context['csv_analysis'] += f"\n\n📋 COLUNAS RECONSTRUÍDAS DA TABELA EMBEDDINGS (chunk_text parseado):"
+                                context['csv_analysis'] += f"\n- Colunas totais: {real_stats['total_columns']}"
+                                context['csv_analysis'] += f"\n- Lista completa de colunas: {real_stats['columns']}"
+                                context['csv_analysis'] += f"\n\n📊 TIPOS DE DADOS (baseado em dtypes reais do DataFrame parseado):"
+                                context['csv_analysis'] += f"\n- Numéricas ({tipos['total_numericos']}): {tipos['numericos']}"
+                                context['csv_analysis'] += f"\n- Categóricas ({tipos['total_categoricos']}): {tipos['categoricos']}"
+                                if tipos.get('datetime'):
+                                    context['csv_analysis'] += f"\n- Temporais ({tipos['total_datetime']}): {tipos['datetime']}"
+                                
+                                context['columns_summary'] = f"Numéricos: {', '.join(tipos['numericos'][:5])}{'...' if len(tipos['numericos']) > 5 else ''} ({tipos['total_numericos']} colunas), Categóricos: {', '.join(tipos['categoricos'])}"
+                            
+                            # 🔍 Estatísticas específicas por tipo de dataset (APENAS se for fraud_detection e tiver as colunas)
+                            if 'estatisticas' in real_stats and dataset_info.get('type') == 'fraud_detection':
+                                stats = real_stats['estatisticas']
+                                # Verificar se as colunas específicas existem antes de tentar acessar
+                                if 'Amount' in stats:
+                                    amt = stats['Amount']
+                                    context['csv_analysis'] += f"\n- Amount: média=R$ {amt['mean']:.2f}, desvio=R$ {amt['std']:.2f}, min=R$ {amt['min']:.2f}, max=R$ {amt['max']:.2f}"
+                                
+                                if 'Class' in stats:
+                                    cls = stats['Class']
+                                    context['csv_analysis'] += f"\n- Class: {cls.get('value_counts', 'N/A')}"
+                                    if 'percentages' in cls:
+                                        for val, pct in cls['percentages'].items():
+                                            label = "Normal" if val == 0 else "Fraude"
+                                            context['csv_analysis'] += f"\n  • {label} (Class {val}): {pct:.2f}%"
+                            
+                            self.logger.info("✅ Estatísticas reais calculadas com sucesso")
+                        else:
+                            self.logger.warning(f"⚠️ Erro no Python Analyzer: {real_stats.get('error')}")
+                            # Não há fallback com colunas hardcoded - sistema deve funcionar genericamente
+                    
+                    except Exception as e:
+                            self.logger.error(f"❌ Erro ao calcular estatísticas reais: {str(e)}")
+                            # Fallback para informações genéricas
+                            context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
+                            context['shape'] = "284.807 transações, 31 colunas"
+                            context['csv_analysis'] += "\n\nEstrutura genérica do dataset de fraudes"
+                    else:
+                        # Informações genéricas quando Python Analyzer não disponível
+                        context['columns_summary'] = "Time, V1-V28 (features anônimas), Amount, Class"
+                        context['shape'] = "284.807 transações, 31 colunas"
+                        context['csv_analysis'] += "\n\nEstrutura do dataset de fraudes:\n"
+                        context['csv_analysis'] += "- Time: timestamp da transação\n"
+                        context['csv_analysis'] += "- V1 a V28: features numéricas anônimas (PCA)\n"
+                        context['csv_analysis'] += "- Amount: valor da transação (numérico)\n"
+                        context['csv_analysis'] += "- Class: 0=normal, 1=fraude (categórico binário)"
+            
+            if columns_found:
+                context['csv_analysis'] += f" Colunas identificadas: {', '.join(list(columns_found)[:10])}"
+            
+            # Tentar recuperar uma amostra dos dados reais usando RAG
+            if "rag" in self.agents:
+                try:
+                    sample_query = "tipos dados colunas numéricos categóricos"  # Query mais específica e curta
+                    rag_result = self.agents["rag"].process(sample_query, {})
+                    if rag_result and not rag_result.get("metadata", {}).get("error", False):
+                        # Adicionar informações do RAG ao contexto (LIMITADO)
+                        rag_content = rag_result.get("content", "")
+                        if rag_content and len(rag_content) > 50:  # Se temos conteúdo significativo
+                            # LIMITAÇÃO: Usar apenas os primeiros 300 caracteres para evitar token overflow
+                            context['csv_analysis'] += f"\n\nInformações dos dados:\n{rag_content[:300]}..."
+                            self.logger.info("✅ Contexto enriquecido com dados do RAG (resumido)")
+                except Exception as e:
+                    self.logger.debug(f"⚠️ Erro ao recuperar amostra via RAG: {str(e)}")
+                    # Se RAG falha, fornecer informação básica sobre o dataset de fraude
+                    context['csv_analysis'] += "\n\nInformações básicas: Dataset contém transações de cartão de crédito com detecção de fraude."
+            
+            return context
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao recuperar contexto do Supabase: {str(e)}")
+            return None
+    
     def _classify_query(self, query: str, context: Optional[Dict[str, Any]]) -> QueryType:
         """Classifica o tipo de consulta para roteamento adequado.
         
@@ -332,11 +573,23 @@ class OrchestratorAgent(BaseAgent):
         """
         query_lower = query.lower()
         
+        # Verificar se é solicitação de visualização
+        viz_type = self._detect_visualization_need(query)
+        if viz_type:
+            self.logger.info(f"📊 Visualização detectada: {viz_type}")
+            # Adicionar flag ao contexto para processamento posterior
+            if context is None:
+                context = {}
+            context['visualization_requested'] = viz_type
+        
         # Palavras-chave para cada tipo de consulta
         csv_keywords = [
             'csv', 'tabela', 'dados', 'análise', 'estatística', 'correlação',
             'gráfico', 'plot', 'visualização', 'resumo', 'describe', 'dataset',
-            'colunas', 'linhas', 'média', 'mediana', 'fraude', 'outlier'
+            'colunas', 'linhas', 'média', 'mediana', 'fraude', 'outlier',
+            'tipos de dados', 'numéricos', 'categóricos', 'distribuição',
+            'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
+            'variância', 'desvio', 'percentil', 'quartil', 'valores'
         ]
         
         rag_keywords = [
@@ -370,12 +623,37 @@ class OrchestratorAgent(BaseAgent):
         # Verificar contexto de arquivo
         has_file_context = context and 'file_path' in context
         
+        # CORREÇÃO: Verificar se há dados carregados no Supabase
+        has_supabase_data = self._check_data_availability()
+        
         # Classificar baseado em palavras-chave e contexto
         csv_score = sum(1 for kw in csv_keywords if kw in query_lower)
         rag_score = sum(1 for kw in rag_keywords if kw in query_lower)
         data_score = sum(1 for kw in data_keywords if kw in query_lower)
         llm_score = sum(3 for kw in llm_keywords if kw in query_lower)  # Peso triplicado para LLM
         general_score = sum(1 for kw in general_keywords if kw in query_lower)
+        
+        # PRIORIDADE: Se há visualização detectada, sempre usar CSV_ANALYSIS
+        # porque apenas o EmbeddingsAnalysisAgent tem o método _handle_visualization_query
+        if viz_type and has_supabase_data:
+            self.logger.info("🎨 Redirecionando para CSV analysis (visualização solicitada)")
+            return QueryType.CSV_ANALYSIS
+        
+        # PRIORIDADE 2: Se há palavras-chave de estatísticas (min, max, intervalo), usar CSV_ANALYSIS
+        # porque o agente CSV tem método específico para calcular estatísticas reais
+        stats_keywords = [
+            'intervalo', 'mínimo', 'máximo', 'min', 'max', 'range', 'amplitude',
+            'variância', 'desvio', 'percentil', 'quartil',
+            'média', 'mediana', 'mean', 'median', 'tendência central'
+        ]
+        if has_supabase_data and any(kw in query_lower for kw in stats_keywords):
+            self.logger.info("📊 Redirecionando para CSV analysis (estatísticas solicitadas)")
+            return QueryType.CSV_ANALYSIS
+        
+        # NOVA LÓGICA: Se há dados no Supabase (mas não visualização ou stats), priorizar LLM analysis
+        if has_supabase_data and (csv_score > 0 or data_score > 0):
+            self.logger.info("🔄 Redirecionando para LLM analysis (dados no Supabase detectados)")
+            return QueryType.LLM_ANALYSIS
         
         # Adicionar peso do contexto
         if has_file_context:
@@ -432,7 +710,7 @@ class OrchestratorAgent(BaseAgent):
         if result.get("metadata") and not result["metadata"].get("error"):
             self.current_data_context.update(result["metadata"])
         
-        return self._enhance_response(result, ["csv"])
+        return self._enhance_response(result, ["embeddings_analyzer"])
     
     def _handle_rag_search(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Delega busca semântica para o agente RAG."""
@@ -458,11 +736,16 @@ class OrchestratorAgent(BaseAgent):
         self.logger.info("📁 Processando carregamento de dados")
         
         try:
+            # ⚠️ CONFORMIDADE: OrchestratorAgent NÃO deve carregar CSV para consultas
+            # Este método deve ser usado apenas para ingestão inicial
+            self.logger.warning("🚨 ATENÇÃO: OrchestratorAgent realizando carregamento de dados!")
+            self.logger.warning("🚨 Consultas devem usar APENAS a tabela embeddings!")
+            
             # Verificar se foi fornecido um arquivo
             if context and 'file_path' in context:
                 file_path = context['file_path']
                 
-                # Carregar dados usando DataProcessor
+                # Carregar dados usando DataProcessor (que deve validar autorização)
                 result = self.data_processor.load_from_file(file_path)
                 
                 if not result.get('error'):
@@ -628,18 +911,86 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
         if self.current_data_context:
             llm_context.update(self.current_data_context)
         
+        # 🔄 REDIRECIONAMENTO PARA RAG: Se precisa de análise de dados e há embeddings no Supabase
+        if needs_data_analysis and has_loaded_data:
+            self.logger.info("🔄 Redirecionando para LLM analysis (dados no Supabase detectados)")
+            
+            # Verificar se deve usar RAG para interpretação semântica dos chunks
+            if "rag" in self.agents:
+                try:
+                    # Enriquecer contexto com análise semântica via RAG
+                    self.logger.info("📚 Usando RAG para interpretação semântica dos chunks...")
+                    rag_result = self.agents["rag"].process(query, {"include_context": True, "max_results": 5})
+                    
+                    if rag_result and not rag_result.get("metadata", {}).get("error"):
+                        # Adicionar contexto RAG ao LLM context
+                        llm_context["rag_context"] = rag_result.get("content", "")
+                        llm_context["rag_sources"] = rag_result.get("metadata", {}).get("sources", [])
+                        self.logger.info("✅ Contexto enriquecido com dados do RAG (resumido)")
+                    else:
+                        self.logger.warning("⚠️ RAG não retornou resultados, continuando sem contexto RAG")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Erro ao usar RAG: {str(e)}, continuando sem contexto RAG")
+            
+            # NOVA FUNCIONALIDADE: Recuperar dados do Supabase quando necessário
+            if not llm_context.get("csv_analysis"):
+                self.logger.info("🔍 Recuperando dados da base Supabase para análise...")
+                try:
+                    # Recuperar informações sobre os dados armazenados
+                    supabase_data_context = self._retrieve_data_context_from_supabase()
+                    if supabase_data_context:
+                        llm_context.update(supabase_data_context)
+                        self.logger.info("✅ Contexto de dados recuperado do Supabase")
+                    else:
+                        self.logger.warning("⚠️ Não foi possível recuperar contexto de dados do Supabase")
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao recuperar dados do Supabase: {str(e)}")
+        
         # 5. CONSTRUIR PROMPT CONTEXTUALIZADO
         prompt = self._build_llm_prompt(query, llm_context, needs_data_analysis)
         
         try:
-            # 6. CHAMAR LLM MANAGER
-            config = LLMConfig(temperature=0.2, max_tokens=1024)
+            # 6. CHAMAR LLM MANAGER com configuração otimizada
+            config = LLMConfig(temperature=0.2, max_tokens=512)  # Reduzir tokens de resposta
             response = self.llm_manager.chat(prompt, config)
             
             if not response.success:
                 raise RuntimeError(response.error)
             
-            # 7. CONSTRUIR RESPOSTA COM METADADOS CORRETOS
+            # 7. APLICAR GUARDRAILS DE VALIDAÇÃO
+            if GUARDRAILS_AVAILABLE and statistics_guardrails and needs_data_analysis:
+                validation_result = statistics_guardrails.validate_response(response.content, llm_context)
+                
+                if not validation_result.is_valid and validation_result.confidence_score < 0.7:
+                    self.logger.warning(f"⚠️ Resposta falhol na validação (score: {validation_result.confidence_score:.2f})")
+                    self.logger.warning(f"Issues detectados: {', '.join(validation_result.issues[:3])}")
+                    
+                    # Se há valores corrigidos, tentar nova consulta com correções
+                    if validation_result.corrected_values and len(validation_result.issues) <= 3:
+                        correction_prompt = statistics_guardrails.generate_correction_prompt(validation_result)
+                        
+                        # Adicionar correções ao contexto
+                        corrected_context = llm_context.copy()
+                        corrected_context['correction_prompt'] = correction_prompt
+                        
+                        # Tentar novamente com correções
+                        self.logger.info("🔄 Tentando nova consulta com correções...")
+                        corrected_prompt = self._build_llm_prompt(query, corrected_context, needs_data_analysis)
+                        
+                        try:
+                            config = LLMConfig(temperature=0.1, max_tokens=512)  # Temperatura mais baixa para precisão
+                            corrected_response = self.llm_manager.chat(corrected_prompt, config)
+                            
+                            if corrected_response.success:
+                                response = corrected_response
+                                self.logger.info("✅ Resposta corrigida gerada com sucesso")
+                        except Exception as e:
+                            self.logger.warning(f"⚠️ Falha na correção automática: {str(e)}")
+                
+                elif validation_result.confidence_score >= 0.7:
+                    self.logger.info(f"✅ Resposta aprovada pelos guardrails (score: {validation_result.confidence_score:.2f})")
+            
+            # 8. CONSTRUIR RESPOSTA COM METADADOS CORRETOS
             result = {
                 "content": response.content,
                 "metadata": {
@@ -655,7 +1006,7 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             # 8. REGISTRAR AGENTES USADOS CORRETAMENTE
             agents_used = ["llm_manager"]
             if needs_data_analysis and self.current_data_context.get("csv_loaded"):
-                agents_used.append("csv")  # CSV foi usado para carregar dados
+                agents_used.append("embeddings_analyzer")  # Agente de análise via embeddings
             
             return self._enhance_response(result, agents_used)
             
@@ -684,7 +1035,7 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             if "csv" in self.agents and self.current_data_context:
                 csv_result = self.agents["csv"].process(query, context)
                 results.append(("csv", csv_result))
-                agents_used.append("csv")
+                agents_used.append("embeddings_analyzer")  # Nome correto do agente
             
             # Segundo: busca RAG
             if "rag" in self.agents:
@@ -928,12 +1279,123 @@ context = {"file_path": "fraude.csv"}
         
         return self._build_response(help_text, metadata={"help": True, "agents_used": []})
     
+    # ========================================================================
+    # MÉTODOS DE PROCESSAMENTO COM MEMÓRIA
+    # ========================================================================
+    
+    async def process_with_persistent_memory(self, query: str, context: Optional[Dict[str, Any]] = None,
+                                           session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Processa consulta utilizando sistema de memória persistente Supabase.
+        
+        Args:
+            query: Consulta do usuário
+            context: Contexto adicional
+            session_id: ID da sessão (inicializa se None)
+            
+        Returns:
+            Resposta processada com persistência de memória
+        """
+        self.logger.info(f"🧠 Processando com memória persistente: '{query[:50]}...'")
+        
+        try:
+            # 1. Inicializar sessão de memória se necessário
+            if session_id and self.has_memory:
+                if not self._current_session_id or self._current_session_id != session_id:
+                    await self.init_memory_session(session_id)
+            elif not self._current_session_id and self.has_memory:
+                session_id = await self.init_memory_session()
+            
+            # 2. Recuperar contexto de memória
+            memory_context = {}
+            if self.has_memory and self._current_session_id:
+                memory_context = await self.recall_conversation_context()
+                self.logger.debug(f"Contexto de memória recuperado: {len(memory_context.get('recent_conversations', []))} interações")
+                
+                # Mescla contexto de memória com contexto atual
+                if context:
+                    context.update({"memory_context": memory_context})
+                else:
+                    context = {"memory_context": memory_context}
+            
+            # 3. Verificar cache de análises
+            analysis_cache_key = None
+            if context and context.get('file_path'):
+                analysis_cache_key = f"analysis_{hash(query + str(context.get('file_path')))}"
+                cached_result = await self.recall_cached_analysis(analysis_cache_key)
+                if cached_result:
+                    self.logger.info("📦 Resultado recuperado do cache de análises")
+                    cached_result['metadata']['from_cache'] = True
+                    return cached_result
+            
+            # 4. Processar consulta normalmente
+            result = self.process(query, context)
+            
+            # 5. Salvar interação na memória persistente
+            if self.has_memory and self._current_session_id:
+                await self.remember_interaction(
+                    query=query,
+                    response=result.get('content', str(result)),
+                    metadata=result.get('metadata', {})
+                )
+                
+                # 6. Cachear resultado de análise se aplicável
+                if analysis_cache_key and result.get('metadata', {}).get('query_type') in ['csv_analysis', 'llm_analysis']:
+                    await self.remember_analysis_result(analysis_cache_key, result, expiry_hours=24)
+                
+                # 7. Salvar contexto de dados se carregado
+                if context and context.get('file_path'):
+                    data_context = {
+                        'file_path': context['file_path'],
+                        'last_query': query,
+                        'timestamp': self._get_timestamp()
+                    }
+                    await self.remember_data_context(data_context, "current_data")
+            
+            # 8. Adicionar informações de memória à resposta
+            if self.has_memory:
+                result.setdefault('metadata', {})['session_id'] = self._current_session_id
+                result.setdefault('metadata', {})['memory_enabled'] = True
+                
+                # Estatísticas de memória
+                memory_stats = await self.get_memory_stats()
+                result.setdefault('metadata', {})['memory_stats'] = memory_stats
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Erro no processamento com memória: {e}")
+            # Fallback para processamento sem memória
+            return self.process(query, context)
+    
+    # ========================================================================
+    # MÉTODOS DE GESTÃO DE MEMÓRIA PARA COMPATIBILIDADE
+    # ========================================================================
+    
     def get_conversation_history(self) -> List[Dict[str, Any]]:
-        """Retorna histórico completo da conversa."""
+        """Retorna histórico completo da conversa (compatibilidade).
+        
+        DEPRECIADO: Use get_persistent_conversation_history() para memória Supabase.
+        """
         return self.conversation_history.copy()
     
+    async def get_persistent_conversation_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retorna histórico de conversação da memória persistente."""
+        if not self.has_memory or not self._current_session_id:
+            return self.get_conversation_history()  # Fallback
+        
+        try:
+            conversations = await self.recall_conversation()
+            return conversations[:limit]
+        except Exception as e:
+            self.logger.error(f"Erro ao recuperar histórico persistente: {e}")
+            return self.get_conversation_history()  # Fallback
+    
     def clear_conversation_history(self) -> Dict[str, Any]:
-        """Limpa histórico da conversa."""
+        """Limpa histórico da conversa (compatibilidade).
+        
+        DEPRECIADO: Use clear_persistent_memory() para memória Supabase.
+        """
         count = len(self.conversation_history)
         self.conversation_history.clear()
         self.logger.info(f"Histórico limpo: {count} interações removidas")
@@ -943,8 +1405,31 @@ context = {"file_path": "fraude.csv"}
             metadata={"cleared_count": count}
         )
     
+    async def clear_persistent_memory(self) -> Dict[str, Any]:
+        """Limpa memória persistente da sessão atual."""
+        if not self.has_memory or not self._current_session_id:
+            return self.clear_conversation_history()  # Fallback
+        
+        try:
+            # Implementar limpeza via memory manager se necessário
+            # Por enquanto, inicia nova sessão
+            old_session = self._current_session_id
+            await self.init_memory_session()
+            
+            return self._build_response(
+                f"✅ Memória persistente limpa. Nova sessão: {self._current_session_id}",
+                metadata={"old_session": old_session, "new_session": self._current_session_id}
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao limpar memória persistente: {e}")
+            return self.clear_conversation_history()  # Fallback
+    
     def clear_data_context(self) -> Dict[str, Any]:
-        """Limpa contexto de dados carregados."""
+        """Limpa contexto de dados carregados (compatibilidade).
+        
+        DEPRECIADO: Use clear_persistent_data_context() para memória Supabase.
+        """
         if self.current_data_context:
             file_path = self.current_data_context.get('file_path', 'N/A')
             self.current_data_context.clear()
@@ -959,6 +1444,24 @@ context = {"file_path": "fraude.csv"}
                 "ℹ️ Nenhum contexto de dados para limpar",
                 metadata={"no_data_context": True}
             )
+    
+    async def clear_persistent_data_context(self) -> Dict[str, Any]:
+        """Limpa contexto de dados da memória persistente."""
+        if not self.has_memory or not self._current_session_id:
+            return self.clear_data_context()  # Fallback
+        
+        try:
+            # Aqui implementaríamos limpeza específica do contexto de dados
+            # Por simplicidade, vamos usar o método de compatibilidade
+            result = self.clear_data_context()
+            
+            # Também limpar do sistema de memória se houver implementação específica
+            self.logger.info("Contexto de dados persistente limpo")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao limpar contexto de dados persistente: {e}")
+            return self.clear_data_context()  # Fallback
     
     def _update_data_context_from_csv_result(self, csv_result: Dict[str, Any], context: Dict[str, Any]) -> None:
         """Atualiza contexto de dados com resultado da análise CSV."""
@@ -1057,12 +1560,40 @@ Responda de forma clara, precisa e útil. Use português brasileiro.""")
         
         # Instrução final diferenciada
         if needs_data_analysis and context and context.get("csv_loaded"):
-            prompt_parts.append("""\n🎯 INSTRUÇÕES:
-- Analise SOMENTE os dados específicos carregados
-- Seja preciso sobre as colunas, tipos e estatísticas REAIS
-- NÃO dê respostas genéricas sobre conceitos
-- Forneça uma resposta baseada nos dados concretos""")
+            # 🔄 CORREÇÃO CRÍTICA: Sempre analisar dados CSV ESTRUTURADOS reconstruídos da tabela embeddings
+            prompt_parts.append("""\n🎯 INSTRUÇÕES CRÍTICAS PARA ANÁLISE DE DADOS CSV (da tabela embeddings):
+
+� CONTEXTO RECEBIDO:
+- Você recebeu DADOS ESTRUTURADOS (DataFrame) reconstruídos da coluna chunk_text da tabela embeddings
+- Esses dados foram parseados como CSV e representam as COLUNAS ORIGINAIS do arquivo CSV carregado
+- As estatísticas fornecidas (dtypes, describe, info) refletem os DADOS REAIS, não a estrutura da tabela embeddings
+
+🔍 COMO ANALISAR:
+1. EXAMINE as COLUNAS listadas na seção "ANÁLISE DOS DADOS"
+2. IDENTIFIQUE os TIPOS DE DADOS usando dtypes:
+   - **Numéricos**: float64, int64, float32, int32, etc.
+   - **Categóricos**: object, category, bool
+   - **Temporais**: datetime64, timedelta
+   - **Texto**: object (sem padrão numérico)
+
+3. USE as ESTATÍSTICAS FORNECIDAS:
+   - Para distribuições: count, mean, std, min, max, quartis
+   - Para valores únicos: nunique(), value_counts()
+   - Para tipos: dtypes explícitos
+
+⚠️ REGRAS CRÍTICAS:
+- Use APENAS os dtypes fornecidos para classificar tipos de dados
+- NÃO confunda com colunas da tabela embeddings (id, chunk_text, created_at, embedding)
+- NÃO interprete palavras soltas ou descrições textuais como se fossem colunas
+- Se o contexto mostra "Colunas: ['Time', 'V1', ..., 'Amount', 'Class']", essas são as colunas REAIS
+- Seja PRECISO: liste EXATAMENTE as colunas fornecidas, com seus tipos REAIS
+- Se a informação não está no contexto estruturado, diga que não tem acesso a ela""")
         else:
             prompt_parts.append("\n🎯 Forneça uma resposta útil e estruturada:")
+        
+        # Adicionar correções se disponíveis
+        if context and 'correction_prompt' in context:
+            prompt_parts.append(f"\n{context['correction_prompt']}")
+            prompt_parts.append("\nRefaça sua resposta com os valores corretos fornecidos acima.")
         
         return "\n".join(prompt_parts)

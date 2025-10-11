@@ -70,9 +70,10 @@ def test_csv_agent():
     print("\n🤖 Inicializando agente CSV...")
     agent = CSVAnalysisAgent()
     
-    # Teste 1: Carregar dados
-    print("\n📁 Teste 1: Carregando dados...")
-    result = agent.load_csv(test_file)
+    # Teste 1: Carregar dados via embeddings
+    print("\n📁 Teste 1: Carregando dados via embeddings...")
+    # O dataset_filter deve ser o nome do arquivo salvo
+    result = agent.load_from_embeddings(dataset_filter=test_file)
     print(f"Resultado: {result['content']}")
     
     # Teste 2: Resumo dos dados
@@ -90,12 +91,12 @@ def test_csv_agent():
     result = agent.process("Quantas transações são fraudulentas? Qual a taxa de fraude?")
     print(result['content'])
     
-    # Teste 5: Informações do dataset
-    print("\n📊 Teste 5: Informações detalhadas...")
-    info = agent.get_dataset_info()
-    print(f"Dataset: {info['rows']} linhas, {info['columns']} colunas")
-    print(f"Colunas numéricas: {len(info['numeric_columns'])}")
-    print(f"Colunas categóricas: {len(info['categorical_columns'])}")
+    # Teste 5: Informações dos embeddings
+    print("\n📊 Teste 5: Informações dos embeddings...")
+    info = agent.get_embeddings_info()
+    print(f"Total de embeddings: {info.get('embeddings_count', 0)}")
+    print(f"Colunas detectadas: {info.get('detected_columns', [])}")
+    print(f"Datasets identificados: {info.get('dataset_metadata', {}).get('sources', [])}")
     
     # Limpeza
     if os.path.exists(test_file):

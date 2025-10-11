@@ -1,11 +1,14 @@
 """Sistema de carregamento de dados CSV com múltiplas fontes e validações robustas.
 
+⚠️ CONFORMIDADE CRÍTICA: Este módulo deve ser usado APENAS pelo agente de ingestão.
+Agentes de resposta devem consultar exclusivamente a tabela embeddings do Supabase.
+
 Este módulo implementa o carregamento inteligente de dados CSV com suporte a:
-- Arquivos locais com detecção automática de encoding
-- URLs remotas (HTTP/HTTPS)
-- DataFrames pandas existentes
-- Dados sintéticos para testes
-- Upload via base64
+- Arquivos locais com detecção automática de encoding (RESTRITO)
+- URLs remotas (HTTP/HTTPS) (RESTRITO)
+- DataFrames pandas existentes (PERMITIDO)
+- Dados sintéticos para testes (PERMITIDO)
+- Upload via base64 (RESTRITO)
 - Validação robusta de formato e conteúdo
 """
 from __future__ import annotations
@@ -16,6 +19,7 @@ import requests
 import chardet
 import pandas as pd
 import numpy as np
+import inspect
 from typing import Any, Dict, List, Optional, Union, Tuple
 from pathlib import Path
 from urllib.parse import urlparse
@@ -30,12 +34,23 @@ class DataLoaderError(Exception):
     pass
 
 
+class UnauthorizedCSVAccessError(Exception):
+    """Exceção lançada quando acesso não autorizado a CSV é detectado."""
+    pass
+
+
 class DataLoader:
-    """Carregador inteligente de dados CSV com múltiplas fontes e validações."""
+    """Carregador inteligente de dados CSV com múltiplas fontes e validações.
     
-    def __init__(self):
+    ⚠️ CONFORMIDADE: Restrito ao agente de ingestão apenas.
+    """
+    
+    def __init__(self, caller_agent: Optional[str] = None):
         self.logger = get_logger(__name__)
         self._last_loaded_info: Optional[Dict[str, Any]] = None
+        
+        # Detectar e validar caller_agent
+        self.caller_agent = caller_agent or self._detect_caller_agent()
         
         # Configurações padrão
         self.default_encoding = 'utf-8'
@@ -43,10 +58,64 @@ class DataLoader:
         self.max_file_size_mb = 500
         self.timeout_seconds = 30
         
-        self.logger.info("DataLoader inicializado")
+        self.logger.info(f"DataLoader inicializado por: {self.caller_agent}")
+    
+    def _detect_caller_agent(self) -> str:
+        """Detecta qual agente está chamando este carregador."""
+        frame = inspect.currentframe()
+        try:
+            # Subir na stack para encontrar o caller
+            for i in range(15):  # Limite de segurança aumentado
+                frame = frame.f_back
+                if frame is None:
+                    break
+                    
+                filename = frame.f_code.co_filename
+                
+                # Verificar se é um agente conhecido
+                if 'ingestion_agent' in filename or 'data_ingestion' in filename:
+                    return 'ingestion_agent'
+                elif 'data_processor' in filename:
+                    return 'data_processor'  # DataProcessor pode ser chamado por vários agentes
+                elif 'orchestrator_agent' in filename:
+                    return 'orchestrator_agent'
+                elif 'csv_analysis_agent' in filename or 'embeddings_analysis_agent' in filename:
+                    return 'analysis_agent'
+                elif 'rag_agent' in filename:
+                    return 'rag_agent'
+                elif 'test_' in filename or '_test' in filename:
+                    return 'test_system'
+                    
+            return 'unknown_caller'
+            
+        finally:
+            del frame
+    
+    def _validate_csv_access_authorization(self) -> None:
+        """Valida se o caller tem autorização para acessar CSV diretamente."""
+        authorized_agents = [
+            'ingestion_agent',
+            'data_processor',       # DataProcessor pode ser usado por ingestão
+            'data_loading_system',  # Para casos de carregamento inicial
+            'test_system'           # Para testes
+        ]
+        
+        if self.caller_agent not in authorized_agents:
+            error_msg = (
+                f"⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!\n"
+                f"Agente '{self.caller_agent}' tentou acessar CSV diretamente via DataLoader.\n"
+                f"Apenas agentes autorizados podem ler CSV: {authorized_agents}\n"
+                f"Agentes de resposta devem usar APENAS a tabela embeddings."
+            )
+            self.logger.error(error_msg)
+            raise UnauthorizedCSVAccessError(error_msg)
+        
+        self.logger.info(f"✅ DataLoader: Acesso autorizado para agente: {self.caller_agent}")
     
     def load_from_file(self, file_path: str, **pandas_kwargs) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Carrega dados de arquivo local com detecção automática de encoding.
+        
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
         
         Args:
             file_path: Caminho para o arquivo CSV
@@ -57,7 +126,10 @@ class DataLoader:
             
         Raises:
             DataLoaderError: Se houver erro no carregamento
+            UnauthorizedCSVAccessError: Se chamador não autorizado
         """
+        self._validate_csv_access_authorization()
+        
         try:
             file_path = Path(file_path).resolve()
             
@@ -72,7 +144,7 @@ class DataLoader:
             if file_size_mb > self.max_file_size_mb:
                 raise DataLoaderError(f"Arquivo muito grande: {file_size_mb:.1f}MB (máximo: {self.max_file_size_mb}MB)")
             
-            self.logger.info(f"Carregando arquivo: {file_path} ({file_size_mb:.1f}MB)")
+            self.logger.warning(f"🚨 ACESSO CSV AUTORIZADO por {self.caller_agent}: {file_path} ({file_size_mb:.1f}MB)")
             
             # Detectar encoding se não especificado
             encoding = pandas_kwargs.get('encoding')
@@ -116,6 +188,8 @@ class DataLoader:
     def load_from_url(self, url: str, **pandas_kwargs) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Carrega dados de URL remota.
         
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
+        
         Args:
             url: URL do arquivo CSV
             **pandas_kwargs: Argumentos adicionais para pd.read_csv()
@@ -125,14 +199,17 @@ class DataLoader:
             
         Raises:
             DataLoaderError: Se houver erro no carregamento
+            UnauthorizedCSVAccessError: Se chamador não autorizado
         """
+        self._validate_csv_access_authorization()
+        
         try:
             # Validar URL
             parsed_url = urlparse(url)
             if not parsed_url.scheme in ['http', 'https']:
                 raise DataLoaderError(f"URL deve usar HTTP ou HTTPS: {url}")
             
-            self.logger.info(f"Baixando dados de: {url}")
+            self.logger.warning(f"🚨 ACESSO CSV VIA URL AUTORIZADO por {self.caller_agent}: {url}")
             
             # Fazer request com timeout
             response = requests.get(url, timeout=self.timeout_seconds, stream=True)
@@ -182,6 +259,8 @@ class DataLoader:
             
             return df, load_info
             
+        except UnauthorizedCSVAccessError:
+            raise  # Re-lançar erro de autorização
         except Exception as e:
             error_msg = f"Erro ao carregar URL {url}: {str(e)}"
             self.logger.error(error_msg)
@@ -225,6 +304,8 @@ class DataLoader:
     def load_from_base64(self, base64_content: str, filename: str = "upload.csv", **pandas_kwargs) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """Carrega dados de string base64 (útil para upload de arquivos).
         
+        ⚠️ CONFORMIDADE: Apenas agente de ingestão autorizado.
+        
         Args:
             base64_content: Conteúdo CSV codificado em base64
             filename: Nome do arquivo para referência
@@ -235,8 +316,13 @@ class DataLoader:
             
         Raises:
             DataLoaderError: Se houver erro no carregamento
+            UnauthorizedCSVAccessError: Se chamador não autorizado
         """
+        self._validate_csv_access_authorization()
+        
         try:
+            self.logger.warning(f"🚨 ACESSO CSV VIA UPLOAD AUTORIZADO por {self.caller_agent}: {filename}")
+            
             # Decodificar base64
             content = base64.b64decode(base64_content)
             
@@ -282,6 +368,8 @@ class DataLoader:
             
             return df, load_info
             
+        except UnauthorizedCSVAccessError:
+            raise  # Re-lançar erro de autorização
         except Exception as e:
             error_msg = f"Erro ao processar upload {filename}: {str(e)}"
             self.logger.error(error_msg)

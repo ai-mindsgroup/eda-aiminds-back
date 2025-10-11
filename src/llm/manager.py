@@ -3,7 +3,7 @@
 
 Este módulo fornece uma camada de abstração para diferentes provedores LLM:
 - Groq (llama-3.1-8b-instant)
-- Google Gemini (gemini-pro)
+- Google Gemini (gemini-1.5-flash)
 - OpenAI (gpt-3.5-turbo)
 - Fallback automático quando um provedor falha
 
@@ -167,7 +167,7 @@ class LLMManager:
         elif provider == LLMProvider.GOOGLE:
             import google.generativeai as genai
             genai.configure(api_key=GOOGLE_API_KEY)
-            client = genai.GenerativeModel('gemini-pro')
+            client = genai.GenerativeModel('models/gemini-2.0-flash')
         
         elif provider == LLMProvider.OPENAI:
             import openai
@@ -182,7 +182,7 @@ class LLMManager:
         """Retorna o modelo padrão para cada provedor."""
         defaults = {
             LLMProvider.GROQ: "llama-3.1-8b-instant",
-            LLMProvider.GOOGLE: "gemini-pro",
+            LLMProvider.GOOGLE: "models/gemini-2.0-flash",
             LLMProvider.OPENAI: "gpt-3.5-turbo"
         }
         return defaults.get(provider, "unknown")
@@ -249,7 +249,7 @@ class LLMManager:
         return LLMResponse(
             content=content,
             provider=LLMProvider.GOOGLE,
-            model="gemini-pro",
+            model="models/gemini-2.0-flash",
             processing_time=processing_time
         )
     

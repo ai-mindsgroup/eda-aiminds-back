@@ -1,0 +1,328 @@
+================================================================================
+ANÁLISE DE DISTRIBUIÇÃO DAS VARIÁVEIS
+================================================================================
+
+📊 Dataset: 20000 registros, 31 colunas
+
+🔢 VARIÁVEIS NUMÉRICAS:
+--------------------------------------------------------------------------------
+
+Time:
+  - Média: 12340.9754
+  - Mediana: 10990.5000
+  - Desvio Padrão: 9316.4821
+  - Min: 0.0000
+  - Max: 32851.0000
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V1:
+  - Média: -0.2449
+  - Mediana: -0.3122
+  - Desvio Padrão: 1.8144
+  - Min: -28.3448
+  - Max: 1.9605
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V2:
+  - Média: 0.2664
+  - Mediana: 0.2434
+  - Desvio Padrão: 1.4872
+  - Min: -40.9789
+  - Max: 13.2089
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V3:
+  - Média: 0.8088
+  - Mediana: 0.9357
+  - Desvio Padrão: 1.6405
+  - Min: -24.6677
+  - Max: 4.1017
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V4:
+  - Média: 0.2914
+  - Mediana: 0.2313
+  - Desvio Padrão: 1.4884
+  - Min: -5.1726
+  - Max: 11.9275
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V5:
+  - Média: -0.1252
+  - Mediana: -0.1891
+  - Desvio Padrão: 1.3935
+  - Min: -32.0921
+  - Max: 34.0993
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V6:
+  - Média: 0.1146
+  - Mediana: -0.1631
+  - Desvio Padrão: 1.3530
+  - Min: -23.4967
+  - Max: 21.3931
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V7:
+  - Média: -0.1472
+  - Mediana: -0.0848
+  - Desvio Padrão: 1.3305
+  - Min: -26.5481
+  - Max: 34.3032
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V8:
+  - Média: -0.0078
+  - Mediana: 0.0169
+  - Desvio Padrão: 1.2955
+  - Min: -23.6325
+  - Max: 14.9551
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V9:
+  - Média: 0.8636
+  - Mediana: 0.8572
+  - Desvio Padrão: 1.2591
+  - Min: -7.1751
+  - Max: 10.3929
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V10:
+  - Média: -0.2807
+  - Mediana: -0.3510
+  - Desvio Padrão: 1.2569
+  - Min: -14.1668
+  - Max: 12.7015
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V11:
+  - Média: 0.7972
+  - Mediana: 0.7503
+  - Desvio Padrão: 1.1964
+  - Min: -2.7675
+  - Max: 12.0189
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V12:
+  - Média: -1.3753
+  - Mediana: -1.6964
+  - Desvio Padrão: 1.5601
+  - Min: -17.7691
+  - Max: 3.7748
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V13:
+  - Média: 0.8876
+  - Mediana: 0.9503
+  - Desvio Padrão: 1.1799
+  - Min: -3.3895
+  - Max: 4.4654
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V14:
+  - Média: 0.7294
+  - Mediana: 0.9763
+  - Desvio Padrão: 1.3361
+  - Min: -19.2143
+  - Max: 7.6922
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V15:
+  - Média: -0.1324
+  - Mediana: 0.0040
+  - Desvio Padrão: 0.9770
+  - Min: -4.1525
+  - Max: 3.6350
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V16:
+  - Média: -0.0311
+  - Mediana: 0.0400
+  - Desvio Padrão: 0.9534
+  - Min: -12.2272
+  - Max: 4.8163
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V17:
+  - Média: 0.3651
+  - Mediana: 0.3603
+  - Desvio Padrão: 1.2272
+  - Min: -18.5874
+  - Max: 9.2535
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V18:
+  - Média: -0.0184
+  - Mediana: 0.0301
+  - Desvio Padrão: 0.8498
+  - Min: -8.0612
+  - Max: 4.2956
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V19:
+  - Média: -0.0828
+  - Mediana: -0.0887
+  - Desvio Padrão: 0.8241
+  - Min: -4.9327
+  - Max: 4.5554
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V20:
+  - Média: 0.0310
+  - Mediana: -0.0325
+  - Desvio Padrão: 0.6227
+  - Min: -13.2760
+  - Max: 13.8499
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V21:
+  - Média: -0.0646
+  - Mediana: -0.1272
+  - Desvio Padrão: 0.8765
+  - Min: -11.4684
+  - Max: 22.6149
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V22:
+  - Média: -0.1617
+  - Mediana: -0.1273
+  - Desvio Padrão: 0.6282
+  - Min: -8.5936
+  - Max: 4.5345
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V23:
+  - Média: -0.0385
+  - Mediana: -0.0451
+  - Desvio Padrão: 0.5767
+  - Min: -26.7511
+  - Max: 13.8762
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V24:
+  - Média: 0.0166
+  - Mediana: 0.0665
+  - Desvio Padrão: 0.5864
+  - Min: -2.5124
+  - Max: 3.6955
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V25:
+  - Média: 0.1201
+  - Mediana: 0.1588
+  - Desvio Padrão: 0.4373
+  - Min: -7.4957
+  - Max: 5.5251
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V26:
+  - Média: 0.0373
+  - Mediana: -0.0305
+  - Desvio Padrão: 0.5486
+  - Min: -1.3386
+  - Max: 3.5173
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V27:
+  - Média: 0.0163
+  - Mediana: 0.0009
+  - Desvio Padrão: 0.4053
+  - Min: -8.5676
+  - Max: 8.2544
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+V28:
+  - Média: 0.0067
+  - Mediana: 0.0177
+  - Desvio Padrão: 0.2600
+  - Min: -3.5753
+  - Max: 4.8608
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+Amount:
+  - Média: 66.7721
+  - Mediana: 15.9500
+  - Desvio Padrão: 189.2256
+  - Min: 0.0000
+  - Max: 7712.4300
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+Class:
+  - Média: 0.0044
+  - Mediana: 0.0000
+  - Desvio Padrão: 0.0662
+  - Min: 0.0000
+  - Max: 1.0000
+  - Valores válidos: 20000
+  - Valores faltantes: 0
+
+
+📑 VARIÁVEIS CATEGÓRICAS:
+--------------------------------------------------------------------------------
+
+
+📁 GRÁFICOS GERADOS:
+--------------------------------------------------------------------------------
+  - outputs/histogramas/hist_Time.png
+  - outputs/histogramas/hist_V1.png
+  - outputs/histogramas/hist_V2.png
+  - outputs/histogramas/hist_V3.png
+  - outputs/histogramas/hist_V4.png
+  - outputs/histogramas/hist_V5.png
+  - outputs/histogramas/hist_V6.png
+  - outputs/histogramas/hist_V7.png
+  - outputs/histogramas/hist_V8.png
+  - outputs/histogramas/hist_V9.png
+  - outputs/histogramas/hist_V10.png
+  - outputs/histogramas/hist_V11.png
+  - outputs/histogramas/hist_V12.png
+  - outputs/histogramas/hist_V13.png
+  - outputs/histogramas/hist_V14.png
+  - outputs/histogramas/hist_V15.png
+  - outputs/histogramas/hist_V16.png
+  - outputs/histogramas/hist_V17.png
+  - outputs/histogramas/hist_V18.png
+  - outputs/histogramas/hist_V19.png
+  - outputs/histogramas/hist_V20.png
+  - outputs/histogramas/hist_V21.png
+  - outputs/histogramas/hist_V22.png
+  - outputs/histogramas/hist_V23.png
+  - outputs/histogramas/hist_V24.png
+  - outputs/histogramas/hist_V25.png
+  - outputs/histogramas/hist_V26.png
+  - outputs/histogramas/hist_V27.png
+  - outputs/histogramas/hist_V28.png
+  - outputs/histogramas/hist_Amount.png
+  - outputs/histogramas/hist_Class.png
+
+================================================================================
