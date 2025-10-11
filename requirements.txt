@@ -147,7 +147,7 @@ openpyxl>=3.1.0
 # huggingface-hub>=0.20.0  # Já incluído via sentence-transformers
 
 # Web scraping (se necessário)
-beautifulsoup4>=4.12.0
+beautifulsoup4==4.14.2
 lxml>=5.0.0
 
 # ============================================================================
@@ -198,7 +198,7 @@ asttokens==3.0.0
 async-lru==2.0.5
 attrs==25.3.0
 babel==2.17.0
-beautifulsoup4==4.14.2
+## beautifulsoup4 já listado acima com versão única
 black==25.9.0
 bleach==6.2.0
 cachetools==5.5.2
@@ -312,8 +312,6 @@ python-dateutil==2.9.0.post0
 python-json-logger==3.3.0
 pytokens==0.1.10
 pytz==2025.2
-pywin32==311
-pywinpty==3.0.0
 PyYAML==6.0.2
 pyzmq==27.1.0
 realtime==2.20.0
