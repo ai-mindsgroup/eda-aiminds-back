@@ -36,7 +36,7 @@ if missing:
     import warnings
     warnings.warn(f"Variáveis ausentes: {', '.join(missing)}. Configure configs/.env ou variáveis de ambiente.")
 
-HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "outputs/histogramas")
+HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "static/histogramas")
 
 # ========================================================================
 # CONFIGURAÇÕES DA API
@@ -54,9 +54,11 @@ API_PORT: int = int(os.getenv("API_PORT", "8011"))
 # ========================================================================
 
 # Diretórios locais de gerenciamento de arquivos CSV
+
 EDA_DATA_DIR: Path = Path(os.getenv("EDA_DATA_DIR", "data"))
 EDA_DATA_DIR_PROCESSANDO: Path = Path(os.getenv("EDA_DATA_DIR_PROCESSANDO", "data/processando"))
 EDA_DATA_DIR_PROCESSADO: Path = Path(os.getenv("EDA_DATA_DIR_PROCESSADO", "data/processado"))
+EDA_DATA_DIR_HISTORICO: Path = Path(os.getenv("EDA_DATA_DIR_HISTORICO", "data/historico"))
 
 # Google Drive API
 GOOGLE_DRIVE_ENABLED: bool = os.getenv("GOOGLE_DRIVE_ENABLED", "false").lower() == "true"

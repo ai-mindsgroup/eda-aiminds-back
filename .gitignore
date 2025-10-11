@@ -11,6 +11,7 @@ __pycache__/
 dist/
 build/
 data/creditcard.csv
+__frontend_i2a2mind/
 
 # Google Drive credentials e tokens (SENSÍVEL - NÃO COMMITAR)
 configs/google_drive_credentials.json

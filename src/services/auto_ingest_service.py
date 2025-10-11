@@ -14,6 +14,13 @@ Funcionalidades:
 - Logging detalhado
 - Retry em caso de falhas
 - Limpeza automática de arquivos antigos
+
+⚠️ COMPATIBILIDADE (2025-10-10):
+Usa DataIngestor para manter a mesma lógica do interface_interativa.py:
+- Limpa base vetorial antes da ingestão
+- Gera análise estatística do CSV (2 chunks)
+- Metadata simples: {'source': caminho_arquivo}
+- Mesma qualidade/resultado que interface_interativa.py
 """
 from __future__ import annotations
 
@@ -33,6 +40,7 @@ from src.integrations.google_drive_client import (
 )
 from src.data.csv_file_manager import CSVFileManager, CSVFileManagerError, create_csv_file_manager
 from src.agent.data_ingestor import DataIngestor
+from src.embeddings.generator import EmbeddingProvider
 from src.settings import (
     AUTO_INGEST_POLLING_INTERVAL,
     GOOGLE_DRIVE_ENABLED,
@@ -59,6 +67,8 @@ class AutoIngestService:
     - Implementar loop de polling
     - Gerenciar erros e retries
     - Fornecer interface de controle (start/stop)
+    
+    ⚠️ COMPATIBILIDADE: Usa DataIngestor para manter mesma lógica do interface_interativa.py
     """
     
     def __init__(
@@ -73,7 +83,7 @@ class AutoIngestService:
         Args:
             google_drive_client: Cliente Google Drive (criado automaticamente se None)
             file_manager: Gerenciador de arquivos CSV
-            data_ingestor: Ingestor de dados
+            data_ingestor: Ingestor de dados (mesma lógica do interface_interativa.py)
             polling_interval: Intervalo entre verificações (segundos)
         """
         self.polling_interval = polling_interval or AUTO_INGEST_POLLING_INTERVAL
@@ -84,6 +94,8 @@ class AutoIngestService:
         self.google_drive_client = google_drive_client
         self.google_drive_processed_folder_id = None  # ID da pasta "processados" no Drive
         self.file_manager = file_manager or create_csv_file_manager()
+        
+        # ✅ COMPATIBILIDADE: Usa DataIngestor (mesma lógica do interface_interativa.py)
         self.data_ingestor = data_ingestor or DataIngestor()
         
         # Estatísticas
@@ -100,6 +112,7 @@ class AutoIngestService:
         logger.info(f"  Polling interval: {self.polling_interval}s")
         logger.info(f"  Google Drive enabled: {GOOGLE_DRIVE_ENABLED}")
         logger.info(f"  Google Drive available: {GOOGLE_DRIVE_AVAILABLE}")
+        logger.info(f"  ✅ Usando DataIngestor (compatibilidade interface_interativa.py)")
         
         # Configura tratamento de sinais para shutdown gracioso
         self._setup_signal_handlers()
@@ -242,12 +255,25 @@ class AutoIngestService:
                     # Processa arquivo (já está em 'processando', então vai fazer ingest + mover para 'processado')
                     logger.info(f"  🔄 Iniciando processamento...")
                     
-                    # 1. Executa ingestão (limpa base vetorial + análise + chunking + embeddings)
-                    logger.info("  → Executando ingestão no Supabase...")
+                    # 1. Limpar base vetorial antes da ingestão
+                    logger.info("  → Limpando base vetorial...")
+                    try:
+                        from src.vectorstore.supabase_client import supabase
+                        supabase.table('embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                        supabase.table('chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                        supabase.table('metadata').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                        logger.info("  ✅ Base vetorial limpa")
+                    except Exception as clean_error:
+                        logger.warning(f"  ⚠️ Aviso ao limpar base: {clean_error}")
+                    
+                    # 2. Executa ingestão usando DataIngestor (mesma lógica interface_interativa.py)
+                    logger.info("  → Executando ingestão no Supabase (DataIngestor)...")
+                    
+                    # Executar ingestão (limpa base + analisa + chunking + embeddings)
                     self.data_ingestor.ingest_csv(str(download_path))
                     logger.info("  ✅ Ingestão concluída com sucesso")
                     
-                    # 2. Move para pasta 'processado'
+                    # 3. Move para pasta 'processado'
                     logger.info("  → Movendo para pasta 'processado'...")
                     processed_path = self.file_manager.move_to_processed(download_path)
                     logger.info(f"  ✅ Movido para: {processed_path}")

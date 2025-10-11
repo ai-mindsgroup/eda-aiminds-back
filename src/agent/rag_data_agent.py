@@ -396,9 +396,15 @@ class RAGDataAgent(BaseAgent):
                     # - Acesso read-only sem modificação de dados
                     # ═══════════════════════════════════════════════════════════
                     
-                    csv_path = Path("data/creditcard.csv")
-                    if csv_path.exists():
-                        # Log de auditoria detalhado
+                    from src.settings import EDA_DATA_DIR_PROCESSADO
+                    # Buscar CSV mais recente em data/processado/
+                    csv_files = list(EDA_DATA_DIR_PROCESSADO.glob("*.csv"))
+                    if not csv_files:
+                        self.logger.error("❌ Nenhum arquivo CSV encontrado em data/processado/")
+                        self.logger.info("⚠️ Continuando com resposta textual sem visualizações")
+                    else:
+                        # Pegar o arquivo mais recente (último modificado)
+                        csv_path = max(csv_files, key=lambda p: p.stat().st_mtime)
                         csv_size_mb = csv_path.stat().st_size / 1_000_000
                         self.logger.warning(
                             "⚠️ EXCEÇÃO DE CONFORMIDADE: Acesso direto ao CSV para visualização",
@@ -416,43 +422,37 @@ class RAGDataAgent(BaseAgent):
                                 "cost_saved_estimate_usd": 50.0
                             }
                         )
-                        
                         viz_df = pd.read_csv(csv_path)
                         self.logger.info(
                             f"✅ CSV carregado para visualização: {viz_df.shape[0]:,} linhas × {viz_df.shape[1]} colunas | "
                             f"Tamanho: {csv_size_mb:.2f} MB"
                         )
-                        
                         # Delegar para agente de visualização
                         from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
                         vis_agent = EmbeddingsAnalysisAgent()
                         vis_context = context.copy() if context else {}
                         vis_context['reconstructed_df'] = viz_df
-                        
                         vis_result = vis_agent._handle_visualization_query(query, vis_context)
-                        
                         if vis_result.get('metadata', {}).get('visualization_success'):
                             # Combinar resposta de visualização com análise textual dos chunks
                             context_texts = [chunk['chunk_text'] for chunk in similar_chunks]
                             context_str = "\n\n".join(context_texts[:5])
-                            
                             text_response = await self._generate_llm_response_langchain(
                                 query=query,
                                 context_data=context_str,
                                 memory_context=memory_context,
                                 chunks_metadata=similar_chunks
                             )
-                            
                             # Combinar resposta textual com informação sobre gráficos
                             graficos_info = vis_result.get('metadata', {}).get('graficos_gerados', [])
-                            graficos_msg = f"\n\n📊 **Visualizações Geradas:**\n"
-                            for gf in graficos_info:
-                                graficos_msg += f"• {gf}\n"
-                            
-                            combined_response = text_response + graficos_msg
-                            
+                            if graficos_info:
+                                graficos_msg = f"\n\n📊 **Visualizações Geradas:**\n"
+                                for gf in graficos_info:
+                                    graficos_msg += f"• {gf}\n"
+                                combined_response = text_response + graficos_msg
+                            else:
+                                combined_response = text_response
                             processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-                            
                             # Salvar interação com metadados de conformidade
                             if self.has_memory:
                                 await self.remember_interaction(
@@ -479,7 +479,6 @@ class RAGDataAgent(BaseAgent):
                                         }
                                     }
                                 )
-                            
                             return self._build_response(
                                 combined_response,
                                 metadata={
@@ -499,9 +498,6 @@ class RAGDataAgent(BaseAgent):
                                     }
                                 }
                             )
-                    else:
-                        self.logger.error(f"❌ CSV não encontrado: {csv_path}")
-                        self.logger.info("⚠️ Continuando com resposta textual sem visualizações")
                     
                 except Exception as e:
                     self.logger.error(f"❌ Erro ao gerar visualizações: {e}", exc_info=True)

@@ -57,8 +57,11 @@ class GraphGenerator:
             try:
                 from src.settings import HISTOGRAMS_DIR
                 output_dir = Path(HISTOGRAMS_DIR)
-            except Exception:
-                output_dir = Path("outputs/histogramas")
+            except Exception as e:
+                # Log do erro antes de usar fallback
+                self.logger = get_logger("graph_generator")
+                self.logger.error(f"Erro ao carregar HISTOGRAMS_DIR de settings: {e}")
+                output_dir = Path("static/histogramas")
         self.output_dir = output_dir
         if output_dir:
             output_dir.mkdir(parents=True, exist_ok=True)

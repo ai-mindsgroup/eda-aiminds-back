@@ -169,12 +169,53 @@ async def main():
     session_id = str(uuid4())
     safe_print(f"🔑 Sessão iniciada: {session_id[:8]}...\n")
 
-    # INTEGRAÇÃO: Executar ingestão do dataset antes de inicializar orchestrador
-    safe_print("🧹 Limpando base vetorial e carregando dataset...")
+    # INTEGRAÇÃO: Executar ingestão de CSVs da pasta processando
+    safe_print("🧹 Verificando arquivos CSV em data/processando/...")
     from src.agent.data_ingestor import DataIngestor
+    from src.data.csv_file_manager import CSVFileManager
+    from src.settings import EDA_DATA_DIR_PROCESSANDO
+
     ingestor = DataIngestor()
-    ingestor.ingest_csv('data/creditcard.csv')
-    safe_print("✅ Dataset creditcard.csv carregado e base vetorial atualizada!\n")
+    file_manager = CSVFileManager()
+
+    # Arquivar último arquivo processado antes de novo processamento
+    file_manager.archive_last_processed_file()
+
+    # Buscar todos os arquivos CSV em data/processando/
+    csv_files = list(EDA_DATA_DIR_PROCESSANDO.glob("*.csv"))
+
+    if not csv_files:
+        safe_print("⚠️ Nenhum arquivo CSV encontrado em data/processando/")
+        safe_print("💡 Coloque seus arquivos CSV em data/processando/ para processá-los\n")
+    else:
+        safe_print(f"📥 Encontrados {len(csv_files)} arquivo(s) CSV para processar\n")
+
+        for csv_file in csv_files:
+            try:
+                safe_print(f"📄 Processando: {csv_file.name}")
+
+                # Limpar base vetorial antes da ingestão
+                safe_print("  → Limpando base vetorial...")
+                from src.vectorstore.supabase_client import supabase
+                supabase.table('embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                supabase.table('chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                supabase.table('metadata').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+
+                # Processar arquivo
+                safe_print("  → Executando ingestão no Supabase...")
+                ingestor.ingest_csv(str(csv_file))
+
+                # Mover para pasta processado
+                safe_print("  → Movendo para pasta 'processado'...")
+                processed_path = file_manager.move_to_processed(csv_file)
+
+                safe_print(f"  ✅ Arquivo processado com sucesso!")
+                safe_print(f"  📁 Localização final: {processed_path}\n")
+
+            except Exception as e:
+                safe_print(f"  ❌ Erro ao processar {csv_file.name}: {e}\n")
+                logger.error(f"Erro no processamento de {csv_file.name}: {e}", exc_info=True)
+        safe_print("✅ Processamento de arquivos concluído!\n")
 
     # Inicializar orchestrador
     safe_print("🔧 Inicializando sistema multiagente...")

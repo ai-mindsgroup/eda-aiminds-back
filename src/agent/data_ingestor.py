@@ -1,20 +1,79 @@
 """
-Agente de Ingestão Inteligente para EDA AIMinds
+⚠️ DEPRECADO - Use RAGAgent ao invés deste módulo
+
+Agente de Ingestão Simplificado para EDA AIMinds
 - Limpa base vetorial Supabase
 - Analisa CSV e gera estatísticas descritivas e insights
 - Chunking automático e inserção de embeddings
 - Mantém tudo em memória, sem arquivos intermediários
+
+❌ PROBLEMA: Esta implementação é SIMPLIFICADA e gera resultados inferiores:
+- Apenas 2 chunks estatísticos básicos
+- Metadata pobre (apenas {'source': path})
+- Sem enriquecimento de contexto
+- Sem estratégia CSV_ROW especializada
+
+✅ SOLUÇÃO: Use src.agent.rag_agent.RAGAgent ao invés:
+- Gera 6 chunks analíticos estruturados
+- Metadata completo e rastreável
+- Enriquecimento automático de contexto
+- Estratégia CSV_ROW especializada para CSV
+- Integração completa com sistema RAG
+
+EXEMPLO DE USO CORRETO:
+    from src.agent.rag_agent import RAGAgent
+    from src.embeddings.generator import EmbeddingProvider
+    
+    agent = RAGAgent(
+        embedding_provider=EmbeddingProvider.SENTENCE_TRANSFORMER,
+        csv_chunk_size_rows=500,
+        csv_overlap_rows=50
+    )
+    
+    result = agent.ingest_csv_file(
+        file_path="data/creditcard.csv",
+        source_id="creditcard_v1",
+        encoding="utf-8"
+    )
+
+Data de Deprecação: 2025-10-10
+Documentação: docs/2025-10-10_ANALISE_CRITICA_INGESTAO.md
 """
 import pandas as pd
 from src.vectorstore.supabase_client import supabase
 from src.embeddings.embedding_generator import generate_embedding
 import numpy as np
 import logging
+import warnings
 
 logger = logging.getLogger("eda.data_ingestor")
 
 class DataIngestor:
+    """
+    ⚠️ DEPRECADO - Use RAGAgent ao invés
+    
+    Esta classe será removida em versões futuras.
+    Use src.agent.rag_agent.RAGAgent para ingestão completa e robusta.
+    """
+    
     def __init__(self, supabase_client=None):
+        # Emitir warning de deprecação
+        warnings.warn(
+            "\n"
+            "⚠️ DEPRECADO: DataIngestor é uma implementação simplificada.\n"
+            "Use RAGAgent para ingestão completa:\n"
+            "  from src.agent.rag_agent import RAGAgent\n"
+            "  agent = RAGAgent(csv_chunk_size_rows=500, csv_overlap_rows=50)\n"
+            "  agent.ingest_csv_file(file_path, source_id)\n"
+            "\n"
+            "Motivos:\n"
+            "  - DataIngestor: 2 chunks básicos, metadata pobre\n"
+            "  - RAGAgent: 6 chunks analíticos, metadata completo\n"
+            "\n"
+            "Ver: docs/2025-10-10_ANALISE_CRITICA_INGESTAO.md",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.supabase = supabase_client or supabase
 
     def clean_vector_db(self):

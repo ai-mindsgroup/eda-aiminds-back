@@ -511,7 +511,13 @@ async def upload_csv(file: UploadFile = File(...)):
                 logger.warning(f"Erro ao processar com sistema multiagente: {e}")
         
         logger.info(f"Upload concluído: {file.filename} ({len(df)} linhas, {len(df.columns)} colunas)")
-        
+        # Dispara ingestão automática em background
+        import subprocess
+        try:
+            subprocess.Popen(['python', 'run_auto_ingest.py', '--once'])
+            logger.info("Script run_auto_ingest.py --once disparado com sucesso.")
+        except Exception as e:
+            logger.error(f"Falha ao disparar run_auto_ingest.py: {e}")
         return CSVUploadResponse(
             file_id=file_id,
             filename=file.filename,
@@ -616,7 +622,8 @@ async def detect_fraud(request: FraudDetectionRequest):
         if request.file_id and request.file_id in uploaded_files:
             file_info = uploaded_files[request.file_id]
             filename_base = file_info['filename'].replace('.csv', '')
-            histogram_dir = os.path.join(root_dir, 'outputs', 'histogramas')
+            from src.settings import HISTOGRAMS_DIR
+            histogram_dir = os.path.join(root_dir, HISTOGRAMS_DIR)
             if os.path.isdir(histogram_dir):
                 for col in file_info['dataframe'].columns:
                     hist_name = f"hist_{col}.png"

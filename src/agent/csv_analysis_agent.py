@@ -1233,8 +1233,9 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             
             self.logger.info(f"✅ DataFrame disponível: {df.shape[0]} linhas, {df.shape[1]} colunas")
             
-            # Criar diretório de saída
-            output_dir = Path('outputs/histogramas')
+            # Criar diretório de saída usando settings
+            from src.settings import HISTOGRAMS_DIR
+            output_dir = Path(HISTOGRAMS_DIR)
             output_dir.mkdir(parents=True, exist_ok=True)
             
             # Separar variáveis numéricas e categóricas
@@ -1342,24 +1343,31 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             
             # Construir resposta
             if graficos_gerados:
+                # Converte caminhos para URLs
+                from src.settings import API_HOST, API_PORT
+                base_url = f"http://localhost:{API_PORT}" if API_HOST == "0.0.0.0" else f"http://{API_HOST}:{API_PORT}"
+                graficos_urls = []
+                for grafico in graficos_gerados:
+                    filename = Path(grafico).name
+                    url = f"{base_url}/files/histogramas/{filename}"
+                    graficos_urls.append(url)
+                
                 response = f"""📊 **Visualizações Geradas com Sucesso!**
 
 ✅ Total de gráficos gerados: {len(graficos_gerados)}
    • Histogramas (variáveis numéricas): {len([g for g in graficos_gerados if 'hist_' in g])}
    • Gráficos de barras (variáveis categóricas): {len([g for g in graficos_gerados if 'bar_' in g])}
 
-📁 **Local dos arquivos:**
-   {output_dir.absolute()}
-
-📈 **Gráficos salvos:**
+ **Gráficos disponíveis:**
 """
-                for i, grafico in enumerate(graficos_gerados, 1):
-                    response += f"   {i}. {Path(grafico).name}\n"
+                for i, url in enumerate(graficos_urls, 1):
+                    response += f"   {i}. {url}\n"
                 
-                response += f"\n💡 **Dica:** Você pode visualizar os gráficos abrindo os arquivos PNG no diretório indicado."
+                response += f"\n💡 **Dica:** Clique nos links acima para visualizar os gráficos no navegador."
                 
                 return self._build_response(response, metadata={
-                    'graficos_gerados': graficos_gerados,
+                    'graficos_gerados': graficos_urls,
+                    'graficos_locais': graficos_gerados,
                     'estatisticas': estatisticas_geradas,
                     'output_dir': str(output_dir.absolute()),
                     'numeric_cols': numeric_cols,

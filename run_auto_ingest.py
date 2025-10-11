@@ -79,13 +79,18 @@ def run_once():
     logger.info("🔄 Modo single-run: executando apenas um ciclo")
     
     try:
+        # Arquivar último arquivo processado antes de novo processamento
+        from src.data.csv_file_manager import create_csv_file_manager
+        file_manager = create_csv_file_manager()
+        file_manager.archive_last_processed_file()
+
         service = create_auto_ingest_service()
-        
+
         # Inicializa Google Drive client se habilitado (necessário antes de _polling_cycle)
         if GOOGLE_DRIVE_ENABLED:
             logger.info("📁 Inicializando Google Drive client...")
             service._initialize_google_drive()
-        
+
         service._polling_cycle()
         service._print_stats()
         logger.info("✅ Ciclo único concluído com sucesso")
@@ -100,6 +105,11 @@ def run_continuous():
     logger.info("🔁 Modo contínuo: iniciando loop de polling")
     
     try:
+        # Arquivar último arquivo processado antes de novo processamento
+        from src.data.csv_file_manager import create_csv_file_manager
+        file_manager = create_csv_file_manager()
+        file_manager.archive_last_processed_file()
+
         service = create_auto_ingest_service()
         service.start()
         return 0

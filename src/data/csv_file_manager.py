@@ -35,6 +35,26 @@ class CSVFileManagerError(Exception):
 
 
 class CSVFileManager:
+    def archive_last_processed_file(self) -> bool:
+        """Move o arquivo mais recente de processado para historico, renomeando com timestamp."""
+        try:
+            from src.settings import EDA_DATA_DIR_HISTORICO
+            EDA_DATA_DIR_HISTORICO.mkdir(parents=True, exist_ok=True)
+            latest = self.get_latest_processed_file()
+            if not latest:
+                logger.info("Nenhum arquivo para arquivar em processado.")
+                return False
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            stem = latest.stem
+            suffix = latest.suffix
+            new_name = f"{stem}_{timestamp}{suffix}"
+            destination = EDA_DATA_DIR_HISTORICO / new_name
+            shutil.move(str(latest), str(destination))
+            logger.info(f"Arquivo arquivado: {latest.name} -> {destination}")
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao arquivar arquivo: {e}")
+            return False
     """Gerencia o ciclo de vida de arquivos CSV no sistema de ingestão.
     
     Responsabilidades:
