@@ -21,6 +21,9 @@ configs/google_drive_token.json
 data/processando/
 data/processado/
 data/*.csv
+data/*
+scripts/git-filter-repo.txt
+git-filter-repo.py
 
 # Logs do serviço de ingestão
 logs/auto_ingest.log
