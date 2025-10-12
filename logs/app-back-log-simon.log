@@ -1,0 +1,619 @@
+⚠️ LangChain não disponível: No module named 'langchain_groq'
+INFO:api_completa:✅ LangChainLLMManager carregado - roteamento inteligente ativo
+🔧 Carregando sistema multiagente...
+INFO:api_completa:✅ Configurações carregadas
+WARNING:api_completa:⚠️ GOOGLE_API_KEY não configurado - modo limitado
+INFO:api_completa:🤖 Tentando carregar agentes...
+INFO:api_completa:✅ Orquestrador encontrado (carregamento lazy)
+INFO:api_completa:🎯 Status: MULTIAGENT=True, ORCHESTRATOR=True
+INFO:api_completa:✅ API pronta para iniciar (agentes em modo lazy loading)
+INFO:     Started server process [7]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:58798 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52874 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55908 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55908 - "GET /csv/files HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55910 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55908 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:46360 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55472 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45528 - "GET /health HTTP/1.1" 200 OK
+INFO:     89.117.23.28:51770 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41488 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55922 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50984 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58370 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57424 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44494 - "GET /health HTTP/1.1" 200 OK
+INFO:api_completa:Upload concluído: creditcard.csv (284807 linhas, 31 colunas)
+INFO:api_completa:Script run_auto_ingest.py --once disparado com sucesso.
+INFO:     24.239.164.84:49663 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49076 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33344 - "POST /csv/upload HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33344 - "GET /csv/files HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34730 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║        📥 EDA AI MINDS - AUTO INGEST SERVICE 📥                 ║
+║                                                                  ║
+║   Sistema de Ingestão Automática de CSV do Google Drive         ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Configuração:
+  • Google Drive: {"✅ Habilitado" if GOOGLE_DRIVE_ENABLED else "❌ Desabilitado"}
+  • Polling: {AUTO_INGEST_POLLING_INTERVAL}s
+  • Log Level: {LOG_LEVEL}
+
+═══════════════════════════════════════════════════════════════════
+
+2025-10-11 20:27:49,113 | INFO | __main__ | 🔄 Modo single-run: executando apenas um ciclo
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager | CSV File Manager inicializado
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager |   Data dir: data
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager |   Processando dir: data/processando
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager |   Processado dir: data/processado
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager | Arquivo arquivado: creditcard_test_500.csv -> data/historico/creditcard_test_500_20251011_202749.csv
+2025-10-11 20:27:49,113 | INFO | eda.csv_file_manager | CSV File Manager inicializado
+2025-10-11 20:27:49,114 | INFO | eda.csv_file_manager |   Data dir: data
+2025-10-11 20:27:49,114 | INFO | eda.csv_file_manager |   Processando dir: data/processando
+2025-10-11 20:27:49,114 | INFO | eda.csv_file_manager |   Processado dir: data/processado
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | Auto Ingest Service inicializado
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   Polling interval: 300s
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   Google Drive enabled: False
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   Google Drive available: True
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   ✅ Usando DataIngestor (compatibilidade interface_interativa.py)
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | 🔍 Iniciando ciclo de verificação (20:27:49)
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | ======================================================================
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | 📊 ESTATÍSTICAS DO SERVIÇO
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | ======================================================================
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   Arquivos processados: 0
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service |   Arquivos com erro: 0
+2025-10-11 20:27:49,114 | INFO | eda.auto_ingest_service | ======================================================================
+2025-10-11 20:27:49,114 | INFO | __main__ | ✅ Ciclo único concluído com sucesso
+INFO:     127.0.0.1:41558 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55470 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60288 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41436 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48064 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56220 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:57496 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:63812 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48434 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50232 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57758 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48582 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50096 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42106 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33682 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60492 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:58976 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35084 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52696 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37530 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:51392 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47892 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49644 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40318 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:31501 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60286 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52094 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59478 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48668 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40850 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58466 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54682 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:33986 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:58268 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58670 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48620 - "OPTIONS /chat HTTP/1.1" 200 OK
+WARNING:api_completa:⚠️ Erro ao inicializar LLM Manager: ❌ LangChain não está disponível. Execute: pip install langchain langchain-openai langchain-google-genai langchain-groq
+INFO:api_completa:💬 Processando pergunta: Como esses outliers afetam a análise?...
+INFO:api_completa:📦 Carregando orquestrador dinamicamente...
+INFO:src.memory:Módulo de memória carregado - versão 1.0.0
+INFO:src.tools.python_analyzer:PythonDataAnalyzer inicializado por: orchestrator_agent
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+INFO:memory.supabase.orchestrator:SupabaseMemoryManager inicializado para agente: orchestrator
+INFO:agent.orchestrator:Memória LangChain+Supabase habilitada para agente orchestrator
+INFO:agent.orchestrator:Agente orchestrator inicializado: Coordenador central do sistema multiagente de IA para análise de dados
+INFO:agent.orchestrator:✅ Prompt Manager inicializado
+INFO:memory.supabase.rag_data_analyzer:SupabaseMemoryManager inicializado para agente: rag_data_analyzer
+INFO:agent.rag_data_analyzer:Memória LangChain+Supabase habilitada para agente rag_data_analyzer
+INFO:agent.rag_data_analyzer:Agente rag_data_analyzer inicializado: Analisa dados usando busca vetorial semântica pura com memória persistente
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+ERROR:src.embeddings.generator:Erro ao inicializar cliente EmbeddingProvider.LLM_MANAGER: Falha ao inicializar LLM Manager: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+WARNING:agent.orchestrator:⚠️ RAG Data Agent: Falha ao inicializar LLM Manager: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+INFO:memory.supabase.rag_agent:SupabaseMemoryManager inicializado para agente: rag_agent
+INFO:agent.rag_agent:Memória LangChain+Supabase habilitada para agente rag_agent
+INFO:agent.rag_agent:Agente rag_agent inicializado: Agente RAG para consultas contextualizadas com busca vetorial
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+INFO:agent.rag_agent:Agente RAG inicializado com sucesso e sistema de memória
+INFO:agent.orchestrator:✅ Agente RAG inicializado
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:agent.orchestrator:⚠️ LLM Manager: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+ERROR:src.data.data_processor:⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!
+Agente 'orchestrator_agent' tentou acessar CSV diretamente.
+Apenas agentes autorizados podem ler CSV: ['ingestion_agent', 'data_loading_system', 'test_system']
+Agentes de resposta devem usar APENAS a tabela embeddings.
+WARNING:agent.orchestrator:⚠️ Data Processor: ⚠️ VIOLAÇÃO DE CONFORMIDADE DETECTADA!
+Agente 'orchestrator_agent' tentou acessar CSV diretamente.
+Apenas agentes autorizados podem ler CSV: ['ingestion_agent', 'data_loading_system', 'test_system']
+Agentes de resposta devem usar APENAS a tabela embeddings.
+INFO:agent.orchestrator:✅ Semantic Router inicializado (classificação via embeddings)
+INFO:agent.orchestrator:🚀 Orquestrador inicializado com 1 agentes
+WARNING:agent.orchestrator:⚠️ 3 componentes falharam na inicialização
+INFO:api_completa:✅ Orquestrador carregado com sucesso
+INFO:api_completa:🧠 Enviando query para o orquestrador...
+INFO:agent.orchestrator:🧠 Processando com memória persistente: 'Como esses outliers afetam a análise?...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=%2A&session_id=eq.default "HTTP/2 200 OK"
+INFO:memory.supabase.orchestrator:Sessão existente recuperada: default
+INFO:agent.orchestrator:Sessão de memória iniciada: default
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc&timestamp=gte.2025-10-10T20%3A31%3A57.093694 "HTTP/2 200 OK"
+INFO:agent.orchestrator:🎯 [async] Processando consulta: 'Como esses outliers afetam a análise?...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:agent.orchestrator:✅ Dados encontrados na tabela embeddings
+INFO:agent.orchestrator:🧠 Usando roteamento semântico via embeddings...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  9.93it/s]Batches: 100%|██████████| 1/1 [00:00<00:00,  9.89it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 89.63it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.493 for query='como esses outliers afetam a análise?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 89.60it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.480 for query='como esses outliers afetam a análise? incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 84.39it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.480 for query='como esses outliers afetam a análise? incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.41s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 121.41it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 134.93it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+WARNING:src.router.semantic_router:Nenhuma correspondência semântica encontrada para a pergunta.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 118.59it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 62.00it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.493 for query='como esses outliers afetam a análise?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 75.33it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.480 for query='como esses outliers afetam a análise? incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 62.36it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.480 for query='como esses outliers afetam a análise? incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.15s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 88.82it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 56.80it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.router.semantic_router:Nenhuma resposta contextualizada encontrada, encaminhando para LLM genérica.
+INFO:agent.orchestrator:📍 Roteamento semântico: {'route': 'llm_generic', 'response': None, 'source': 'semantic_router'}
+WARNING:agent.orchestrator:⚠️ Confiança baixa (0.00), usando fallback estático
+INFO:agent.orchestrator:📋 Usando roteamento estático por palavras-chave...
+INFO:matplotlib.font_manager:generated new fontManager
+INFO:agent.orchestrator:🎨 Visualização detectada: boxplot
+INFO:agent.orchestrator:📊 Visualização detectada: boxplot
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:agent.orchestrator:🎨 Redirecionando para CSV analysis (visualização solicitada)
+INFO:agent.orchestrator:📝 [async] Tipo de consulta identificado: csv_analysis
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_context?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&agent_name=eq.orchestrator&order=created_at.asc "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc "HTTP/2 200 OK"
+INFO:api_completa:✅ Orquestrador retornou resposta: unknown
+INFO:api_completa:Chat processado em 18.31s por orchestrator
+INFO:api_completa:   LLM: fallback
+INFO:     172.19.0.1:48620 - "POST /chat HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48630 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36082 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48180 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51892 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36720 - "GET /health HTTP/1.1" 200 OK
+WARNING:api_completa:⚠️ Erro ao inicializar LLM Manager: ❌ LangChain não está disponível. Execute: pip install langchain langchain-openai langchain-google-genai langchain-groq
+INFO:api_completa:💬 Processando pergunta: Podem ser removidos, transformados ou investigados?...
+INFO:api_completa:🧠 Enviando query para o orquestrador...
+INFO:agent.orchestrator:🧠 Processando com memória persistente: 'Podem ser removidos, transformados ou investigados...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc&timestamp=gte.2025-10-10T20%3A32%3A29.536776 "HTTP/2 200 OK"
+INFO:agent.orchestrator:🎯 [async] Processando consulta: 'Podem ser removidos, transformados ou investigados...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:agent.orchestrator:✅ Dados encontrados na tabela embeddings
+INFO:agent.orchestrator:🧠 Usando roteamento semântico via embeddings...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 94.84it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 91.67it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.492 for query='podem ser removidos, transformados ou investigados?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 97.80it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.483 for query='podem ser removidos, transformados ou investigados? incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 74.55it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.483 for query='podem ser removidos, transformados ou investigados? incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.14s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 94.58it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+WARNING:src.router.semantic_router:Nenhuma correspondência semântica encontrada para a pergunta.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 99.99it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 92.80it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.492 for query='podem ser removidos, transformados ou investigados?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 72.58it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.483 for query='podem ser removidos, transformados ou investigados? incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 80.78it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.483 for query='podem ser removidos, transformados ou investigados? incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.14s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 114.85it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.router.semantic_router:Nenhuma resposta contextualizada encontrada, encaminhando para LLM genérica.
+INFO:agent.orchestrator:📍 Roteamento semântico: {'route': 'llm_generic', 'response': None, 'source': 'semantic_router'}
+WARNING:agent.orchestrator:⚠️ Confiança baixa (0.00), usando fallback estático
+INFO:agent.orchestrator:📋 Usando roteamento estático por palavras-chave...
+INFO:agent.orchestrator:📝 [async] Tipo de consulta identificado: unknown
+WARNING:agent.orchestrator:🤔 Consulta de tipo desconhecido: Podem ser removidos, transformados ou investigados...
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_context?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&agent_name=eq.orchestrator&order=created_at.asc "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc "HTTP/2 200 OK"
+INFO:api_completa:✅ Orquestrador retornou resposta: unknown
+INFO:api_completa:Chat processado em 4.40s por orchestrator
+INFO:api_completa:   LLM: fallback
+INFO:     172.19.0.1:36160 - "POST /chat HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40758 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48198 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:24813 - "GET /health HTTP/1.1" 200 OK
+WARNING:api_completa:⚠️ Erro ao inicializar LLM Manager: ❌ LangChain não está disponível. Execute: pip install langchain langchain-openai langchain-google-genai langchain-groq
+INFO:api_completa:💬 Processando pergunta: Existe correlação entre as variáveis?...
+INFO:api_completa:🧠 Enviando query para o orquestrador...
+INFO:agent.orchestrator:🧠 Processando com memória persistente: 'Existe correlação entre as variáveis?...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc&timestamp=gte.2025-10-10T20%3A32%3A47.250252 "HTTP/2 200 OK"
+INFO:agent.orchestrator:🎯 [async] Processando consulta: 'Existe correlação entre as variáveis?...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:agent.orchestrator:✅ Dados encontrados na tabela embeddings
+INFO:agent.orchestrator:🧠 Usando roteamento semântico via embeddings...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 112.65it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 87.61it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.467 for query='existe correlação entre as variáveis?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 80.16it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.455 for query='existe correlação entre as variáveis? desvio padrão variância incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 84.38it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.455 for query='existe correlação entre as variáveis? desvio padrão variância incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.46s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 106.48it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 82.85it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 94.33it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 110.24it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+WARNING:src.router.semantic_router:Nenhuma correspondência semântica encontrada para a pergunta.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 117.63it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 88.74it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.467 for query='existe correlação entre as variáveis?'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 86.14it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.455 for query='existe correlação entre as variáveis? desvio padrão variância incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 89.51it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.455 for query='existe correlação entre as variáveis? desvio padrão variância incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.16s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 106.31it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 99.54it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 100.17it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 102.58it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.router.semantic_router:Nenhuma resposta contextualizada encontrada, encaminhando para LLM genérica.
+INFO:agent.orchestrator:📍 Roteamento semântico: {'route': 'llm_generic', 'response': None, 'source': 'semantic_router'}
+WARNING:agent.orchestrator:⚠️ Confiança baixa (0.00), usando fallback estático
+INFO:agent.orchestrator:📋 Usando roteamento estático por palavras-chave...
+INFO:agent.orchestrator:🎨 Visualização detectada: scatter
+INFO:agent.orchestrator:📊 Visualização detectada: scatter
+INFO:agent.orchestrator:🎨 Redirecionando para CSV analysis (visualização solicitada)
+INFO:agent.orchestrator:📝 [async] Tipo de consulta identificado: csv_analysis
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_context?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&agent_name=eq.orchestrator&order=created_at.asc "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc "HTTP/2 200 OK"
+INFO:api_completa:✅ Orquestrador retornou resposta: unknown
+INFO:api_completa:Chat processado em 5.11s por orchestrator
+INFO:api_completa:   LLM: fallback
+INFO:     172.19.0.1:44956 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52470 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48786 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42418 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36304 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48898 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35240 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:42958 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:41401 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60562 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35720 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39396 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:39914 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52182 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58856 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47504 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:49540 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:5751 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38190 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44434 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54370 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54370 - "GET /csv/files HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54380 - "GET /dashboard/metrics HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54382 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36516 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34274 - "GET /health HTTP/1.1" 200 OK
+WARNING:api_completa:⚠️ Erro ao inicializar LLM Manager: ❌ LangChain não está disponível. Execute: pip install langchain langchain-openai langchain-google-genai langchain-groq
+INFO:api_completa:💬 Processando pergunta: como pode me ajudar...
+INFO:api_completa:🧠 Enviando query para o orquestrador...
+INFO:agent.orchestrator:🧠 Processando com memória persistente: 'como pode me ajudar...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc&timestamp=gte.2025-10-10T20%3A35%3A14.702648 "HTTP/2 200 OK"
+INFO:agent.orchestrator:🎯 [async] Processando consulta: 'como pode me ajudar...'
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:agent.orchestrator:✅ Dados encontrados na tabela embeddings
+INFO:agent.orchestrator:🧠 Usando roteamento semântico via embeddings...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 86.70it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 95.44it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.501 for query='como pode me ajudar'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 84.28it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.476 for query='como pode me ajudar incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 91.40it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.476 for query='como pode me ajudar incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.15s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 112.56it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+WARNING:src.router.semantic_router:Nenhuma correspondência semântica encontrada para a pergunta.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 100.45it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Nenhum resultado encontrado
+INFO:src.embeddings.generator:Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:src.embeddings.generator:Sentence Transformer carregado com sucesso
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/embeddings?select=id&limit=1 "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Conexão com vector store estabelecida
+WARNING:src.llm.manager:⚠️ GROQ: API key não configurada
+WARNING:src.llm.manager:⚠️ GOOGLE: Biblioteca google-generativeai não instalada
+WARNING:src.llm.manager:⚠️ OPENAI: API key não configurada
+WARNING:src.router.query_refiner:⚠️ Falha ao inicializar LLM Manager para paraphrases: ❌ Nenhum provedor LLM disponível. Verifique as configurações de API keys.
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 98.69it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 1 (original): best_historical_similarity=0.501 for query='como pode me ajudar'
+INFO:src.router.query_refiner:🔄 Tentando refinamento heurístico (ontologia + termos)...
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 87.13it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 2 (heuristic): best_historical_similarity=0.476 for query='como pode me ajudar incluir exemplos e colunas específicas'
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 89.38it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.query_refiner:[QueryRefiner] Iter 3 (heuristic): best_historical_similarity=0.476 for query='como pode me ajudar incluir exemplos e colunas específicas'
+INFO:src.router.query_refiner:[QueryRefiner] refine_query completed: success=False iterations=3 elapsed=0.15s paraphrase_used=False
+Batches:   0%|          | 0/1 [00:00<?, ?it/s]Batches: 100%|██████████| 1/1 [00:00<00:00, 115.22it/s]
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/rpc/match_embeddings "HTTP/2 200 OK"
+INFO:src.embeddings.vector_store:Encontrados 1 resultados similares
+INFO:src.router.semantic_router:Resposta contextualizada encontrada via embeddings.
+INFO:agent.orchestrator:📍 Roteamento semântico: {'route': 'contextual_embedding', 'response': "# Análise Descritiva do Dataset\n\n## Colunas Numéricas\n\n| Coluna | Mínimo | Máximo | Média | Mediana | Moda | Desvio Padrão | Valores Nulos |\n|--------|--------|--------|-------|---------|------|---------------|---------------|\n| id | 1 | 2000 | 1000.50 | 1000.50 | 1 | 577.49 | 0 |\n| valor | 1.1168131100705765 | 5559.579688455814 | 117.90 | 57.61 | 1.1168131100705765 | 220.07 | 0 |\n| hora | 0 | 23 | 11.85 | 12.00 | 22 | 6.89 | 0 |\n| dia_semana | 1 | 7 | 3.98 | 4.00 | 2 | 2.01 | 0 |\n| idade_cliente | -2.0 | 78.0 | 38.86 | 39.00 | 35.0 | 12.34 | 20 |\n| saldo_conta | -1824.085798885704 | 8316.097516439671 | 3019.60 | 3020.10 | -1824.085798885704 | 1556.40 | 60 |\n| num_transacoes_dia | 0 | 8 | 2.02 | 2.00 | 1 | 1.44 | 0 |\n| eh_fim_semana | 0 | 1 | 0.31 | 0.00 | 0 | 0.46 | 0 |\n| distancia_casa_km | 0.0049974579614659 | 46.10079252403728 | 5.11 | 3.58 | 0.0049974579614659 | 5.10 | 0 |\n| eh_fraude | 0 | 1 | 0.01 | 0.00 | 0 | 0.11 | 0 |\n\n## Colunas Categóricas\n\n| Coluna | Valor Mais Frequente | Frequência | Valores Únicos | Valores Nulos |\n|--------|---------------------|------------|----------------|---------------|\n| categoria | farmacia | 341 | 6 | 0 |\n\n## Insights\n\n- A coluna 'id' apresenta alta variabilidade.\n- A coluna 'valor' apresenta alta variabilidade.\n- A coluna 'hora' apresenta alta variabilidade.\n- A coluna 'dia_semana' apresenta alta variabilidade.\n- A coluna 'idade_cliente' possui 20 valores nulos.\n- A coluna 'saldo_conta' apresenta alta variabilidade.\n- A coluna 'saldo_conta' possui 60 valores nulos.\n- A coluna 'num_transacoes_dia' apresenta alta variabilidade.\n- A coluna 'eh_fim_semana' apresenta alta variabilidade.\n- A coluna 'distancia_casa_km' apresenta alta variabilidade.\n- A coluna 'eh_fraude' apresenta alta variabilidade.\n", 'source': 'semantic_router'}
+WARNING:agent.orchestrator:⚠️ Confiança baixa (0.00), usando fallback estático
+INFO:agent.orchestrator:📋 Usando roteamento estático por palavras-chave...
+INFO:agent.orchestrator:📝 [async] Tipo de consulta identificado: llm_analysis
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=conversation_turn&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.desc&limit=1 "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: POST https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations "HTTP/2 201 Created"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_context?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&agent_name=eq.orchestrator&order=created_at.asc "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_sessions?select=id&session_id=eq.default "HTTP/2 200 OK"
+INFO:httpx:HTTP Request: GET https://ncefmfiulpwssaajybtl.supabase.co/rest/v1/agent_conversations?select=%2A&session_id=eq.f7d8887d-f1c5-4ae8-b1dc-82c7a147bd21&order=conversation_turn.asc "HTTP/2 200 OK"
+INFO:api_completa:✅ Orquestrador retornou resposta: unknown
+INFO:api_completa:Chat processado em 5.14s por orchestrator
+INFO:api_completa:   LLM: fallback
+INFO:     172.19.0.1:54364 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48520 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:46654 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34130 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:21237 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52098 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52160 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:60756 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34762 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46094 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43866 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:54136 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34920 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:50057 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57672 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59770 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:38416 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47792 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49144 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59836 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:36612 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45462 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:29170 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45284 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52250 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:43580 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43840 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59268 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47770 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:44020 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46402 - "GET /health HTTP/1.1" 200 OK
+INFO:     24.239.164.84:65048 - "GET /health HTTP/1.1" 200 OK

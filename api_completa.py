@@ -629,9 +629,13 @@ async def detect_fraud(request: FraudDetectionRequest):
                     hist_name = f"hist_{col}.png"
                     hist_path = os.path.join(histogram_dir, hist_name)
                     if os.path.isfile(hist_path):
-                        # Gera URL relativa para frontend usando HISTOGRAMS_DIR
-                        from src.settings import HISTOGRAMS_DIR
-                        url = f"/files/histogramas/{hist_name}"  # Exemplo: endpoint para servir arquivos
+                        # Monta URL absoluta usando host/porta configurados
+                        from src.settings import API_HOST, API_PORT
+                        # Se API_HOST for 0.0.0.0 ou 127.0.0.1, substitui pelo IP público
+                        public_host = API_HOST
+                        if public_host in ["0.0.0.0", "127.0.0.1", "localhost"]:
+                            public_host = "89.117.23.28"  # IP público fixo
+                        url = f"http://{public_host}:{API_PORT}/files/histogramas/{hist_name}"
                         # Opcional: carrega base64 se desejado
                         base64_img = None
                         try:
@@ -644,7 +648,8 @@ async def detect_fraud(request: FraudDetectionRequest):
                             name=col,
                             url=url,
                             base64=None,  # Para evitar respostas muito grandes, só retorna base64 se solicitado
-                            description=f"Histograma da variável {col}"
+                            description=f"Histograma da variável {col}",
+                            label=hist_name
                         ))
         logger.info(f"Detecção de fraude concluída: score={fraud_score}, risco={risk_level}, imagens={len(images)}")
 
