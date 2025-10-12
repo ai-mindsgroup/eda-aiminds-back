@@ -27,4 +27,6 @@ git-filter-repo.py
 
 # Logs do serviço de ingestão
 logs/auto_ingest.log
+
+requirements_2025-10-11.txt
 logs/service-*.log
