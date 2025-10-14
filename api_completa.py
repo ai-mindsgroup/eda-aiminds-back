@@ -511,11 +511,13 @@ async def upload_csv(file: UploadFile = File(...)):
                 logger.warning(f"Erro ao processar com sistema multiagente: {e}")
         
         logger.info(f"Upload concluído: {file.filename} ({len(df)} linhas, {len(df.columns)} colunas)")
-        # Dispara ingestão automática em background
+        # Dispara ingestão automática em background usando python do ambiente virtual
         import subprocess
         try:
-            subprocess.Popen(['python', 'run_auto_ingest.py', '--once'])
-            logger.info("Script run_auto_ingest.py --once disparado com sucesso.")
+            subprocess.Popen([
+                '.venv\\Scripts\\python.exe', 'run_auto_ingest.py', '--once'
+            ])
+            logger.info("Script run_auto_ingest.py --once disparado com python do ambiente virtual.")
         except Exception as e:
             logger.error(f"Falha ao disparar run_auto_ingest.py: {e}")
         return CSVUploadResponse(
@@ -625,16 +627,25 @@ async def detect_fraud(request: FraudDetectionRequest):
             from src.settings import HISTOGRAMS_DIR
             histogram_dir = os.path.join(root_dir, HISTOGRAMS_DIR)
             if os.path.isdir(histogram_dir):
+                # Para obter o host do request, precisamos passar o objeto Request
+                # Adicione 'request: Request' como parâmetro na função detect_fraud
+                # Exemplo: async def detect_fraud(request: FraudDetectionRequest, req: Request)
+                # Aqui, usamos 'req' para pegar o host
+                # Se não estiver presente, fallback para API_PORT
+                req_host = None
+                try:
+                    req_host = request._request.headers.get('host', f'localhost:{os.getenv("API_PORT", "8011")}')
+                except Exception:
+                    req_host = f'localhost:{os.getenv("API_PORT", "8011")}'
                 for col in file_info['dataframe'].columns:
                     hist_name = f"hist_{col}.png"
                     hist_path = os.path.join(histogram_dir, hist_name)
                     if os.path.isfile(hist_path):
                         # Monta URL absoluta usando host/porta configurados
                         from src.settings import API_HOST, API_PORT
-                        # Se API_HOST for 0.0.0.0 ou 127.0.0.1, substitui pelo IP público
                         public_host = API_HOST
                         if public_host in ["0.0.0.0", "127.0.0.1", "localhost"]:
-                            public_host = "89.117.23.28"  # IP público fixo
+                            public_host = req_host if 'req_host' in locals() else "89.117.23.28"
                         url = f"http://{public_host}:{API_PORT}/files/histogramas/{hist_name}"
                         # Opcional: carrega base64 se desejado
                         base64_img = None
@@ -647,7 +658,7 @@ async def detect_fraud(request: FraudDetectionRequest):
                         images.append(FraudDetectionImage(
                             name=col,
                             url=url,
-                            base64=None,  # Para evitar respostas muito grandes, só retorna base64 se solicitado
+                            base64=None,
                             description=f"Histograma da variável {col}",
                             label=hist_name
                         ))

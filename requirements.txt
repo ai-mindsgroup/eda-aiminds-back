@@ -1,3 +1,7 @@
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
 # EDA AI Minds Backend - Requirements
 # Sistema multiagente para análise inteligente de dados CSV
 # Versão Python: 3.10+
