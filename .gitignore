@@ -16,6 +16,7 @@ __frontend_i2a2mind/
 # Google Drive credentials e tokens (SENSÍVEL - NÃO COMMITAR)
 configs/google_drive_credentials.json
 configs/google_drive_token.json
+configs/eda-api-drive-adb150d0f669.json
 
 # Diretórios de processamento (arquivos grandes)
 data/processando/

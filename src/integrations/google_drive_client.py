@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import logging
 
+import logging
 try:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
@@ -24,8 +25,9 @@ try:
     from googleapiclient.http import MediaIoBaseDownload
     from googleapiclient.errors import HttpError
     GOOGLE_DRIVE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     GOOGLE_DRIVE_AVAILABLE = False
+    logging.getLogger("eda.google_drive_client").error(f"Erro ao importar bibliotecas do Google Drive: {e}")
 
 from src.settings import (
     GOOGLE_DRIVE_CREDENTIALS_FILE,

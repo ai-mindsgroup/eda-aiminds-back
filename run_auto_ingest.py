@@ -32,6 +32,38 @@ from pathlib import Path
 # Adiciona src ao path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# --- Verificação rápida de dependências críticas (evitar falhas quando chamado por outro processo)
+def _ensure_dependency(module_name: str, pip_name: str | None = None) -> bool:
+    """Tenta importar o módulo e, se não existir, instala usando o pip do Python atual.
+
+    module_name: nome do módulo usado pelo Python (ex: 'googleapiclient')
+    pip_name: nome do pacote PyPI (ex: 'google-api-python-client'). Se None, usa module_name.
+
+    Retorna True se o módulo estiver disponível após a checagem/instalação.
+    """
+    try:
+        __import__(module_name)
+        return True
+    except Exception:
+        # Tenta instalar usando o pip do mesmo Python que executa este script
+        try:
+            import subprocess, sys
+            logger = logging.getLogger(__name__)
+            pkg = pip_name or module_name
+            logger.info(f"Módulo '{module_name}' não encontrado. Instalando pacote PyPI '{pkg}'...")
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', pkg])
+            # tenta importar novamente
+            __import__(module_name)
+            logger.info(f"Pacote '{pkg}' instalado com sucesso e módulo '{module_name}' disponível.")
+            return True
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"Falha ao instalar pacote '{pkg}' para módulo '{module_name}': {e}")
+            return False
+
+# Verifica googleapiclient (módulo) mas instala pacote PyPI correto
+_ensure_dependency('googleapiclient', 'google-api-python-client')
+
 from src.services.auto_ingest_service import create_auto_ingest_service
 from src.settings import (
     LOG_LEVEL,
