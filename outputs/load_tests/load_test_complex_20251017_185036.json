@@ -1,0 +1,36 @@
+{
+  "test_name": "Complex Analysis - Heavy Load",
+  "start_time": "2025-10-17T18:51:14.446413",
+  "end_time": "2025-10-17T18:51:19.889928",
+  "total_duration_seconds": 5.443514585494995,
+  "configuration": {
+    "num_threads": 5,
+    "executions_per_thread": 10,
+    "total_executions": 50
+  },
+  "results": {
+    "successful_executions": 0,
+    "failed_executions": 50,
+    "success_rate": 0.0
+  },
+  "latency_ms": {
+    "min": 228.00064086914062,
+    "max": 1198.9781856536865,
+    "mean": 476.8922710418701,
+    "median": 442.97468662261963,
+    "p95": 756.9870948791504,
+    "p99": 1198.9781856536865,
+    "stdev": 177.735066528115
+  },
+  "throughput": {
+    "executions_per_second": 9.185242220757887
+  },
+  "memory_mb": {
+    "min": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "error_distribution": {
+    "exception": 50
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "test_name": "Mixed Workload - Realistic Scenario",
+  "start_time": "2025-10-17T18:51:19.913921",
+  "end_time": "2025-10-17T18:51:34.295934",
+  "total_duration_seconds": 14.382012605667114,
+  "configuration": {
+    "num_threads": 10,
+    "executions_per_thread": 25,
+    "total_executions": 250
+  },
+  "results": {
+    "successful_executions": 0,
+    "failed_executions": 250,
+    "success_rate": 0.0
+  },
+  "latency_ms": {
+    "min": 223.9971160888672,
+    "max": 1750.2963542938232,
+    "mean": 532.3195629119873,
+    "median": 439.99671936035156,
+    "p95": 1264.9831771850586,
+    "p99": 1709.2986106872559,
+    "stdev": 300.9403638735751
+  },
+  "throughput": {
+    "executions_per_second": 17.382824424829774
+  },
+  "memory_mb": {
+    "min": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "error_distribution": {
+    "exception": 250
+  }
+}

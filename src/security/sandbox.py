@@ -108,7 +108,16 @@ except ImportError:
     safe_globals = {}
     safer_getattr = None
 
-from utils.logging_config import get_logger
+from src.utils.logging_config import get_logger
+
+# Sistema de monitoramento
+try:
+    from src.monitoring.sandbox_monitor import SandboxMonitor, ExecutionStatus
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
+    SandboxMonitor = None
+    ExecutionStatus = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -522,6 +531,39 @@ def build_safe_globals() -> Dict[str, Any]:
     return safe_env
 
 
+def _record_metrics(monitor, code: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Registra métricas de execução no monitor (função auxiliar).
+    
+    Args:
+        monitor: Instância do SandboxMonitor (ou None)
+        code: Código executado
+        result: Resultado da execução
+        
+    Returns:
+        result com campo 'monitoring' adicionado (se monitor disponível)
+    """
+    if not monitor:
+        return result
+    
+    logger = get_logger(__name__)
+    
+    try:
+        metrics = monitor.record_execution(code, result)
+        result['monitoring'] = {
+            'execution_id': metrics.execution_id,
+            'status': metrics.status,
+            'code_hash': metrics.code_hash,
+            'execution_time_ms': metrics.execution_time_ms,
+            'memory_used_mb': metrics.memory_used_mb
+        }
+        logger.debug(f"✅ Métricas registradas: {metrics.execution_id}")
+    except Exception as e:
+        logger.debug(f"⚠️ Erro ao registrar métricas: {e}")
+    
+    return result
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # FUNÇÃO PRINCIPAL: execute_in_sandbox
 # ═══════════════════════════════════════════════════════════════════════════
@@ -532,7 +574,8 @@ def execute_in_sandbox(
     memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB,
     allowed_imports: Optional[List[str]] = None,
     return_variable: str = 'resultado',
-    custom_globals: Optional[Dict[str, Any]] = None
+    custom_globals: Optional[Dict[str, Any]] = None,
+    enable_monitoring: bool = True
 ) -> Dict[str, Any]:
     """
     Executa código Python em ambiente sandbox seguro.
@@ -544,6 +587,7 @@ def execute_in_sandbox(
         allowed_imports: Lista customizada de imports permitidos (opcional)
         return_variable: Nome da variável a retornar como resultado (padrão: 'resultado')
         custom_globals: Dicionário com variáveis globais customizadas (ex: {'df': dataframe})
+        enable_monitoring: Se True, coleta métricas via SandboxMonitor (padrão: True)
         
     Returns:
         Dict com:
@@ -553,6 +597,7 @@ def execute_in_sandbox(
             - error (str): Mensagem de erro (se success=False)
             - error_type (str): Tipo do erro (se success=False)
             - logs (List[str]): Logs da execução
+            - monitoring (Dict): Métricas de monitoramento (se enable_monitoring=True)
             
     Raises:
         ValueError: Se RestrictedPython não estiver disponível
@@ -568,11 +613,20 @@ def execute_in_sandbox(
     """
     logger = get_logger(__name__)
     
+    # Inicializar monitor se disponível
+    monitor = None
+    if enable_monitoring and MONITORING_AVAILABLE:
+        try:
+            monitor = SandboxMonitor(enable_persistence=True)
+        except Exception as e:
+            logger.warning(f"⚠️ Não foi possível inicializar monitor: {e}")
+            monitor = None
+    
     # Verificar se RestrictedPython está disponível
     if not RESTRICTED_PYTHON_AVAILABLE:
         error_msg = "RestrictedPython não está instalado. Execute: pip install RestrictedPython"
         logger.error(error_msg)
-        return {
+        result = {
             'success': False,
             'result': None,
             'execution_time_ms': 0,
@@ -580,6 +634,19 @@ def execute_in_sandbox(
             'error_type': 'DependencyError',
             'logs': [error_msg]
         }
+        
+        # Registrar no monitor
+        if monitor:
+            try:
+                metrics = monitor.record_execution(code, result)
+                result['monitoring'] = {
+                    'execution_id': metrics.execution_id,
+                    'status': metrics.status
+                }
+            except Exception as e:
+                logger.debug(f"Erro ao registrar no monitor: {e}")
+        
+        return result
     
     # Atualizar whitelist se customizada
     global ALLOWED_IMPORTS
@@ -608,7 +675,7 @@ def execute_in_sandbox(
             error_msg = str(e)
             logger.error(f"❌ Erro de compilação (código restrito): {error_msg}")
             execution_logs.append(f"Erro de compilação: {error_msg}")
-            return {
+            result = {
                 'success': False,
                 'result': None,
                 'execution_time_ms': (time.time() - start_time) * 1000,
@@ -616,6 +683,7 @@ def execute_in_sandbox(
                 'error_type': 'CompilationError',
                 'logs': execution_logs
             }
+            return _record_metrics(monitor, code, result)
         
         # compile_restricted retorna objeto 'code' diretamente quando sucesso
         # ou lança SyntaxError quando falha
@@ -685,7 +753,7 @@ def execute_in_sandbox(
             error_msg = f"Execução excedeu o timeout de {timeout_seconds}s"
             logger.error(f"⏱️ {error_msg}")
             execution_logs.append(f"TIMEOUT: {error_msg}")
-            return {
+            result = {
                 'success': False,
                 'result': None,
                 'execution_time_ms': (time.time() - start_time) * 1000,
@@ -693,6 +761,7 @@ def execute_in_sandbox(
                 'error_type': 'TimeoutError',
                 'logs': execution_logs
             }
+            return _record_metrics(monitor, code, result)
             
         except MemoryLimitExceeded as e:
             error_msg = str(e)
@@ -708,7 +777,7 @@ def execute_in_sandbox(
                     delta = memory_after_mb - memory_before_mb
                     execution_logs.append(f"Delta memória: {delta:.2f}MB")
             
-            return {
+            result = {
                 'success': False,
                 'result': None,
                 'execution_time_ms': execution_time_ms,
@@ -716,6 +785,7 @@ def execute_in_sandbox(
                 'error_type': 'MemoryLimitError',
                 'logs': execution_logs
             }
+            return _record_metrics(monitor, code, result)
             
         except MemoryError as e:
             # MemoryError do Python (limite hard atingido no Unix)
@@ -724,7 +794,7 @@ def execute_in_sandbox(
             logger.error(f"💾 {error_msg}")
             execution_logs.append(f"MEMORY ERROR: {error_msg}")
             
-            return {
+            result = {
                 'success': False,
                 'result': None,
                 'execution_time_ms': execution_time_ms,
@@ -732,6 +802,7 @@ def execute_in_sandbox(
                 'error_type': 'MemoryError',
                 'logs': execution_logs
             }
+            return _record_metrics(monitor, code, result)
         
         # Obter uso de memória final (para estatísticas)
         memory_after_mb = get_memory_usage_mb()
@@ -763,7 +834,7 @@ def execute_in_sandbox(
         logger.info(f"✅ Sandbox executado com sucesso em {execution_time_ms:.2f}ms")
         execution_logs.append(f"Sucesso em {execution_time_ms:.2f}ms")
         
-        return {
+        result = {
             'success': True,
             'result': result_value,
             'execution_time_ms': execution_time_ms,
@@ -772,12 +843,14 @@ def execute_in_sandbox(
             'logs': execution_logs
         }
         
+        return _record_metrics(monitor, code, result)
+        
     except SandboxImportError as e:
         # Import bloqueado
         error_msg = str(e)
         logger.error(f"🚨 Import bloqueado: {error_msg}")
         execution_logs.append(f"ERRO DE SEGURANÇA: {error_msg}")
-        return {
+        result = {
             'success': False,
             'result': None,
             'execution_time_ms': (time.time() - start_time) * 1000,
@@ -785,6 +858,7 @@ def execute_in_sandbox(
             'error_type': 'ImportError',
             'logs': execution_logs
         }
+        return _record_metrics(monitor, code, result)
         
     except Exception as e:
         # Erro genérico
@@ -793,7 +867,7 @@ def execute_in_sandbox(
         logger.error(f"❌ Erro durante execução: {error_msg}\n{error_trace}")
         execution_logs.append(f"ERRO: {error_msg}")
         
-        return {
+        result = {
             'success': False,
             'result': None,
             'execution_time_ms': (time.time() - start_time) * 1000,
@@ -802,6 +876,8 @@ def execute_in_sandbox(
             'logs': execution_logs,
             'traceback': error_trace
         }
+        
+        return _record_metrics(monitor, code, result)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

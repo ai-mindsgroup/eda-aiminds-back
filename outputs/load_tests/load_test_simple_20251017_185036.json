@@ -1,0 +1,36 @@
+{
+  "test_name": "Simple Code - High Throughput",
+  "start_time": "2025-10-17T18:50:36.358908",
+  "end_time": "2025-10-17T18:50:52.787216",
+  "total_duration_seconds": 16.428308248519897,
+  "configuration": {
+    "num_threads": 10,
+    "executions_per_thread": 20,
+    "total_executions": 200
+  },
+  "results": {
+    "successful_executions": 0,
+    "failed_executions": 200,
+    "success_rate": 0.0
+  },
+  "latency_ms": {
+    "min": 223.99377822875977,
+    "max": 2261.384963989258,
+    "mean": 780.1881945133209,
+    "median": 725.0397205352783,
+    "p95": 1652.2784233093262,
+    "p99": 2245.20206451416,
+    "stdev": 392.6433449046807
+  },
+  "throughput": {
+    "executions_per_second": 12.174108068493233
+  },
+  "memory_mb": {
+    "min": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "error_distribution": {
+    "exception": 200
+  }
+}

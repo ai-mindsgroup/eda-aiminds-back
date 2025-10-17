@@ -1,0 +1,144 @@
+{
+  "timestamp": "2025-10-17 18:44:49",
+  "total_tests": 27,
+  "passed": 26,
+  "failed": 1,
+  "success_rate": 96.29629629629629,
+  "results": [
+    {
+      "test": "test_01_sandbox_basic",
+      "status": "PASS",
+      "message": "Execução básica deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_01_monitoring_present",
+      "status": "PASS",
+      "message": "Resultado deveria conter dados de monitoring"
+    },
+    {
+      "test": "test_01_result_correct",
+      "status": "PASS",
+      "message": "Resultado deveria ser 4, obteve 4"
+    },
+    {
+      "test": "test_02_pandas_execution",
+      "status": "PASS",
+      "message": "Execução com pandas deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_02_vendas_correct",
+      "status": "PASS",
+      "message": "Total vendas deveria ser 1500, obteve 1500"
+    },
+    {
+      "test": "test_02_lucro_correct",
+      "status": "PASS",
+      "message": "Total lucro deveria ser 600, obteve 600"
+    },
+    {
+      "test": "test_03_statistics",
+      "status": "PASS",
+      "message": "Análise estatística deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_03_media_correct",
+      "status": "PASS",
+      "message": "Média deveria ser ~175, obteve 175"
+    },
+    {
+      "test": "test_04_blocked_execution",
+      "status": "PASS",
+      "message": "Import bloqueado deveria falhar"
+    },
+    {
+      "test": "test_04_error_message",
+      "status": "PASS",
+      "message": "Mensagem de erro deveria mencionar import bloqueado"
+    },
+    {
+      "test": "test_05_runtime_error",
+      "status": "PASS",
+      "message": "Código com erro deveria falhar"
+    },
+    {
+      "test": "test_05_error_type",
+      "status": "PASS",
+      "message": "Erro deveria ser NameError, obteve NameError"
+    },
+    {
+      "test": "test_06_division_error",
+      "status": "PASS",
+      "message": "Divisão por zero deveria falhar"
+    },
+    {
+      "test": "test_06_error_type",
+      "status": "PASS",
+      "message": "Erro deveria ser ZeroDivisionError, obteve ZeroDivisionError"
+    },
+    {
+      "test": "test_07_execution_1",
+      "status": "PASS",
+      "message": "Execução 1 deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_07_execution_2",
+      "status": "PASS",
+      "message": "Execução 2 deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_07_execution_3",
+      "status": "PASS",
+      "message": "Execução 3 deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_07_metric_persisted_exec_202",
+      "status": "FAIL",
+      "message": "Métrica exec_20251017_184441_768604_1e912a9d deveria estar no Supabase"
+    },
+    {
+      "test": "test_10_alerts_list",
+      "status": "PASS",
+      "message": "Resultado deveria ser uma lista de alertas"
+    },
+    {
+      "test": "test_12_complex_analysis",
+      "status": "PASS",
+      "message": "Análise complexa deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_12_growth_positive",
+      "status": "PASS",
+      "message": "Crescimento deveria ser positivo"
+    },
+    {
+      "test": "test_13_time_series",
+      "status": "PASS",
+      "message": "Análise de séries temporais deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_14_correlation",
+      "status": "PASS",
+      "message": "Análise de correlação deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_14_strong_correlation",
+      "status": "PASS",
+      "message": "Correlação deveria ser forte (> 0.7)"
+    },
+    {
+      "test": "test_15_outlier_detection",
+      "status": "PASS",
+      "message": "Detecção de outliers deveria ser bem-sucedida"
+    },
+    {
+      "test": "test_15_outliers_found",
+      "status": "PASS",
+      "message": "Deveria detectar pelo menos 1 outlier"
+    },
+    {
+      "test": "test_15_correct_outlier",
+      "status": "PASS",
+      "message": "Deveria detectar 500 como outlier"
+    }
+  ]
+}

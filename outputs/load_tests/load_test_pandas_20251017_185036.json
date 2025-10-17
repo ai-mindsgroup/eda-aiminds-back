@@ -1,0 +1,36 @@
+{
+  "test_name": "Pandas Operations - Medium Load",
+  "start_time": "2025-10-17T18:50:52.885211",
+  "end_time": "2025-10-17T18:51:03.695519",
+  "total_duration_seconds": 10.810307502746582,
+  "configuration": {
+    "num_threads": 8,
+    "executions_per_thread": 15,
+    "total_executions": 120
+  },
+  "results": {
+    "successful_executions": 0,
+    "failed_executions": 120,
+    "success_rate": 0.0
+  },
+  "latency_ms": {
+    "min": 249.99523162841797,
+    "max": 2482.6531410217285,
+    "mean": 698.1127460797628,
+    "median": 585.4921340942383,
+    "p95": 2094.6595668792725,
+    "p99": 2432.6517581939697,
+    "stdev": 453.28181502366425
+  },
+  "throughput": {
+    "executions_per_second": 11.100516795614881
+  },
+  "memory_mb": {
+    "min": 0.0,
+    "max": 0.0,
+    "mean": 0.0
+  },
+  "error_distribution": {
+    "exception": 120
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "timestamp": "20251017_185036",
+  "total_tests": 5,
+  "total_executions": 740,
+  "total_successful": 0,
+  "total_duration_seconds": 57.513022899627686,
+  "averages": {
+    "success_rate": 0.0,
+    "latency_p95_ms": 1320.9799766540527,
+    "throughput_exec_per_sec": 12.265435203646254
+  },
+  "sla_checks": {
+    "Taxa de sucesso >= 95%": "FAIL",
+    "Latência P95 <= 500ms": "FAIL",
+    "Throughput >= 5 exec/s": "PASS"
+  },
+  "individual_reports": [
+    {
+      "test_name": "Simple Code - High Throughput",
+      "start_time": "2025-10-17T18:50:36.358908",
+      "end_time": "2025-10-17T18:50:52.787216",
+      "total_duration_seconds": 16.428308248519897,
+      "configuration": {
+        "num_threads": 10,
+        "executions_per_thread": 20,
+        "total_executions": 200
+      },
+      "results": {
+        "successful_executions": 0,
+        "failed_executions": 200,
+        "success_rate": 0.0
+      },
+      "latency_ms": {
+        "min": 223.99377822875977,
+        "max": 2261.384963989258,
+        "mean": 780.1881945133209,
+        "median": 725.0397205352783,
+        "p95": 1652.2784233093262,
+        "p99": 2245.20206451416,
+        "stdev": 392.6433449046807
+      },
+      "throughput": {
+        "executions_per_second": 12.174108068493233
+      },
+      "memory_mb": {
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0
+      },
+      "error_distribution": {
+        "exception": 200
+      }
+    },
+    {
+      "test_name": "Pandas Operations - Medium Load",
+      "start_time": "2025-10-17T18:50:52.885211",
+      "end_time": "2025-10-17T18:51:03.695519",
+      "total_duration_seconds": 10.810307502746582,
+      "configuration": {
+        "num_threads": 8,
+        "executions_per_thread": 15,
+        "total_executions": 120
+      },
+      "results": {
+        "successful_executions": 0,
+        "failed_executions": 120,
+        "success_rate": 0.0
+      },
+      "latency_ms": {
+        "min": 249.99523162841797,
+        "max": 2482.6531410217285,
+        "mean": 698.1127460797628,
+        "median": 585.4921340942383,
+        "p95": 2094.6595668792725,
+        "p99": 2432.6517581939697,
+        "stdev": 453.28181502366425
+      },
+      "throughput": {
+        "executions_per_second": 11.100516795614881
+      },
+      "memory_mb": {
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0
+      },
+      "error_distribution": {
+        "exception": 120
+      }
+    },
+    {
+      "test_name": "Statistical Analysis",
+      "start_time": "2025-10-17T18:51:03.985538",
+      "end_time": "2025-10-17T18:51:14.434418",
+      "total_duration_seconds": 10.448879957199097,
+      "configuration": {
+        "num_threads": 6,
+        "executions_per_thread": 20,
+        "total_executions": 120
+      },
+      "results": {
+        "successful_executions": 0,
+        "failed_executions": 120,
+        "success_rate": 0.0
+      },
+      "latency_ms": {
+        "min": 222.98789024353027,
+        "max": 1283.8621139526367,
+        "mean": 490.21352529525757,
+        "median": 440.79065322875977,
+        "p95": 835.991621017456,
+        "p99": 941.5209293365479,
+        "stdev": 204.74804435672758
+      },
+      "throughput": {
+        "executions_per_second": 11.48448450853549
+      },
+      "memory_mb": {
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0
+      },
+      "error_distribution": {
+        "exception": 120
+      }
+    },
+    {
+      "test_name": "Complex Analysis - Heavy Load",
+      "start_time": "2025-10-17T18:51:14.446413",
+      "end_time": "2025-10-17T18:51:19.889928",
+      "total_duration_seconds": 5.443514585494995,
+      "configuration": {
+        "num_threads": 5,
+        "executions_per_thread": 10,
+        "total_executions": 50
+      },
+      "results": {
+        "successful_executions": 0,
+        "failed_executions": 50,
+        "success_rate": 0.0
+      },
+      "latency_ms": {
+        "min": 228.00064086914062,
+        "max": 1198.9781856536865,
+        "mean": 476.8922710418701,
+        "median": 442.97468662261963,
+        "p95": 756.9870948791504,
+        "p99": 1198.9781856536865,
+        "stdev": 177.735066528115
+      },
+      "throughput": {
+        "executions_per_second": 9.185242220757887
+      },
+      "memory_mb": {
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0
+      },
+      "error_distribution": {
+        "exception": 50
+      }
+    },
+    {
+      "test_name": "Mixed Workload - Realistic Scenario",
+      "start_time": "2025-10-17T18:51:19.913921",
+      "end_time": "2025-10-17T18:51:34.295934",
+      "total_duration_seconds": 14.382012605667114,
+      "configuration": {
+        "num_threads": 10,
+        "executions_per_thread": 25,
+        "total_executions": 250
+      },
+      "results": {
+        "successful_executions": 0,
+        "failed_executions": 250,
+        "success_rate": 0.0
+      },
+      "latency_ms": {
+        "min": 223.9971160888672,
+        "max": 1750.2963542938232,
+        "mean": 532.3195629119873,
+        "median": 439.99671936035156,
+        "p95": 1264.9831771850586,
+        "p99": 1709.2986106872559,
+        "stdev": 300.9403638735751
+      },
+      "throughput": {
+        "executions_per_second": 17.382824424829774
+      },
+      "memory_mb": {
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0
+      },
+      "error_distribution": {
+        "exception": 250
+      }
+    }
+  ]
+}
