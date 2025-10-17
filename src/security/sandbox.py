@@ -329,7 +329,8 @@ def execute_in_sandbox(
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     memory_limit_mb: int = DEFAULT_MEMORY_LIMIT_MB,
     allowed_imports: Optional[List[str]] = None,
-    return_variable: str = 'resultado'
+    return_variable: str = 'resultado',
+    custom_globals: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Executa código Python em ambiente sandbox seguro.
@@ -340,6 +341,7 @@ def execute_in_sandbox(
         memory_limit_mb: Limite de memória em MB (padrão: 100)
         allowed_imports: Lista customizada de imports permitidos (opcional)
         return_variable: Nome da variável a retornar como resultado (padrão: 'resultado')
+        custom_globals: Dicionário com variáveis globais customizadas (ex: {'df': dataframe})
         
     Returns:
         Dict com:
@@ -354,11 +356,12 @@ def execute_in_sandbox(
         ValueError: Se RestrictedPython não estiver disponível
         
     Exemplo:
-        >>> result = execute_in_sandbox('''
-        ... import pandas as pd
-        ... df = pd.DataFrame({'A': [1, 2, 3]})
-        ... resultado = df['A'].mean()
-        ... ''')
+        >>> import pandas as pd
+        >>> df = pd.DataFrame({'A': [1, 2, 3]})
+        >>> result = execute_in_sandbox(
+        ...     code="resultado = df['A'].mean()",
+        ...     custom_globals={'df': df}
+        ... )
         >>> print(result['result'])  # 2.0
     """
     logger = get_logger(__name__)
@@ -421,6 +424,12 @@ def execute_in_sandbox(
         # ═══════════════════════════════════════════════════════════════
         logger.debug("🔧 Preparando ambiente de execução...")
         safe_env = build_safe_globals()
+        
+        # 🔧 INJETAR VARIÁVEIS GLOBAIS CUSTOMIZADAS (ex: DataFrame 'df')
+        if custom_globals:
+            logger.debug(f"🔧 Injetando {len(custom_globals)} variável(is) customizada(s)")
+            safe_env.update(custom_globals)
+            execution_logs.append(f"Variáveis customizadas injetadas: {list(custom_globals.keys())}")
         
         # Namespace local para variáveis do código
         local_namespace = {}

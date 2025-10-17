@@ -62,6 +62,10 @@ from utils.logging_config import get_logger
 from analysis.intent_classifier import IntentClassifier, AnalysisIntent
 from analysis.orchestrator import AnalysisOrchestrator
 
+# 🔒 SPRINT 3 P0-4: Import do Sandbox Seguro (RestrictedPython)
+# Substitui PythonREPLTool inseguro detectado no Sprint 2
+from security.sandbox import execute_in_sandbox
+
 # Imports LangChain
 try:
     from langchain_openai import ChatOpenAI
@@ -70,7 +74,8 @@ try:
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain.chains import ConversationChain
     from langchain.memory import ConversationBufferMemory
-    from langchain_experimental.tools import PythonREPLTool
+    # 🔒 REMOVIDO: PythonREPLTool (vulnerabilidade RCE crítica)
+    # from langchain_experimental.tools import PythonREPLTool
     LANGCHAIN_AVAILABLE = True
 except ImportError as e:
     LANGCHAIN_AVAILABLE = False
@@ -79,7 +84,6 @@ except ImportError as e:
     HumanMessage = None
     SystemMessage = None
     AIMessage = None
-    PythonREPLTool = None
     print(f"⚠️ LangChain não disponível: {e}")
 
 
@@ -486,54 +490,110 @@ Responda de forma clara e estruturada.
                 return resultado
             if acao_norm in ('estatísticas gerais', 'estatisticas gerais', 'describe', 'summary', 'resumo'):
                 return df[colunas].describe().T
-            # Métricas compostas ou extraordinárias: delega à LLM com execução SEGURA
-            if self.llm and PythonREPLTool:
+            
+            # ═════════════════════════════════════════════════════════════════
+            # 🔒 SPRINT 3 P0-4: MÉTRICAS COMPOSTAS VIA SANDBOX SEGURO
+            # ═════════════════════════════════════════════════════════════════
+            # Métricas complexas que requerem código dinâmico: delega à LLM + SANDBOX
+            if self.llm:
                 try:
-                    # 🔒 SEGURANÇA: Usar PythonREPLTool com sandbox isolado
-                    python_repl = PythonREPLTool()
-                    
+                    # Prompt estruturado para geração de código analítico
                     prompt = (
                         f"Receba instrução analítica: {instrucao}.\n"
                         f"DataFrame já está disponível como variável 'df'.\n"
                         f"Colunas disponíveis: {list(df.columns)}.\n"
+                        f"Colunas numéricas: {df.select_dtypes(include=['number']).columns.tolist()}.\n"
                         "Gere código Python (pandas/numpy) que:\n"
-                        "1. Execute a métrica pedida\n"
+                        "1. Execute a métrica/análise pedida\n"
                         "2. Armazene o resultado em uma variável chamada 'resultado'\n"
-                        "3. Retorne 'resultado' na última linha\n"
-                        "Retorne APENAS o código, sem explicações, sem markdown.\n"
-                        "Exemplo: resultado = df['coluna'].mean()"
+                        "3. O resultado deve ser um DataFrame, Series ou valor escalar\n"
+                        "4. Use apenas bibliotecas permitidas: pandas, numpy, math, statistics, datetime\n"
+                        "Retorne APENAS o código, sem explicações, sem markdown, sem comentários.\n"
+                        "Exemplo válido: resultado = df['coluna'].mean()\n"
+                        "Exemplo válido: resultado = df.groupby('categoria')['valor'].sum()"
                     )
                     
+                    # Gerar código via LLM
                     response = self.llm.invoke(prompt)
                     code = response.content.strip()
                     
-                    # Remove markdown code blocks se presentes
+                    # Limpar markdown code blocks se presentes
                     if code.startswith("```python"):
                         code = code.split("```python")[1].split("```")[0].strip()
                     elif code.startswith("```"):
                         code = code.split("```")[1].split("```")[0].strip()
                     
-                    # Log código antes de executar (auditoria)
-                    self.logger.info(f"🔒 Executando código seguro via PythonREPLTool:\n{code[:200]}...")
+                    # Remover comentários inline (segurança: evitar injeção via comentários)
+                    code_lines = [line for line in code.split('\n') if not line.strip().startswith('#')]
+                    code = '\n'.join(code_lines)
                     
-                    # Preparar contexto com DataFrame
-                    import pandas as pd
-                    import numpy as np
-                    globals_context = {'df': df, 'pd': pd, 'np': np}
+                    # Log código antes de executar (auditoria de segurança)
+                    self.logger.info({
+                        'event': 'llm_code_generation',
+                        'instrucao': str(instrucao)[:100],
+                        'code_generated': code[:200] + ('...' if len(code) > 200 else ''),
+                        'code_length': len(code),
+                        'timestamp': datetime.now().isoformat()
+                    })
                     
-                    # 🔒 Execução segura via PythonREPLTool (sandbox isolado)
-                    # Nota: PythonREPLTool executa em ambiente isolado sem acesso ao filesystem
-                    resultado = python_repl.run(code, globals=globals_context)
+                    # 🔒 EXECUÇÃO SEGURA VIA SANDBOX (RestrictedPython)
+                    # Substitui PythonREPLTool vulnerável (Sprint 2)
+                    sandbox_result = self._executar_codigo_sandbox(
+                        code=code,
+                        df=df,
+                        timeout_seconds=5,
+                        memory_limit_mb=100
+                    )
                     
-                    self.logger.info(f"✅ Código executado com sucesso via PythonREPLTool")
-                    return resultado
+                    # Processar resultado do sandbox
+                    if sandbox_result.get('success'):
+                        resultado = sandbox_result.get('result')
+                        exec_time = sandbox_result.get('execution_time_ms', 0)
+                        
+                        self.logger.info({
+                            'event': 'sandbox_execution_success',
+                            'execution_time_ms': exec_time,
+                            'result_type': type(resultado).__name__,
+                            'result_shape': resultado.shape if hasattr(resultado, 'shape') else None,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        
+                        return resultado
+                    else:
+                        # Erro na execução sandbox
+                        error_msg = sandbox_result.get('error', 'Erro desconhecido')
+                        error_type = sandbox_result.get('error_type', 'UnknownError')
+                        
+                        self.logger.error({
+                            'event': 'sandbox_execution_failed',
+                            'error_type': error_type,
+                            'error_message': error_msg[:200],
+                            'code_attempted': code[:200],
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        
+                        # Log detalhado para debugging
+                        self.logger.debug(f"Código problemático:\n{code}")
+                        self.logger.debug(f"Logs do sandbox: {sandbox_result.get('logs', [])}")
+                        
+                        return None
                     
                 except Exception as e:
-                    self.logger.error(f"❌ Erro ao executar código via PythonREPLTool: {e}")
-                    self.logger.debug(f"Código problemático: {code}")
+                    self.logger.error({
+                        'event': 'llm_code_execution_error',
+                        'error': str(e),
+                        'exception_type': type(e).__name__,
+                        'instrucao': str(instrucao)[:100],
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    self.logger.debug(f"Código problemático: {code if 'code' in locals() else 'N/A'}")
                     return None
             else:
-                self.logger.warning("LLM ou PythonREPLTool não disponível para métricas compostas")
+                self.logger.warning({
+                    'event': 'llm_unavailable_for_complex_metrics',
+                    'instrucao': str(instrucao)[:100],
+                    'timestamp': datetime.now().isoformat()
+                })
                 return None
         except Exception as e:
             self.logger.warning(f"Falha ao executar instrução: {instrucao} | Erro: {e}")
@@ -798,6 +858,130 @@ Responda de forma clara e estruturada.
         
         self.llm = None
         self.logger.warning("⚠️ Nenhum LLM LangChain disponível - usando fallback manual")
+    
+    # ═══════════════════════════════════════════════════════════════
+    # 🔒 SPRINT 3 P0-4: MÉTODO DE EXECUÇÃO SEGURA VIA SANDBOX
+    # ═══════════════════════════════════════════════════════════════
+    
+    def _executar_codigo_sandbox(
+        self, 
+        code: str, 
+        df: pd.DataFrame,
+        timeout_seconds: int = 5,
+        memory_limit_mb: int = 100
+    ) -> Dict[str, Any]:
+        """
+        🔒 Executa código Python dinâmico de forma SEGURA usando RestrictedPython sandbox.
+        
+        SEGURANÇA (5 camadas):
+        1. Compilação restritiva (bloqueia eval, exec, compile)
+        2. Whitelist de imports (pandas, numpy, math, statistics, datetime, json, collections, re)
+        3. Blacklist de imports perigosos (os, subprocess, sys, socket, urllib, requests, etc.)
+        4. Ambiente isolado (sem acesso a open, __import__, globals, locals)
+        5. Limites de recursos (timeout 5s, memória 100MB)
+        
+        Args:
+            code: Código Python a executar (deve definir variável 'resultado')
+            df: DataFrame pandas disponível como variável 'df' no contexto
+            timeout_seconds: Tempo máximo de execução (default: 5s)
+            memory_limit_mb: Limite de memória (default: 100MB, apenas Unix/Linux)
+            
+        Returns:
+            Dict com chaves:
+            - success (bool): True se execução bem-sucedida
+            - result (Any): Resultado da execução (valor da variável 'resultado')
+            - error (str): Mensagem de erro se falha
+            - error_type (str): Tipo do erro (SandboxImportError, SandboxTimeoutError, etc.)
+            - execution_time_ms (float): Tempo de execução em milissegundos
+            - logs (List[str]): Logs de auditoria da execução
+            
+        Raises:
+            Nunca levanta exceções - sempre retorna dict com 'success': False em caso de erro
+            
+        Example:
+            >>> code = "resultado = df['Amount'].mean()"
+            >>> result = agent._executar_codigo_sandbox(code, df)
+            >>> if result['success']:
+            ...     print(f"Média: {result['result']}")
+            >>> else:
+            ...     print(f"Erro: {result['error']}")
+        """
+        # Preparar contexto global seguro (DataFrame disponível)
+        import pandas as pd
+        import numpy as np
+        
+        # Log de auditoria ANTES da execução
+        self.logger.info({
+            'event': 'sandbox_execution_request',
+            'code_length': len(code),
+            'code_preview': code[:200] + ('...' if len(code) > 200 else ''),
+            'timeout_seconds': timeout_seconds,
+            'memory_limit_mb': memory_limit_mb,
+            'dataframe_shape': df.shape if df is not None else None,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        try:
+            # 🔒 PREPARAR VARIÁVEIS GLOBAIS CUSTOMIZADAS (DataFrame + bibliotecas)
+            custom_globals = {
+                'df': df,  # DataFrame disponível como 'df' no código
+                'pd': pd,  # pandas disponível como 'pd'
+                'np': np   # numpy disponível como 'np'
+            }
+            
+            # 🔒 EXECUÇÃO SEGURA via RestrictedPython
+            sandbox_result = execute_in_sandbox(
+                code=code,
+                timeout_seconds=timeout_seconds,
+                memory_limit_mb=memory_limit_mb,
+                allowed_imports=['pandas', 'numpy', 'math', 'statistics', 'datetime', 'json', 'collections', 're'],
+                return_variable='resultado',
+                custom_globals=custom_globals  # 🔑 INJETAR VARIÁVEIS NO SANDBOX
+            )
+            
+            # Validar que sandbox retornou dict válido
+            if not isinstance(sandbox_result, dict):
+                raise TypeError(f"Sandbox retornou tipo inválido: {type(sandbox_result)}")
+            
+            # Log de auditoria APÓS execução
+            self.logger.info({
+                'event': 'sandbox_execution_completed',
+                'success': sandbox_result.get('success', False),
+                'execution_time_ms': sandbox_result.get('execution_time_ms', 0),
+                'error_type': sandbox_result.get('error_type'),
+                'error_message': str(sandbox_result.get('error', ''))[:200],  # Truncar erros longos
+                'logs_count': len(sandbox_result.get('logs', [])),
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            # Registrar logs do sandbox no logger principal
+            for log_entry in sandbox_result.get('logs', []):
+                self.logger.debug(f"[SANDBOX LOG] {log_entry}")
+            
+            return sandbox_result
+            
+        except Exception as e:
+            # Fallback extremo: erro na própria chamada do sandbox
+            import traceback
+            error_msg = f"Erro crítico ao chamar sandbox: {str(e)}"
+            traceback_str = traceback.format_exc()
+            
+            self.logger.error({
+                'event': 'sandbox_execution_critical_error',
+                'error': error_msg,
+                'exception_type': type(e).__name__,
+                'traceback': traceback_str[:500],  # Truncar traceback
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            return {
+                'success': False,
+                'result': None,
+                'error': error_msg,
+                'error_type': 'CriticalSandboxError',
+                'execution_time_ms': 0.0,
+                'logs': [f"ERRO CRÍTICO: {error_msg}", f"Traceback: {traceback_str}"]
+            }
     
     async def process(
         self, 
