@@ -48,15 +48,17 @@ REFERÊNCIAS:
 ════════════════════════════════════════════════════════════════════════════════
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 import json
 from datetime import datetime
 import asyncio
 
-from src.agent.base_agent import BaseAgent, AgentError
-from src.vectorstore.supabase_client import supabase
-from src.embeddings.generator import EmbeddingGenerator
-from src.utils.logging_config import get_logger
+from agent.base_agent import BaseAgent, AgentError
+from vectorstore.supabase_client import supabase
+from embeddings.generator import EmbeddingGenerator
+from utils.logging_config import get_logger
+from analysis.intent_classifier import IntentClassifier, AnalysisIntent
 
 # Imports LangChain
 try:
@@ -66,6 +68,7 @@ try:
     from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain.chains import ConversationChain
     from langchain.memory import ConversationBufferMemory
+    from langchain_experimental.tools import PythonREPLTool
     LANGCHAIN_AVAILABLE = True
 except ImportError as e:
     LANGCHAIN_AVAILABLE = False
@@ -74,10 +77,456 @@ except ImportError as e:
     HumanMessage = None
     SystemMessage = None
     AIMessage = None
+    PythonREPLTool = None
     print(f"⚠️ LangChain não disponível: {e}")
 
 
 class RAGDataAgent(BaseAgent):
+    def _interpretar_pergunta_llm(self, pergunta: str, df):
+        """
+        ✅ V3.0: Utiliza IntentClassifier para classificação semântica SEM HARD-CODING.
+        
+        Retorna instruções analíticas baseadas na intenção classificada pela LLM.
+        Cada instrução é um dict: {'acao': ..., 'colunas': [...], 'params': {}, 'justificativa': str}
+        """
+        if not self.llm:
+            # Fallback: retorna instrução genérica
+            return [{'acao': 'estatísticas gerais', 'colunas': list(df.columns), 'params': {}, 
+                    'justificativa': 'LLM indisponível, fornecendo estatísticas gerais.'}]
+        
+        try:
+            # 🔥 V3.0: Usar IntentClassifier para classificação semântica
+            classifier = IntentClassifier(llm=self.llm, logger=self.logger)
+            
+            # Classificar intenção da pergunta
+            context = {
+                'available_columns': list(df.columns),
+                'dataframe_info': f"Shape: {df.shape}, Colunas numéricas: {df.select_dtypes(include=['number']).columns.tolist()}"
+            }
+            
+            classification_result = classifier.classify(query=pergunta, context=context)
+            
+            # Log da classificação
+            self.logger.info({
+                'event': 'intent_classification',
+                'primary_intent': classification_result.primary_intent.value,
+                'secondary_intents': [intent.value for intent in classification_result.secondary_intents],
+                'confidence': classification_result.confidence,
+                'reasoning': classification_result.reasoning
+            })
+            
+            # 🎯 Mapear intenções para instruções analíticas
+            instrucoes = []
+            
+            # Processar intenção primária
+            primary_action = self._intent_to_action(
+                classification_result.primary_intent, 
+                df, 
+                classification_result.reasoning
+            )
+            if primary_action:
+                instrucoes.append(primary_action)
+            
+            # Processar intenções secundárias se existirem
+            for secondary_intent in classification_result.secondary_intents:
+                secondary_action = self._intent_to_action(
+                    secondary_intent, 
+                    df, 
+                    f"Intenção secundária detectada: {secondary_intent.value}"
+                )
+                if secondary_action and secondary_action not in instrucoes:
+                    instrucoes.append(secondary_action)
+            
+            # Garantir pelo menos uma instrução
+            if not instrucoes:
+                instrucoes = [{
+                    'acao': 'estatísticas gerais',
+                    'colunas': list(df.columns),
+                    'params': {},
+                    'justificativa': 'Nenhuma intenção específica detectada, fornecendo visão geral.'
+                }]
+            
+            self.logger.info({
+                'event': 'instructions_generated',
+                'num_instructions': len(instrucoes),
+                'actions': [ins['acao'] for ins in instrucoes]
+            })
+            
+            return instrucoes
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao interpretar pergunta com IntentClassifier: {e}")
+            # Fallback para interpretação básica via LLM direta
+            return self._fallback_interpretation(pergunta, df)
+    
+    def _intent_to_action(self, intent: AnalysisIntent, df, justificativa: str) -> Optional[Dict]:
+        """
+        🎯 Converte AnalysisIntent em instrução analítica.
+        Mapeia tipos de intenção para ações específicas.
+        """
+        # Selecionar colunas numéricas por padrão
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        all_cols = list(df.columns)
+        
+        intent_map = {
+            AnalysisIntent.STATISTICAL: {
+                'acao': 'estatísticas gerais',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.FREQUENCY: {
+                'acao': 'frequency_analysis',
+                'colunas': all_cols,
+                'params': {'top_n': 10},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.TEMPORAL: {
+                'acao': 'temporal_analysis',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.CLUSTERING: {
+                'acao': 'clustering_analysis',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {'n_clusters': 3},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.CORRELATION: {
+                'acao': 'correlation_analysis',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.OUTLIERS: {
+                'acao': 'outlier_detection',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.COMPARISON: {
+                'acao': 'comparison_analysis',
+                'colunas': all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.VISUALIZATION: {
+                'acao': 'visualization_request',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            },
+            AnalysisIntent.GENERAL: {
+                'acao': 'estatísticas gerais',
+                'colunas': numeric_cols if numeric_cols else all_cols,
+                'params': {},
+                'justificativa': justificativa
+            }
+        }
+        
+        return intent_map.get(intent)
+    
+    def _fallback_interpretation(self, pergunta: str, df) -> List[Dict]:
+        """
+        Fallback: interpretação básica via LLM direta quando IntentClassifier falha.
+        Mantém apenas lógica essencial, SEM hard-coding de keywords.
+        """
+        prompt = (
+            "Você é um especialista em análise de dados.\n"
+            "Interprete a pergunta do usuário e retorne uma lista JSON de instruções analíticas.\n"
+            "Formato de cada instrução: {'acao': str, 'colunas': [str], 'params': {}, 'justificativa': str}\n"
+            f"Pergunta: {pergunta}\n"
+            f"Colunas disponíveis: {list(df.columns)}\n"
+            "Responda APENAS com o JSON, sem explicações."
+        )
+        
+        try:
+            response = self.llm.invoke(prompt)
+            import json
+            instrucoes = json.loads(response.content)
+            return instrucoes if isinstance(instrucoes, list) else [instrucoes]
+        except Exception as e:
+            self.logger.error(f"Fallback interpretation falhou: {e}")
+            return [{
+                'acao': 'estatísticas gerais',
+                'colunas': list(df.columns),
+                'params': {},
+                'justificativa': 'Interpretação padrão devido a erro.'
+            }]
+
+    def _executar_instrucao(self, df, instrucao):
+        """
+        Executa uma instrução analítica sobre o DataFrame.
+        Suporta métricas nativas pandas/NumPy e delega compostas à LLM.
+        """
+        acao = instrucao.get('acao','')
+        colunas = instrucao.get('colunas', list(df.columns))
+        params = instrucao.get('params', {})
+        try:
+            # Normalizar nome da ação para comparação (tolerante a maiúsculas/minúsculas)
+            acao_norm = str(acao).strip().lower()
+            # Métricas nativas pandas
+            if acao_norm in ('média', 'media', 'mean'):
+                return df[colunas].mean().to_frame(name='Média')
+            if acao_norm in ('mediana', 'median'):
+                return df[colunas].median().to_frame(name='Mediana')
+            if acao_norm in ('moda', 'mode'):
+                return df[colunas].mode().T
+            if acao_norm in ('desvio padrão', 'desvio padrao', 'std', 'standard deviation'):
+                return df[colunas].std().to_frame(name='Desvio padrão')
+            if acao_norm in ('variância', 'variancia', 'variance', 'var'):
+                # Variância populacional/por padrão pandas var() usa ddof=1 (amostral). Mantemos default.
+                return df[colunas].var().to_frame(name='Variância')
+            if acao_norm in ('intervalo', 'minmax', 'min_max', 'mínimo', 'máximo'):
+                resultado = df[colunas].agg(['min','max']).T
+                resultado.columns = ['Mínimo','Máximo']
+                return resultado
+            if acao_norm in ('estatísticas gerais', 'estatisticas gerais', 'describe', 'summary', 'resumo'):
+                return df[colunas].describe().T
+            # Métricas compostas ou extraordinárias: delega à LLM com execução SEGURA
+            if self.llm and PythonREPLTool:
+                try:
+                    # 🔒 SEGURANÇA: Usar PythonREPLTool com sandbox isolado
+                    python_repl = PythonREPLTool()
+                    
+                    prompt = (
+                        f"Receba instrução analítica: {instrucao}.\n"
+                        f"DataFrame já está disponível como variável 'df'.\n"
+                        f"Colunas disponíveis: {list(df.columns)}.\n"
+                        "Gere código Python (pandas/numpy) que:\n"
+                        "1. Execute a métrica pedida\n"
+                        "2. Armazene o resultado em uma variável chamada 'resultado'\n"
+                        "3. Retorne 'resultado' na última linha\n"
+                        "Retorne APENAS o código, sem explicações, sem markdown.\n"
+                        "Exemplo: resultado = df['coluna'].mean()"
+                    )
+                    
+                    response = self.llm.invoke(prompt)
+                    code = response.content.strip()
+                    
+                    # Remove markdown code blocks se presentes
+                    if code.startswith("```python"):
+                        code = code.split("```python")[1].split("```")[0].strip()
+                    elif code.startswith("```"):
+                        code = code.split("```")[1].split("```")[0].strip()
+                    
+                    # Log código antes de executar (auditoria)
+                    self.logger.info(f"🔒 Executando código seguro via PythonREPLTool:\n{code[:200]}...")
+                    
+                    # Preparar contexto com DataFrame
+                    import pandas as pd
+                    import numpy as np
+                    globals_context = {'df': df, 'pd': pd, 'np': np}
+                    
+                    # 🔒 Execução segura via PythonREPLTool (sandbox isolado)
+                    # Nota: PythonREPLTool executa em ambiente isolado sem acesso ao filesystem
+                    resultado = python_repl.run(code, globals=globals_context)
+                    
+                    self.logger.info(f"✅ Código executado com sucesso via PythonREPLTool")
+                    return resultado
+                    
+                except Exception as e:
+                    self.logger.error(f"❌ Erro ao executar código via PythonREPLTool: {e}")
+                    self.logger.debug(f"Código problemático: {code}")
+                    return None
+            else:
+                self.logger.warning("LLM ou PythonREPLTool não disponível para métricas compostas")
+                return None
+        except Exception as e:
+            self.logger.warning(f"Falha ao executar instrução: {instrucao} | Erro: {e}")
+            return None
+
+    def _analisar_completo_csv(self, csv_path: str, pergunta: str, override_temporal_col: str = None,
+                               temporal_col_names: list = None, accepted_types: tuple = None) -> str:
+        """
+        Executa análise temporal robusta e modular usando arquitetura refatorada V2.0.
+        
+        ARQUITETURA MODULAR:
+        - Detecção via TemporalColumnDetector (src/analysis/temporal_detection.py)
+        - Análise via TemporalAnalyzer (src/analysis/temporal_analyzer.py)
+        - Fallback para análise estatística geral quando não houver colunas temporais
+        
+        Critérios de detecção:
+        - Override manual (prioritário)
+        - Tipo datetime64 nativo
+        - Nomes comuns parametrizáveis (case-insensitive)
+        - Conversão de strings temporais
+        - Sequências numéricas temporais (modo agressivo)
+        
+        Parâmetros:
+            - override_temporal_col: força uso de coluna específica (ou None para auto)
+            - temporal_col_names: lista de nomes comuns (default: ["time", "date", "timestamp", "data", "datetime"])
+            - accepted_types: DEPRECATED - mantido para backward compatibility
+            
+        Returns:
+            String formatada em Markdown com análises temporais e/ou estatísticas
+        """
+        import pandas as pd
+        from analysis.temporal_detection import TemporalColumnDetector, TemporalDetectionConfig
+        from analysis.temporal_analyzer import TemporalAnalyzer
+        
+        # Carregar dados
+        df = pd.read_csv(csv_path)
+        
+        logger = self.logger if hasattr(self, 'logger') else logging.getLogger(__name__)
+        logger.info({
+            'event': 'inicio_analise_csv_v2',
+            'csv_path': csv_path,
+            'shape': df.shape,
+            'override_temporal_col': override_temporal_col
+        })
+        
+        # ═══════════════════════════════════════════════════════════════
+        # ETAPA 1: DETECÇÃO DE COLUNAS TEMPORAIS
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Configurar detector com parâmetros customizáveis
+        detection_config = TemporalDetectionConfig()
+        if temporal_col_names:
+            detection_config.common_names = temporal_col_names
+        
+        detector = TemporalColumnDetector(config=detection_config)
+        
+        try:
+            detection_results = detector.detect(df, override_column=override_temporal_col)
+            temporal_cols = detector.get_detected_columns(detection_results)
+            detection_summary = detector.get_detection_summary(detection_results)
+            
+            logger.info({
+                'event': 'deteccao_temporal_concluida',
+                'colunas_detectadas': temporal_cols,
+                'total_colunas': len(df.columns),
+                'taxa_deteccao': detection_summary['detection_rate'],
+                'metodos_usados': detection_summary['methods_used']
+            })
+        except Exception as e:
+            logger.error(f"Erro na detecção de colunas temporais: {e}", exc_info=True)
+            temporal_cols = []
+        
+        # ═══════════════════════════════════════════════════════════════
+        # ETAPA 2: ANÁLISE TEMPORAL (se colunas detectadas)
+        # ═══════════════════════════════════════════════════════════════
+        
+        if temporal_cols:
+            logger.info(f"Executando análise temporal em {len(temporal_cols)} coluna(s)")
+            
+            analyzer = TemporalAnalyzer(logger=logger)
+            respostas = []
+            
+            for col in temporal_cols:
+                try:
+                    # Executar análise temporal avançada
+                    result = analyzer.analyze(df, col, enable_advanced=True)
+                    
+                    # Gerar relatório Markdown
+                    respostas.append(result.to_markdown())
+                    
+                    logger.info({
+                        'event': 'analise_temporal_coluna_concluida',
+                        'coluna': col,
+                        'trend_type': result.trend.get('type'),
+                        'anomalies_count': result.anomalies.get('count', 0),
+                        'seasonality_detected': result.seasonality.get('detected', False)
+                    })
+                except Exception as e:
+                    logger.error(f"Erro ao analisar coluna temporal '{col}': {e}", exc_info=True)
+                    respostas.append(
+                        f"## Erro na Análise: {col}\n\n"
+                        f"Não foi possível completar a análise temporal da coluna '{col}': {str(e)}\n"
+                    )
+            
+            # Adicionar sumário executivo da detecção
+            header = (
+                f"# Análise Temporal Completa\n\n"
+                f"**Dataset:** `{csv_path}`\n\n"
+                f"**Colunas analisadas:** {len(temporal_cols)} de {len(df.columns)} colunas totais\n\n"
+                f"**Taxa de detecção:** {detection_summary['detection_rate']:.1%}\n\n"
+                f"**Métodos de detecção utilizados:** {', '.join(detection_summary['methods_used'].keys())}\n\n"
+                "---\n\n"
+            )
+            
+            return header + "\n\n---\n\n".join(respostas)
+        
+        # ═══════════════════════════════════════════════════════════════
+        # ETAPA 3: FALLBACK - ANÁLISE ESTATÍSTICA GERAL
+        # ═══════════════════════════════════════════════════════════════
+        
+        logger.info({
+            'event': 'fallback_analise_geral',
+            'motivo': 'nenhuma_coluna_temporal_detectada'
+        })
+        
+        # Interpretar intenção da pergunta via LLM
+        instrucoes = self._interpretar_pergunta_llm(pergunta, df)
+        
+        # Executar instruções e consolidar resultados
+        resultados = []
+        for instrucao in instrucoes:
+            resultado = self._executar_instrucao(df, instrucao)
+            if resultado is not None:
+                justificativa = instrucao.get('justificativa', '')
+                if hasattr(resultado, 'to_markdown'):
+                    resultados.append(
+                        f"**{instrucao.get('acao', 'Métrica')}**\n"
+                        f"{justificativa}\n\n"
+                        f"{resultado.to_markdown()}"
+                    )
+                else:
+                    resultados.append(
+                        f"**{instrucao.get('acao', 'Métrica')}**\n"
+                        f"{justificativa}\n\n"
+                        f"{str(resultado)}"
+                    )
+        
+        if resultados:
+            header = (
+                f"# Análise Estatística Geral\n\n"
+                f"**Dataset:** `{csv_path}`\n\n"
+                f"*Nenhuma coluna temporal detectada. Executando análise estatística padrão.*\n\n"
+                "---\n\n"
+            )
+            return header + "\n\n".join(resultados)
+        else:
+            # Fallback final: estatísticas gerais descritivas
+            logger.warning("Fallback final: retornando describe() do DataFrame")
+            return (
+                f"# Estatísticas Descritivas\n\n"
+                f"**Dataset:** `{csv_path}`\n\n"
+                f"{df.describe().T.to_markdown()}"
+            )
+
+    def _should_use_global_csv(self, query: str, chunks_metadata: List[Dict]) -> bool:
+        """
+        Decide se é necessário recorrer ao CSV completo para responder a pergunta.
+        Critérios:
+        - Pergunta exige análise de todas as colunas/linhas (ex: intervalo de todas variáveis)
+        - Chunks não possuem dados suficientes (ex: subset de colunas)
+        """
+        # Detecta termos que indicam análise global
+        termos_globais = ["todas as variáveis", "todas as colunas", "intervalo de cada variável", "intervalo de todas", "intervalo completo", "todas as linhas", "análise completa"]
+        if any(t in query.lower() for t in termos_globais):
+            return True
+        # Detecta se chunks não cobrem todas as colunas
+        if chunks_metadata:
+            # Extrai colunas presentes nos chunks
+            colunas_chunks = set()
+            for chunk in chunks_metadata:
+                if 'columns' in chunk:
+                    colunas_chunks.update(chunk['columns'])
+            # Se número de colunas for pequeno, pode indicar subset
+            if len(colunas_chunks) < 5:
+                return True
+        return False
+
+    def reset_memory(self, session_id: str = None):
+        """
+        Reseta a memória/contexto do agente para a sessão informada.
+        """
+        self.memory = {}
+        if session_id:
+            self.session_id = session_id
+        self.logger.info(f"Memória/contexto resetados para sessão: {session_id}")
     """
     Agente que responde perguntas sobre dados usando RAG vetorial + memória persistente + LangChain.
     
@@ -267,102 +716,46 @@ class RAGDataAgent(BaseAgent):
                 except Exception as e:
                     self.logger.warning(f"⚠️ Falha ao salvar contexto de dados: {e}")
             
-            if not similar_chunks:
-                # No similar chunks found via match_embeddings. If this query
-                # explicitly requests visualization, attempt a controlled,
-                # safe global reconstruct directly from a limited sample of the
-                # embeddings table as a fallback. This preserves the
-                # "embeddings-only" policy while improving UX for visualizations.
-                response_text = (
-                    "❌ Nenhum dado relevante encontrado na base vetorial. "
-                    "Verifique se os dados foram carregados corretamente com: "
-                    "`python load_csv_data.py <arquivo.csv>`"
-                )
-
-                # If visualization was requested, try a safe fallback sampling
-                viz_requested = bool(context and context.get('visualization_requested'))
-                fallback_used = False
-
-                if viz_requested:
+            # Fallback inteligente: se chunks não são suficientes OU pergunta exige análise global
+            if not similar_chunks or self._should_use_global_csv(query, similar_chunks):
+                # Tentar extrair caminho do CSV dos chunks ou do contexto
+                csv_path = None
+                if context and 'csv_path' in context:
+                    csv_path = context['csv_path']
+                elif similar_chunks:
+                    for chunk in similar_chunks:
+                        if 'csv_path' in chunk:
+                            csv_path = chunk['csv_path']
+                            break
+                # Se não encontrar, buscar na pasta processados
+                if not csv_path:
                     try:
-                        from src.tools.python_analyzer import PythonDataAnalyzer
-                        from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+                        from src.settings import EDA_DATA_DIR_PROCESSADO
+                        import os
                         import pandas as pd
-
-                        # Sample limit configurable default (safe): try 800 chunks
-                        sample_limit = context.get('fallback_sample_limit', 800)
-                        self.logger.info(f"🔁 Nenhum chunk similar — visualização solicitada. Tentando fallback com amostra de {sample_limit} embeddings")
-
-                        analyzer = PythonDataAnalyzer(caller_agent=self.name)
-                        sampled_df = analyzer.get_data_from_embeddings(limit=sample_limit, parse_chunk_text=True)
-
-                        if sampled_df is not None and not sampled_df.empty:
-                            self.logger.info(f"🔄 Fallback reconstruct bem-sucedido: {sampled_df.shape[0]} linhas, {sampled_df.shape[1]} colunas")
-                            # Delegate to the existing visualization handler in EmbeddingsAnalysisAgent
-                            vis_agent = EmbeddingsAnalysisAgent()
-                            # Inject the parsed df into a context to avoid re-parsing
-                            vis_context = context.copy() if context else {}
-                            vis_context['reconstructed_df'] = sampled_df
-
-                            # Call visualization handler (synchronous) and capture metadata
-                            try:
-                                vis_result = vis_agent._handle_visualization_query(query, vis_context)
-                                metadata = vis_result.get('metadata', {}) if isinstance(vis_result, dict) else {}
-                                metadata.setdefault('fallback_used', True)
-
-                                # Save interaction in memory with fallback metrics
-                                if self.has_memory:
-                                    await self.remember_interaction(
-                                        query=query,
-                                        response="[visualization_fallback_executed]",
-                                        processing_time_ms=int((datetime.now() - start_time).total_seconds() * 1000),
-                                        confidence=0.0,
-                                        model_used="rag_vectorial_v2_fallback",
-                                        metadata={
-                                            "chunks_found": 0,
-                                            "fallback_used": True,
-                                            "sampled_chunks": min(sample_limit, sampled_df.shape[0])
-                                        }
-                                    )
-
-                                # Return visualization success if any
-                                if metadata.get('visualization_success'):
-                                    return self._build_response(
-                                        vis_result.get('response', "📈 Visualizações geradas via fallback."),
-                                        metadata={
-                                            **metadata,
-                                            "method": "rag_vectorial_v2_fallback",
-                                            "chunks_found": 0
-                                        }
-                                    )
-                                else:
-                                    # Fallback reconstruct did not produce visualizations
-                                    self.logger.warning("Fallback reconstruct não produziu visualizações válidas")
-                                    fallback_used = True
-
-                            except Exception as e:
-                                self.logger.warning(f"Erro ao executar visualização via fallback: {e}")
-                                fallback_used = True
-
+                        csv_files = list(EDA_DATA_DIR_PROCESSADO.glob('*.csv'))
+                        if csv_files:
+                            csv_path = str(max(csv_files, key=lambda p: p.stat().st_mtime))
                     except Exception as e:
-                        self.logger.warning(f"Erro durante fallback de visualização: {e}")
-                        fallback_used = True
-
-                # Salvar na memória mesmo com erro (ou fallback)
-                if self.has_memory:
-                    await self.remember_interaction(
-                        query=query,
-                        response=response_text,
-                        processing_time_ms=int((datetime.now() - start_time).total_seconds() * 1000),
-                        confidence=0.0,
-                        model_used="rag_vectorial_v2",
-                        metadata={"chunks_found": 0, "error": True, "fallback_used": fallback_used}
-                    )
-
-                return self._build_response(
-                    response_text,
-                    metadata={"chunks_found": 0, "method": "rag_vectorial_v2", "fallback_used": fallback_used}
-                )
+                        self.logger.warning(f"Não foi possível localizar CSV para fallback: {e}")
+                if csv_path:
+                    self.logger.info(f"⚡ Fallback: análise global do CSV ({csv_path}) para pergunta '{query[:60]}...'")
+                    try:
+                        resposta_csv = self._analisar_completo_csv(csv_path, query)
+                        return self._build_response(
+                            resposta_csv,
+                            metadata={
+                                "method": "global_csv_fallback",
+                                "csv_path": csv_path,
+                                "chunks_found": len(similar_chunks)
+                            }
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Erro no fallback global CSV: {e}")
+                        return self._build_error_response(f"Erro ao processar CSV global: {e}")
+                else:
+                    self.logger.error("❌ Fallback global: CSV não encontrado.")
+                    return self._build_error_response("CSV original não encontrado para análise global.")
             
             self.logger.info(f"✅ Encontrados {len(similar_chunks)} chunks relevantes")
             
@@ -428,11 +821,10 @@ class RAGDataAgent(BaseAgent):
                             f"Tamanho: {csv_size_mb:.2f} MB"
                         )
                         # Delegar para agente de visualização
-                        from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
-                        vis_agent = EmbeddingsAnalysisAgent()
+                        # Removido: agente obsoleto csv_analysis_agent.py
                         vis_context = context.copy() if context else {}
                         vis_context['reconstructed_df'] = viz_df
-                        vis_result = vis_agent._handle_visualization_query(query, vis_context)
+                        vis_result = self._handle_visualization_query(query, vis_context)
                         if vis_result.get('metadata', {}).get('visualization_success'):
                             # Combinar resposta de visualização com análise textual dos chunks
                             context_texts = [chunk['chunk_text'] for chunk in similar_chunks]
