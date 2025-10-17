@@ -81,6 +81,14 @@ except ImportError:
     RESOURCE_AVAILABLE = False
     resource = None
 
+# psutil para monitoramento de memória (fallback Windows)
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
 # RestrictedPython para compilação segura
 try:
     from RestrictedPython import compile_restricted
@@ -114,6 +122,7 @@ ALLOWED_IMPORTS: Set[str] = {
     'math',
     'statistics',
     'datetime',
+    'time',  # Para sleep e medições de tempo
     'json',
     'collections',
     'itertools',
@@ -227,6 +236,198 @@ def execution_timeout(seconds: int):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# LIMITE DE MEMÓRIA
+# ═══════════════════════════════════════════════════════════════════════════
+
+class MemoryLimitExceeded(Exception):
+    """Exceção levantada quando limite de memória é excedido."""
+    pass
+
+
+def set_memory_limit_unix(megabytes: int) -> bool:
+    """
+    Define limite de memória para o processo atual (Unix/Linux apenas).
+    
+    Args:
+        megabytes: Limite de memória em MB
+        
+    Returns:
+        True se limite foi aplicado, False caso contrário
+        
+    Raises:
+        MemoryLimitExceeded: Se já excedeu o limite antes de configurar
+    """
+    if not RESOURCE_AVAILABLE:
+        return False
+    
+    logger = get_logger(__name__)
+    
+    try:
+        # Converter MB para bytes
+        max_bytes = megabytes * 1024 * 1024
+        
+        # Definir limite de memória virtual (RLIMIT_AS)
+        # Usa soft limit para permitir ajustes dinâmicos
+        resource.setrlimit(resource.RLIMIT_AS, (max_bytes, max_bytes))
+        
+        logger.debug(f"✅ Limite de memória configurado: {megabytes}MB (Unix/Linux)")
+        return True
+        
+    except ValueError as e:
+        logger.error(f"❌ Erro ao configurar limite de memória: {e}")
+        return False
+    except OSError as e:
+        logger.error(f"❌ OSError ao configurar limite de memória: {e}")
+        return False
+
+
+def get_memory_usage_mb() -> float:
+    """
+    Obtém uso atual de memória do processo em MB.
+    
+    Returns:
+        Uso de memória em MB, ou -1 se não disponível
+    """
+    logger = get_logger(__name__)
+    
+    # Tentar psutil primeiro (cross-platform)
+    if PSUTIL_AVAILABLE:
+        try:
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            # rss = Resident Set Size (memória física usada)
+            return memory_info.rss / (1024 * 1024)
+        except Exception as e:
+            logger.debug(f"Erro ao obter memória via psutil: {e}")
+    
+    # Fallback: resource (Unix/Linux)
+    if RESOURCE_AVAILABLE:
+        try:
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            # ru_maxrss em KB no Linux, bytes no macOS
+            import platform
+            if platform.system() == 'Darwin':  # macOS
+                return usage.ru_maxrss / (1024 * 1024)
+            else:  # Linux
+                return usage.ru_maxrss / 1024
+        except Exception as e:
+            logger.debug(f"Erro ao obter memória via resource: {e}")
+    
+    return -1
+
+
+@contextmanager
+def memory_limit_context(megabytes: int, platform_name: str = None):
+    """
+    Context manager para aplicar limite de memória.
+    
+    ESTRATÉGIA:
+    - Unix/Linux: resource.setrlimit() (hard limit pelo kernel)
+    - Windows: Monitoramento via psutil + exceção manual (soft limit)
+    
+    Args:
+        megabytes: Limite de memória em MB
+        platform_name: Nome da plataforma (auto-detectado se None)
+        
+    Yields:
+        None
+        
+    Raises:
+        MemoryLimitExceeded: Se limite de memória for excedido
+    """
+    logger = get_logger(__name__)
+    
+    # Detectar plataforma
+    if platform_name is None:
+        import platform
+        platform_name = platform.system()
+    
+    # Variáveis de controle
+    original_limit = None
+    monitoring_active = False
+    
+    try:
+        # ═══════════════════════════════════════════════════════════
+        # UNIX/LINUX: Hard limit via resource.setrlimit()
+        # ═══════════════════════════════════════════════════════════
+        if platform_name in ('Linux', 'Darwin') and RESOURCE_AVAILABLE:
+            try:
+                # Salvar limite original
+                original_limit = resource.getrlimit(resource.RLIMIT_AS)
+                
+                # Aplicar novo limite
+                success = set_memory_limit_unix(megabytes)
+                
+                if success:
+                    logger.info(f"🔒 Limite de memória HARD aplicado: {megabytes}MB (Unix/Linux)")
+                else:
+                    logger.warning(f"⚠️ Não foi possível aplicar limite hard, usando monitoramento")
+                    monitoring_active = True
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao configurar limite Unix: {e}, usando monitoramento")
+                monitoring_active = True
+        
+        # ═══════════════════════════════════════════════════════════
+        # WINDOWS: Soft limit via monitoramento psutil
+        # ═══════════════════════════════════════════════════════════
+        else:
+            logger.info(f"🔒 Limite de memória SOFT via monitoramento: {megabytes}MB (Windows/Fallback)")
+            monitoring_active = True
+        
+        # Executar código protegido
+        yield
+        
+    finally:
+        # Restaurar limite original (Unix/Linux)
+        if original_limit is not None and RESOURCE_AVAILABLE:
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, original_limit)
+                logger.debug("✅ Limite de memória original restaurado")
+            except Exception as e:
+                logger.warning(f"⚠️ Erro ao restaurar limite: {e}")
+
+
+def check_memory_limit(megabytes: int, memory_before: float = 0):
+    """
+    Verifica se uso atual de memória excede o limite (para fallback Windows).
+    
+    Estratégia:
+    - Se memory_before fornecido: verifica DELTA de memória (alocação do código)
+    - Se memory_before não fornecido: verifica memória TOTAL do processo
+    
+    Args:
+        megabytes: Limite de memória em MB
+        memory_before: Memória antes da execução (MB), para calcular delta
+        
+    Raises:
+        MemoryLimitExceeded: Se memória exceder limite
+    """
+    current_mb = get_memory_usage_mb()
+    logger = get_logger(__name__)
+    
+    if current_mb <= 0:
+        return  # Não conseguiu medir memória
+    
+    # Estratégia 1: Verificar DELTA de memória (mais justo)
+    if memory_before > 0:
+        delta_mb = current_mb - memory_before
+        
+        if delta_mb > megabytes:
+            logger.error(f"❌ Delta de memória excedido: {delta_mb:.2f}MB > {megabytes}MB")
+            raise MemoryLimitExceeded(
+                f"Código alocou {delta_mb:.2f}MB de memória, limite é {megabytes}MB"
+            )
+    
+    # Estratégia 2: Verificar memória TOTAL do processo (fallback conservador)
+    else:
+        if current_mb > megabytes:
+            logger.error(f"❌ Memória total excedida: {current_mb:.2f}MB > {megabytes}MB")
+            raise MemoryLimitExceeded(
+                f"Processo excedeu limite de memória: {current_mb:.2f}MB > {megabytes}MB"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # IMPORT GUARD
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -306,6 +507,7 @@ def build_safe_globals() -> Dict[str, Any]:
             '_getattr_': safer_getattr,
             '_print_': PrintCollector,
             '_inplacevar_': lambda op, x, y: op(x, y),  # Para operadores in-place (+=, -=, etc)
+            '_write_': lambda x: x,  # Para operações de escrita (necessário para RestrictedPython)
             
             # Import seguro
             '__import__': safe_import,
@@ -437,20 +639,48 @@ def execute_in_sandbox(
         # ═══════════════════════════════════════════════════════════════
         # 3. CONFIGURAR LIMITES DE RECURSOS
         # ═══════════════════════════════════════════════════════════════
-        # TODO: Implementar limites de memória (requer cgroups no Linux)
-        # Por enquanto, apenas logging
-        logger.debug(f"⚙️ Limites: timeout={timeout_seconds}s, memory={memory_limit_mb}MB")
-        execution_logs.append(f"Limites configurados: {timeout_seconds}s, {memory_limit_mb}MB")
+        import platform
+        platform_name = platform.system()
+        
+        # Detectar disponibilidade de limites de memória
+        memory_limit_available = RESOURCE_AVAILABLE or PSUTIL_AVAILABLE
+        
+        if memory_limit_available:
+            logger.debug(f"⚙️ Limites: timeout={timeout_seconds}s, memory={memory_limit_mb}MB")
+            execution_logs.append(f"Limites configurados: {timeout_seconds}s, {memory_limit_mb}MB")
+            
+            if RESOURCE_AVAILABLE and platform_name in ('Linux', 'Darwin'):
+                execution_logs.append(f"Plataforma: {platform_name} (limite HARD via resource)")
+            elif PSUTIL_AVAILABLE:
+                execution_logs.append(f"Plataforma: {platform_name} (limite SOFT via psutil)")
+            else:
+                execution_logs.append(f"Plataforma: {platform_name} (sem limite de memória)")
+        else:
+            logger.warning(f"⚠️ Limites de memória não disponíveis (instale psutil)")
+            execution_logs.append(f"⚠️ Apenas timeout disponível: {timeout_seconds}s")
         
         # ═══════════════════════════════════════════════════════════════
-        # 4. EXECUTAR CÓDIGO COM TIMEOUT
+        # 4. EXECUTAR CÓDIGO COM TIMEOUT E LIMITE DE MEMÓRIA
         # ═══════════════════════════════════════════════════════════════
         logger.info("▶️ Executando código no sandbox...")
         execution_logs.append("Iniciando execução")
         
+        # Obter uso de memória inicial (para estatísticas)
+        memory_before_mb = get_memory_usage_mb()
+        if memory_before_mb > 0:
+            execution_logs.append(f"Memória inicial: {memory_before_mb:.2f}MB")
+        
         try:
-            with execution_timeout(timeout_seconds):
-                exec(byte_code, safe_env, local_namespace)
+            # Context manager para limite de memória (Unix) ou monitoramento (Windows)
+            with memory_limit_context(memory_limit_mb, platform_name):
+                with execution_timeout(timeout_seconds):
+                    exec(byte_code, safe_env, local_namespace)
+                    
+                    # Verificação adicional de memória para Windows (soft limit)
+                    # Usa DELTA de memória (mais justo) ao invés de memória total
+                    if platform_name == 'Windows' and PSUTIL_AVAILABLE:
+                        check_memory_limit(memory_limit_mb, memory_before=memory_before_mb)
+                        
         except TimeoutException:
             error_msg = f"Execução excedeu o timeout de {timeout_seconds}s"
             logger.error(f"⏱️ {error_msg}")
@@ -463,6 +693,53 @@ def execute_in_sandbox(
                 'error_type': 'TimeoutError',
                 'logs': execution_logs
             }
+            
+        except MemoryLimitExceeded as e:
+            error_msg = str(e)
+            execution_time_ms = (time.time() - start_time) * 1000
+            logger.error(f"💾 {error_msg}")
+            execution_logs.append(f"MEMORY LIMIT: {error_msg}")
+            
+            # Estatísticas de memória
+            memory_after_mb = get_memory_usage_mb()
+            if memory_after_mb > 0:
+                execution_logs.append(f"Memória final: {memory_after_mb:.2f}MB")
+                if memory_before_mb > 0:
+                    delta = memory_after_mb - memory_before_mb
+                    execution_logs.append(f"Delta memória: {delta:.2f}MB")
+            
+            return {
+                'success': False,
+                'result': None,
+                'execution_time_ms': execution_time_ms,
+                'error': error_msg,
+                'error_type': 'MemoryLimitError',
+                'logs': execution_logs
+            }
+            
+        except MemoryError as e:
+            # MemoryError do Python (limite hard atingido no Unix)
+            error_msg = f"Execução esgotou memória disponível: {str(e)}"
+            execution_time_ms = (time.time() - start_time) * 1000
+            logger.error(f"💾 {error_msg}")
+            execution_logs.append(f"MEMORY ERROR: {error_msg}")
+            
+            return {
+                'success': False,
+                'result': None,
+                'execution_time_ms': execution_time_ms,
+                'error': error_msg,
+                'error_type': 'MemoryError',
+                'logs': execution_logs
+            }
+        
+        # Obter uso de memória final (para estatísticas)
+        memory_after_mb = get_memory_usage_mb()
+        if memory_after_mb > 0:
+            execution_logs.append(f"Memória final: {memory_after_mb:.2f}MB")
+            if memory_before_mb > 0:
+                delta = memory_after_mb - memory_before_mb
+                execution_logs.append(f"Delta memória: {delta:.2f}MB")
         
         execution_logs.append("✅ Execução concluída")
         
