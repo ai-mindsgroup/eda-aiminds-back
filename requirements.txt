@@ -123,10 +123,16 @@ orjson==3.11.3
 # DEVELOPMENT & TESTING - Dependências de desenvolvimento
 # ============================================================================
 
-# Testing
+# Testing Framework
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
 pytest-mock>=3.10.0
+
+# 🔒 SPRINT 3 - Testing Extensions (Testes Automatizados)
+pytest-cov>=4.1.0          # Cobertura de código
+pytest-timeout>=2.2.0      # Timeout para testes
+pytest-xdist>=3.5.0        # Execução paralela
+pytest-benchmark>=4.0.0    # Performance benchmarking
 
 # Code quality
 black>=23.0.0
