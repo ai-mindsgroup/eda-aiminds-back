@@ -44,7 +44,7 @@ def demonstrar_consultas_embeddings_only():
     print("=" * 50)
     
     try:
-        from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+    # Removido: agente obsoleto csv_analysis_agent.py
         from src.agent.orchestrator_agent import OrchestratorAgent
         
         # 1. EmbeddingsAnalysisAgent usa APENAS embeddings

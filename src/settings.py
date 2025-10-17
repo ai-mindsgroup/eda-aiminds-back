@@ -47,7 +47,7 @@ HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "static/histogramas")
 #           127.0.0.1 = aceita apenas conexões locais
 # API_PORT: Use porta não comum para segurança (evita ataques em portas conhecidas)
 API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
-API_PORT: int = int(os.getenv("API_PORT", "8011"))
+API_PORT: int = int(os.getenv("API_PORT", "8012"))
 
 # ========================================================================
 # CONFIGURAÇÕES DE INGESTÃO AUTOMÁTICA DE CSV

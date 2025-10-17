@@ -19,7 +19,7 @@ import pandas as pd
 
 from src.data.data_loader import DataLoader, DataLoaderError  
 from src.data.data_validator import DataValidator, DataValidationError
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 from src.utils.logging_config import get_logger
 
 
@@ -52,8 +52,9 @@ class DataProcessor:
         # Componentes principais (com caller_agent)
         self.loader = DataLoader(caller_agent=self.caller_agent)
         self.validator = DataValidator()
-        self.analyzer = EmbeddingsAnalysisAgent()
-        
+        from src.agent.rag_data_agent import RAGDataAgent
+        self.analyzer = RAGDataAgent()
+
         # Configurações
         self.auto_validate = auto_validate
         self.auto_clean = auto_clean

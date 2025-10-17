@@ -8,7 +8,7 @@ from pathlib import Path
 # Adicionar o diretório raiz ao PYTHONPATH
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.agent.csv_analysis_agent import CSVAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 import pandas as pd
 import numpy as np
 

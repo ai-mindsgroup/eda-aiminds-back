@@ -24,7 +24,15 @@ def install_requirements():
 # 3. Executa interface_interativa.py
 def run_interface():
     print('Executando interface_interativa.py...')
-    subprocess.run([os.path.join(venv_dir, 'Scripts', 'python.exe'), interface_file], check=True)
+    # Garantir que imports funcionem tanto para 'src.*' quanto para 'utils.*' (pacotes dentro de src)
+    env = os.environ.copy()
+    repo_root = os.getcwd()
+    src_dir = os.path.join(repo_root, 'src')
+    existing_pp = env.get('PYTHONPATH', '')
+    # Incluir repo_root (para imports 'src.*') e src_dir (para imports como 'utils.*')
+    composed_pp = os.pathsep.join([p for p in [repo_root, src_dir, existing_pp] if p])
+    env['PYTHONPATH'] = composed_pp
+    subprocess.run([os.path.join(venv_dir, 'Scripts', 'python.exe'), interface_file], check=True, env=env)
 
 if __name__ == '__main__':
     create_venv()

@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 import numpy as np
-from src.agent.csv_analysis_agent import CSVAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 
 
 def create_comprehensive_demo():

@@ -739,22 +739,38 @@ ANÁLISE TEMPORAL:
         try:
             # Configurações da busca
             config = context or {}
-            similarity_threshold = config.get('similarity_threshold', 0.3)  # Reduzido de 0.7 para 0.3 (mais permissivo para chunks analíticos)
+            similarity_threshold = config.get('similarity_threshold', 0.3)
             max_results = config.get('max_results', 5)
             include_context = config.get('include_context', True)
-            
+            ingestion_id = config.get('ingestion_id')
+            source_id = config.get('source_id')
+
             # 1. Gerar embedding da query
             self.logger.debug("Gerando embedding da consulta...")
             query_embedding_result = self.embedding_generator.generate_embedding(query)
             query_embedding = query_embedding_result.embedding
-            
-            # 2. Busca vetorial
-            self.logger.debug(f"Executando busca vetorial (threshold={similarity_threshold})")
-            search_results = self.vector_store.search_similar(
-                query_embedding=query_embedding,
-                similarity_threshold=similarity_threshold,
-                limit=max_results
-            )
+
+            # 2. Busca vetorial com filtro obrigatório por ingestion_id/source_id
+            filters = {}
+            if ingestion_id:
+                filters['ingestion_id'] = ingestion_id
+            if source_id:
+                filters['source'] = source_id
+            if not filters:
+                self.logger.warning("Nenhum filtro de dataset ativo (ingestion_id/source_id) fornecido. Risco de contaminação de contexto!")
+
+            self.logger.debug(f"Executando busca vetorial (threshold={similarity_threshold}, filters={filters})")
+            # Se não houver filtro, não retorna nada!
+            if not filters:
+                self.logger.error("Busca vetorial sem filtro de contexto! Retornando lista vazia para evitar contaminação.")
+                search_results = []
+            else:
+                search_results = self.vector_store.search_similar(
+                    query_embedding=query_embedding,
+                    similarity_threshold=similarity_threshold,
+                    limit=max_results,
+                    filters=filters
+                )
             # 3. Construir contexto a partir dos resultados
             context_pieces = []
             source_info = {}
@@ -778,14 +794,26 @@ ANÁLISE TEMPORAL:
 
             # 4. Síntese da resposta via agente especializado
             from src.agent.rag_synthesis_agent import synthesize_response
-            chunks = [result.chunk_text for result in search_results]
+            # Filtrar chunks para garantir que só colunas do source_id atual sejam usadas
+            filtered_chunks = []
+            for result in search_results:
+                # Se o chunk contém colunas do CSV antigo (ex: V1, V28, Time, Amount), ignore
+                chunk_text_lower = result.chunk_text.lower()
+                if any(col in chunk_text_lower for col in ["v1", "v28", "time", "amount", "class"]):
+                    # Se o source_id do resultado não for igual ao context['source_id'], ignore
+                    if context and result.source != context.get("source_id"):
+                        continue
+                filtered_chunks.append(result.chunk_text)
+            # Se não houver chunks filtrados, use apenas os do source_id atual
+            if not filtered_chunks and context and context.get("source_id"):
+                filtered_chunks = [r.chunk_text for r in search_results if r.source == context["source_id"]]
             # Se LLM disponível, use síntese via LangChain; senão, fallback manual
             try:
-                content = synthesize_response(chunks, query, use_llm=include_context)
+                content = synthesize_response(filtered_chunks, query, use_llm=include_context)
                 self.logger.info("✅ Resposta consolidada gerada pelo agente de síntese")
             except Exception as e:
                 self.logger.error(f"❌ Falha na síntese via LLM, usando fallback manual: {e}")
-                content = synthesize_response(chunks, query, use_llm=False)
+                content = synthesize_response(filtered_chunks, query, use_llm=False)
             
             processing_time = time.perf_counter() - start_time
             

@@ -169,21 +169,20 @@ async def main():
     session_id = str(uuid4())
     safe_print(f"🔑 Sessão iniciada: {session_id[:8]}...\n")
 
+
     # INTEGRAÇÃO: Executar ingestão de CSVs da pasta processando
     safe_print("🧹 Verificando arquivos CSV em data/processando/...")
-    from src.agent.data_ingestor import DataIngestor
+    from src.agent.rag_agent import RAGAgent
     from src.data.csv_file_manager import CSVFileManager
     from src.settings import EDA_DATA_DIR_PROCESSANDO
 
-    ingestor = DataIngestor()
+    rag_agent = RAGAgent()
     file_manager = CSVFileManager()
-
-    # Arquivar último arquivo processado antes de novo processamento
-    file_manager.archive_last_processed_file()
 
     # Buscar todos os arquivos CSV em data/processando/
     csv_files = list(EDA_DATA_DIR_PROCESSANDO.glob("*.csv"))
 
+    active_source_id = None
     if not csv_files:
         safe_print("⚠️ Nenhum arquivo CSV encontrado em data/processando/")
         safe_print("💡 Coloque seus arquivos CSV em data/processando/ para processá-los\n")
@@ -194,16 +193,23 @@ async def main():
             try:
                 safe_print(f"📄 Processando: {csv_file.name}")
 
-                # Limpar base vetorial antes da ingestão
-                safe_print("  → Limpando base vetorial...")
+                # Limpar base vetorial e memória do agente antes da ingestão
+                safe_print("  → Limpando base vetorial e memória...")
                 from src.vectorstore.supabase_client import supabase
                 supabase.table('embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
                 supabase.table('chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
                 supabase.table('metadata').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+                rag_agent.clear_memory()
 
-                # Processar arquivo
-                safe_print("  → Executando ingestão no Supabase...")
-                ingestor.ingest_csv(str(csv_file))
+                # Processar arquivo usando RAGAgent
+                safe_print("  → Executando ingestão robusta via RAGAgent...")
+                source_id = csv_file.stem
+                ingest_result = rag_agent.ingest_csv_file(
+                    file_path=str(csv_file),
+                    source_id=source_id,
+                    encoding="utf-8"
+                )
+                active_source_id = source_id
 
                 # Mover para pasta processado
                 safe_print("  → Movendo para pasta 'processado'...")
@@ -211,6 +217,7 @@ async def main():
 
                 safe_print(f"  ✅ Arquivo processado com sucesso!")
                 safe_print(f"  📁 Localização final: {processed_path}\n")
+                safe_print(f"  🟢 Dataset ativo: {source_id}\n")
 
             except Exception as e:
                 safe_print(f"  ❌ Erro ao processar {csv_file.name}: {e}\n")
@@ -226,7 +233,11 @@ async def main():
             enable_data_processor=True
         )
         safe_print("✅ Sistema inicializado com sucesso!")
-        safe_print("✅ RAGDataAgent V2.0: Memória persistente + LangChain\n")
+        safe_print(f"✅ RAGDataAgent V2.0: Memória persistente + LangChain\n")
+        if active_source_id:
+            safe_print(f"🟢 Dataset ativo: {active_source_id}\n")
+        # Patch: garantir que toda consulta do orquestrador inclua o source_id do dataset ativo
+        orchestrator._active_source_id = active_source_id
     except Exception as e:
         safe_print(f"❌ Erro ao inicializar sistema: {e}")
         logger.error(f"Erro na inicialização: {e}", exc_info=True)
@@ -257,9 +268,11 @@ async def main():
             
             try:
                 # USAR MÉTODO ASYNC COM MEMÓRIA PERSISTENTE
+                # Patch: garantir que o contexto da consulta inclua o source_id do dataset ativo
+                context = {"source_id": getattr(orchestrator, "_active_source_id", None)}
                 response = await orchestrator.process_with_persistent_memory(
                     user_input,
-                    context={},
+                    context=context,
                     session_id=session_id
                 )
                 

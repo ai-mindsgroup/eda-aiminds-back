@@ -37,10 +37,12 @@ class SemanticRouter:
     5. Fallback contextual antes de LLM genérica
     6. Logging estruturado
     """
-    def __init__(self):
+    def __init__(self, ingestion_id: str = None, source_id: str = None):
         self.embedding_generator = embedding_generator
         self.vector_store = vector_store
         self.logger = logger
+        self.ingestion_id = ingestion_id
+        self.source_id = source_id
 
     def normalize(self, question: str) -> str:
         """
@@ -67,20 +69,21 @@ class SemanticRouter:
     def search_with_expansion(self, question: str,
                               base_threshold: float = 0.7,
                               base_limit: int = 3) -> List["VectorSearchResult"]:
-        """Tenta buscar no vector store usando a query original e variações geradas pela ontologia.
+        """Busca chunks SEMPRE filtrando por ingestion_id/source_id para garantir isolamento de contexto."""
+        # Montar filtro
+        filters = {}
+        if self.ingestion_id:
+            filters['ingestion_id'] = self.ingestion_id
+        if self.source_id:
+            filters['source_id'] = self.source_id
 
-        Estratégia:
-        1. Buscar com a query original (threshold/base_limit)
-        2. Gerar variações simples via StatisticalOntology.generate_simple_expansions
-        3. Para cada variação, gerar embedding e buscar com threshold reduzido e limit aumentado
-        4. Agregar resultados ordenando por similaridade
-        """
         # 1) search original
         embedding = self.embed_question(question)
         results = self.vector_store.search_similar(
             query_embedding=embedding,
             similarity_threshold=base_threshold,
-            limit=base_limit
+            limit=base_limit,
+            filters=filters if filters else None
         )
 
         if results:
@@ -95,7 +98,8 @@ class SemanticRouter:
                 alt_results = self.vector_store.search_similar(
                     query_embedding=emb,
                     similarity_threshold=base_threshold,
-                    limit=base_limit
+                    limit=base_limit,
+                    filters=filters if filters else None
                 )
                 if alt_results:
                     return alt_results
@@ -114,7 +118,8 @@ class SemanticRouter:
                 alt_results = self.vector_store.search_similar(
                     query_embedding=emb,
                     similarity_threshold=max(0.5, base_threshold - 0.15),
-                    limit=min(10, base_limit * 3)
+                    limit=min(10, base_limit * 3),
+                    filters=filters if filters else None
                 )
 
                 for r in alt_results:

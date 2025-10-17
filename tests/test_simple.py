@@ -69,7 +69,7 @@ def test_csv_integration():
     print("=" * 40)
     
     try:
-        from src.agent.csv_analysis_agent import CSVAnalysisAgent
+    # Removido: agente obsoleto csv_analysis_agent.py
         
         # Criar agente CSV
         csv_agent = CSVAnalysisAgent()

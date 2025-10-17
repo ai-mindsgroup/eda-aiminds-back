@@ -111,6 +111,20 @@ class StoredEmbedding:
 
 
 class VectorStore:
+    def invalidate_embedding_cache(self):
+        """Invalida cache/memória de embeddings após nova ingestão."""
+        # Exemplo: se usar cache local/global, limpe aqui
+        if hasattr(self, 'embedding_cache'):
+            self.embedding_cache = None
+        self.logger.info("Cache de embeddings invalidado após nova ingestão.")
+
+    def refresh_embeddings(self, ingestion_id: str):
+        """Atualiza memória/contexto para o ingestion_id atual."""
+        self.invalidate_embedding_cache()
+        # Busca todos os embeddings do ingestion_id atual
+        embeddings = self.search_similar([0.0]*384, similarity_threshold=0.0, limit=1000, filters={'ingestion_id': ingestion_id})
+        # Atualize contexto/memória conforme necessário
+        self.logger.info(f"Memória/contexto atualizado para ingestion_id={ingestion_id} com {len(embeddings)} embeddings.")
     """Sistema de armazenamento e busca vetorial."""
     
     def __init__(self):
@@ -324,38 +338,40 @@ class VectorStore:
             results = []
             for row in response.data:
                 embedding_parsed = parse_embedding_from_api(row['embedding'])
+                metadata = row.get('metadata') or {}
                 result = VectorSearchResult(
                     chunk_text=row['chunk_text'],
                     similarity_score=float(row['similarity']),
-                    metadata=row['metadata'] or {},
+                    metadata=metadata,
                     embedding_id=row['id'],
-                    source=row['metadata'].get('source', 'unknown'),
-                    chunk_index=row['metadata'].get('chunk_index', 0)
+                    source=metadata.get('source', 'unknown'),
+                    chunk_index=metadata.get('chunk_index', 0)
                 )
                 result.embedding = embedding_parsed
                 results.append(result)
-            
+
+            # Aplicar filtros de metadata no cliente se fornecidos (ex: {'ingestion_id': id})
+            if filters:
+                def _matches_filters(meta: dict, flt: dict) -> bool:
+                    for k, v in flt.items():
+                        # metadata pode conter valores aninhados ou strings; comparar como string/valor direto
+                        if meta is None:
+                            return False
+                        meta_val = meta.get(k)
+                        if meta_val != v:
+                            return False
+                    return True
+
+                filtered = [r for r in results if _matches_filters(r.metadata, filters)]
+                self.logger.info(f"Encontrados {len(filtered)} resultados após aplicar filtros {filters}")
+                return filtered
+
             self.logger.info(f"Encontrados {len(results)} resultados similares")
             return results
             
         except Exception as e:
             self.logger.error(f"Erro na busca vetorial: {str(e)}")
             # Fallback para busca simples por texto se busca vetorial falhar
-            return self._fallback_text_search(query_embedding, limit)
-    
-    def _fallback_text_search(self, query_embedding: List[float], limit: int) -> List[VectorSearchResult]:
-        """Busca fallback usando similaridade de texto simples."""
-        self.logger.warning("Usando busca fallback por texto")
-        
-        try:
-            # Buscar alguns registros recentes
-            response = self.supabase.table('embeddings').select('*').limit(limit * 2).execute()
-            
-            if not response.data:
-                return []
-            
-            # Calcular similaridade manualmente (simplificado)
-            results = []
             for row in response.data:
                 # Similaridade mock baseada no comprimento do texto (apenas para fallback)
                 mock_similarity = min(0.9, len(row['chunk_text']) / 1000)

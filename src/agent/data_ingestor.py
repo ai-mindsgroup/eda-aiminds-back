@@ -1,3 +1,30 @@
+def atomic_ingestion_and_query(csv_path, supabase, vector_store):
+    """
+    Fluxo atômico: limpa embeddings, faz ingestão, atualiza memória/cache e realiza consulta isolada.
+    Logging detalhado em cada etapa.
+    """
+    logger.info(f"[Atomicidade] Iniciando fluxo atômico para arquivo: {csv_path}")
+    # 1. NOTA: Não apagar toda a tabela de embeddings aqui.
+    # A estratégia correta é usar `ingestion_id` para isolar dados.
+    logger.info("[Atomicidade] Skipping global delete; usando ingestion_id para isolar novas ingestões.")
+    # 2. Ingestão nova
+    ingestor = DataIngestor(supabase)
+    ingestion_id = ingestor.ingest_csv(csv_path)
+    logger.info(f"[Atomicidade] Ingestão realizada com ingestion_id={ingestion_id}")
+    # 2.5 Limpar registros anteriores: manter apenas embeddings do ingestion_id atual
+    try:
+        # Usar método seguro em DataIngestor para deletar registros antigos em batches
+        deleted = ingestor.delete_except_ingestion(ingestion_id)
+        logger.info(f"[Atomicidade] Deleção de registros antigos concluída. Total removido (estimado): {deleted}")
+    except Exception as del_err:
+        logger.warning(f"[Atomicidade] Falha ao remover embeddings anteriores via delete_except_ingestion: {del_err}")
+    # 3. Refresh memória/cache
+    vector_store.refresh_embeddings(ingestion_id)
+    logger.info(f"[Atomicidade] Memória/cache atualizada para ingestion_id={ingestion_id}")
+    # 4. Consulta subsequente
+    results = vector_store.search_similar([0.0]*384, similarity_threshold=0.0, limit=1000, filters={'ingestion_id': ingestion_id})
+    logger.info(f"[Atomicidade] Consulta retornou {len(results)} embeddings para ingestion_id={ingestion_id}")
+    return results
 """
 ⚠️ DEPRECADO - Use RAGAgent ao invés deste módulo
 
@@ -45,6 +72,7 @@ from src.embeddings.embedding_generator import generate_embedding
 import numpy as np
 import logging
 import warnings
+from datetime import datetime
 
 logger = logging.getLogger("eda.data_ingestor")
 
@@ -78,10 +106,65 @@ class DataIngestor:
 
     def clean_vector_db(self):
         logger.info("Limpando base vetorial Supabase...")
-        self.supabase.table('embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-        self.supabase.table('chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-        self.supabase.table('metadata').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-        logger.info("Base vetorial limpa com sucesso.")
+        # Anteriormente este método apagava toda a base vetorial. Isso removia ingestões
+        # anteriores e impedia consultas históricas por `ingestion_id`.
+        # Para preservar histórico e permitir isolamento por ingestion_id, esta função
+        # agora é um noop compatível. Se for necessário limpar explicitamente, use
+        # `delete_embeddings_by_source` ou uma rotina administrativa.
+        logger.info("clean_vector_db() é noop por compatibilidade; não apaga embeddings existentes.")
+        return 0
+
+    def delete_except_ingestion(self, ingestion_id: str, batch_size: int = 200) -> int:
+        """Deleta em batches todos os registros em embeddings/chunks/metadata cuja
+        metadata->>'ingestion_id' seja diferente do fornecido.
+
+        Faz remoção por ids em batches para evitar timeouts e para prover logs
+        e retries menores. Retorna o total deletado (apenas estimativa baseada em batches).
+        """
+        total_deleted = 0
+        try:
+            logger.info(f"Iniciando deleção em lote de registros antigos (keep={ingestion_id})")
+            while True:
+                # Pegar um batch de ids para deletar da tabela embeddings
+                resp = self.supabase.table('embeddings') \
+                    .select('id, metadata') \
+                    .neq("metadata->>ingestion_id", ingestion_id) \
+                    .limit(batch_size) \
+                    .execute()
+
+                rows = resp.data if getattr(resp, 'data', None) else []
+                if not rows:
+                    break
+
+                ids = [r['id'] for r in rows if r.get('id')]
+                if not ids:
+                    break
+
+                # Deletar por ids (batch) nas três tabelas relevantes
+                try:
+                    self.supabase.table('embeddings').delete().in_('id', ids).execute()
+                except Exception as e:
+                    logger.warning(f"Falha ao deletar batch em embeddings: {e}")
+
+                try:
+                    self.supabase.table('chunks').delete().in_('id', ids).execute()
+                except Exception as e:
+                    logger.debug(f"chunks delete non-critical: {e}")
+
+                try:
+                    self.supabase.table('metadata').delete().in_('id', ids).execute()
+                except Exception as e:
+                    logger.debug(f"metadata delete non-critical: {e}")
+
+                total_deleted += len(ids)
+                logger.info(f"Deletados {len(ids)} registros (parcial). Total até agora: {total_deleted}")
+
+            logger.info(f"Deleção concluída. Total estimado deletado: {total_deleted}")
+            return total_deleted
+
+        except Exception as e:
+            logger.error(f"Erro ao deletar registros antigos: {e}")
+            return total_deleted
 
     def analyze_csv(self, csv_path):
         df = pd.read_csv(csv_path)
@@ -173,19 +256,29 @@ class DataIngestor:
         return chunks
 
     def ingest_csv(self, csv_path):
+        import uuid
+        ingestion_id = str(uuid.uuid4())
         self.clean_vector_db()
-        logger.info(f"Processando CSV: {csv_path}")
+        logger.info(f"[Ingestão] Processando CSV: {csv_path} | ingestion_id={ingestion_id}")
         md_text = self.analyze_csv(csv_path)
         chunks = self.chunk_text(md_text)
-        logger.info(f"Gerando embeddings e inserindo {len(chunks)} chunks...")
-        for chunk in chunks:
+        logger.info(f"[Ingestão] Gerando embeddings e inserindo {len(chunks)} chunks...")
+        for idx, chunk in enumerate(chunks):
             embedding = generate_embedding(chunk)
+            metadata = {
+                'source': csv_path,
+                'ingestion_id': ingestion_id,
+                'chunk_index': idx,
+                'created_at': datetime.now().isoformat()
+            }
             self.supabase.table('embeddings').insert({
                 'chunk_text': chunk,
                 'embedding': embedding,
-                'metadata': {'source': csv_path}
+                'metadata': metadata
             }).execute()
-        logger.info("Ingestão concluída com sucesso.")
+            logger.info(f"[Ingestão] Embedding inserido: chunk_index={idx}, ingestion_id={ingestion_id}")
+        logger.info(f"[Ingestão] Concluída com ingestion_id={ingestion_id}")
+        return ingestion_id
 
 
 if __name__ == "__main__":

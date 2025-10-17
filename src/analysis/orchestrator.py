@@ -340,3 +340,127 @@ Sintetize essas interpretações de forma coerente e contextual.
         except Exception as e:
             self.logger.error(f"Erro ao gerar interpretação combinada: {e}")
             return "Análise concluída. Consulte seções acima para detalhes."
+    
+    def orchestrate_v3_direct(
+        self,
+        intent_result: Dict[str, float],
+        df: pd.DataFrame,
+        confidence_threshold: float = 0.6
+    ) -> Dict[str, Any]:
+        """
+        🔥 V3.0: Orquestração direta baseada em dict de intenções.
+        
+        Usado para integração com rag_data_agent.py que já possui
+        classificação de intenção prévia.
+        
+        Args:
+            intent_result: Dict {intent_type: confidence_score}
+                          Ex: {"STATISTICAL": 0.92, "FREQUENCY": 0.75}
+            df: DataFrame a analisar
+            confidence_threshold: Threshold mínimo de confiança (padrão: 0.6)
+            
+        Returns:
+            Dict estruturado com resultados:
+            {
+                "results": {
+                    "statistical": {...},
+                    "frequency": {...}
+                },
+                "execution_order": ["statistical", "frequency"],
+                "metadata": {
+                    "total_time_ms": 145.2,
+                    "modules_executed": 2,
+                    "timestamp": "2025-10-17T10:30:00"
+                }
+            }
+        """
+        start_time = datetime.now()
+        
+        try:
+            self.logger.debug(f"🎯 Orquestração V3 direta iniciada com {len(intent_result)} intenções")
+            
+            results = {}
+            execution_order = []
+            
+            # Mapear strings de intenção para AnalysisIntent enum
+            intent_map = {
+                "STATISTICAL": AnalysisIntent.STATISTICAL,
+                "FREQUENCY": AnalysisIntent.FREQUENCY,
+                "TEMPORAL": AnalysisIntent.TEMPORAL,
+                "CLUSTERING": AnalysisIntent.CLUSTERING,
+                "CORRELATION": AnalysisIntent.CORRELATION,
+                "OUTLIERS": AnalysisIntent.OUTLIERS,
+                "COMPARISON": AnalysisIntent.COMPARISON,
+                "GENERAL": AnalysisIntent.GENERAL
+            }
+            
+            # Executar análises conforme confiança
+            for analysis_type, confidence in intent_result.items():
+                if confidence < confidence_threshold:
+                    self.logger.debug(f"⏭️ Ignorando {analysis_type} (confiança {confidence:.2f} < {confidence_threshold})")
+                    continue
+                
+                # Converter para enum
+                intent_enum = intent_map.get(analysis_type.upper())
+                if not intent_enum:
+                    self.logger.warning(f"⚠️ Tipo de análise desconhecido: {analysis_type}")
+                    continue
+                
+                # Obter função do analyzer
+                analyzer_func = self._intent_to_analyzer.get(intent_enum)
+                
+                if analyzer_func:
+                    try:
+                        self.logger.info(f"▶️ Executando análise: {analysis_type}")
+                        
+                        analysis_result = analyzer_func(df, query="", context=None)
+                        
+                        if analysis_result:
+                            analyzer_key = analysis_type.lower()
+                            
+                            # Converter resultado para dict se possível
+                            if hasattr(analysis_result, 'to_dict'):
+                                results[analyzer_key] = analysis_result.to_dict()
+                            elif hasattr(analysis_result, '__dict__'):
+                                results[analyzer_key] = analysis_result.__dict__
+                            else:
+                                results[analyzer_key] = str(analysis_result)
+                            
+                            execution_order.append(analyzer_key)
+                            self.logger.info(f"✅ Análise {analysis_type} concluída")
+                    
+                    except Exception as e:
+                        self.logger.error(f"❌ Erro na análise {analysis_type}: {e}", exc_info=True)
+                        results[analysis_type.lower()] = {"error": str(e)}
+            
+            # Metadados
+            total_time = (datetime.now() - start_time).total_seconds() * 1000
+            
+            response = {
+                "results": results,
+                "execution_order": execution_order,
+                "metadata": {
+                    "total_time_ms": total_time,
+                    "modules_executed": len(execution_order),
+                    "timestamp": datetime.now().isoformat(),
+                    "dataframe_shape": list(df.shape)
+                }
+            }
+            
+            self.logger.info(
+                f"🎯 Orquestração V3 concluída: {len(execution_order)} módulos "
+                f"executados em {total_time:.0f}ms"
+            )
+            
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro crítico na orquestração V3: {e}", exc_info=True)
+            return {
+                "results": {},
+                "execution_order": [],
+                "metadata": {
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat()
+                }
+            }

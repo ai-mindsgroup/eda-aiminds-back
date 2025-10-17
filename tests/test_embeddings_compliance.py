@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.data.data_processor import DataProcessor, UnauthorizedCSVAccessError
 from src.data.data_loader import DataLoader, UnauthorizedCSVAccessError as DataLoaderUnauthorizedError
 from src.tools.python_analyzer import PythonDataAnalyzer, UnauthorizedCSVAccessError as AnalyzerUnauthorizedError
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 
 
 class TestEmbeddingsCompliance:

@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.agent.rag_agent import RAGAgent
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 from src.tools.python_analyzer import PythonDataAnalyzer, UnauthorizedCSVAccessError
 from src.embeddings.generator import EmbeddingProvider
 

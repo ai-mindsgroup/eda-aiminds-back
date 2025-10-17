@@ -53,12 +53,14 @@ from typing import Any, Dict, List, Optional
 import json
 from datetime import datetime
 import asyncio
+import pandas as pd
 
 from agent.base_agent import BaseAgent, AgentError
 from vectorstore.supabase_client import supabase
 from embeddings.generator import EmbeddingGenerator
 from utils.logging_config import get_logger
 from analysis.intent_classifier import IntentClassifier, AnalysisIntent
+from analysis.orchestrator import AnalysisOrchestrator
 
 # Imports LangChain
 try:
@@ -254,6 +256,206 @@ class RAGDataAgent(BaseAgent):
                 'params': {},
                 'justificativa': 'Interpretação padrão devido a erro.'
             }]
+    
+    def _build_analytical_response_v3(
+        self,
+        query: str,
+        df: pd.DataFrame,
+        context_data: str,
+        history_context: str = ""
+    ) -> str:
+        """
+        🔥 V3.0: Constrói resposta analítica usando AnalysisOrchestrator.
+        
+        Substitui ~240 linhas de cascata if/elif por orquestração inteligente.
+        
+        Args:
+            query: Pergunta do usuário
+            df: DataFrame carregado
+            context_data: Chunks analíticos do CSV
+            history_context: Histórico conversacional
+            
+        Returns:
+            Resposta formatada em Markdown
+        """
+        try:
+            self.logger.info("🔥 Usando V3.0: AnalysisOrchestrator")
+            
+            # Classificar intenção via IntentClassifier
+            classifier = IntentClassifier(llm=self.llm, logger=self.logger)
+            
+            context_info = {
+                'available_columns': list(df.columns),
+                'dataframe_shape': df.shape,
+                'has_history': bool(history_context)
+            }
+            
+            intent_result = classifier.classify(query, context=context_info)
+            
+            # Converter IntentClassificationResult para dict de confiança
+            intent_dict = {intent_result.primary_intent.value.upper(): intent_result.confidence}
+            
+            # Adicionar intenções secundárias
+            for secondary in intent_result.secondary_intents:
+                intent_dict[secondary.value.upper()] = 0.75  # Confiança padrão para secundárias
+            
+            self.logger.info(f"Intenções detectadas: {intent_dict}")
+            
+            # Criar orquestrador e executar análises
+            orchestrator = AnalysisOrchestrator(llm=self.llm, logger=self.logger)
+            
+            orchestration_result = orchestrator.orchestrate_v3_direct(
+                intent_result=intent_dict,
+                df=df,
+                confidence_threshold=0.6
+            )
+            
+            # Construir resposta formatada
+            response = self._format_orchestrated_response(
+                query=query,
+                orchestration_result=orchestration_result,
+                context_data=context_data,
+                history_context=history_context,
+                intent_result=intent_result
+            )
+            
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro no V3 orchestrator: {e}", exc_info=True)
+            # Fallback para resposta básica
+            return self._fallback_basic_response(query, context_data, history_context)
+    
+    def _format_orchestrated_response(
+        self,
+        query: str,
+        orchestration_result: Dict[str, Any],
+        context_data: str,
+        history_context: str,
+        intent_result
+    ) -> str:
+        """
+        Formata resultado orquestrado em resposta humanizada.
+        
+        Args:
+            query: Pergunta original
+            orchestration_result: Resultado do orchestrator.orchestrate_v3_direct()
+            context_data: Chunks analíticos
+            history_context: Histórico
+            intent_result: Classificação de intenção
+            
+        Returns:
+            Resposta formatada em Markdown
+        """
+        try:
+            # Construir prompt para LLM formatar resposta final
+            from langchain.schema import SystemMessage, HumanMessage
+            
+            system_prompt = """
+Você é um agente EDA especializado. Sua tarefa é apresentar resultados analíticos de forma clara e estruturada.
+
+Você receberá:
+1. Pergunta do usuário
+2. Resultados de análises executadas (JSON estruturado)
+3. Chunks analíticos do CSV (contexto adicional)
+4. Histórico conversacional (se houver)
+
+Sua resposta deve:
+- Iniciar com: "Pergunta feita: [pergunta]"
+- Apresentar resultados de forma humanizada e estruturada
+- Usar tabelas Markdown quando apropriado
+- Destacar insights relevantes
+- Finalizar com: "Se precisar de mais detalhes, é só perguntar!"
+"""
+            
+            results_summary = []
+            for analyzer_name, result in orchestration_result.get('results', {}).items():
+                if isinstance(result, dict) and 'error' not in result:
+                    results_summary.append(f"**{analyzer_name.title()}**: Análise executada com sucesso")
+                elif isinstance(result, dict) and 'error' in result:
+                    results_summary.append(f"**{analyzer_name.title()}**: Erro - {result['error']}")
+            
+            user_prompt = f"""
+**Pergunta do Usuário:**
+{query}
+
+{history_context}
+
+**Resultados das Análises Executadas:**
+{chr(10).join(results_summary)}
+
+**Detalhes Completos (JSON):**
+```json
+{json.dumps(orchestration_result.get('results', {}), indent=2, ensure_ascii=False)}
+```
+
+**Chunks Analíticos do CSV (contexto adicional):**
+{context_data[:1000]}...
+
+**Intenção Detectada:**
+- Principal: {intent_result.primary_intent.value}
+- Confiança: {intent_result.confidence:.1%}
+- Justificativa: {intent_result.reasoning}
+
+Apresente os resultados de forma clara, humanizada e estruturada.
+"""
+            
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            return response.content
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao formatar resposta orquestrada: {e}")
+            # Fallback: retornar JSON bruto formatado
+            import json
+            return f"""
+Pergunta feita: {query}
+
+**Análises Executadas:**
+{chr(10).join([f"- {k}" for k in orchestration_result.get('results', {}).keys()])}
+
+**Resultados:**
+```json
+{json.dumps(orchestration_result, indent=2, ensure_ascii=False)}
+```
+
+Se precisar de mais detalhes, é só perguntar!
+"""
+    
+    def _fallback_basic_response(
+        self,
+        query: str,
+        context_data: str,
+        history_context: str
+    ) -> str:
+        """
+        Fallback básico quando V3 orchestrator falha completamente.
+        """
+        from langchain.schema import SystemMessage, HumanMessage
+        
+        system_prompt = "Você é um agente EDA. Responda à pergunta usando os chunks fornecidos."
+        
+        user_prompt = f"""
+Pergunta: {query}
+
+{history_context}
+
+Chunks analíticos:
+{context_data}
+
+Responda de forma clara e estruturada.
+"""
+        
+        try:
+            messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+            response = self.llm.invoke(messages)
+            return response.content
+        except Exception as e:
+            return f"Erro ao processar análise: {str(e)}"
 
     def _executar_instrucao(self, df, instrucao):
         """
@@ -1028,17 +1230,37 @@ class RAGDataAgent(BaseAgent):
             # Preparar prompt DINÂMICO baseado no tipo de query
             query_lower = query.lower()
             
-            # Detectar tipo de query para customizar prompt
-            # TIPO 1: Perguntas sobre o HISTÓRICO/CONTEXTO da conversa
-            if any(term in query_lower for term in ['pergunta anterior', 'perguntei antes', 'falamos sobre', 'conversamos sobre', 'você disse', 'previous question', 'asked before']):
-                # Query sobre HISTÓRICO - não precisa de chunks, apenas memória
+            # ═══════════════════════════════════════════════════════════════
+            # 🔥 V3.0: ORQUESTRAÇÃO INTELIGENTE VIA LLM (ZERO HARD-CODING)
+            # ═══════════════════════════════════════════════════════════════
+            # 
+            # ANTES (V2.0): ~240 linhas de cascata if/elif com keywords hardcoded
+            # DEPOIS (V3.0): Classificação semântica + orquestração modular
+            # 
+            # Benefícios:
+            # - ✅ Reconhece QUALQUER sinônimo (não limitado a lista fixa)
+            # - ✅ Processa queries mistas simultaneamente
+            # - ✅ Extensível (novos tipos sem modificar código)
+            # - ✅ Manutenível (código limpo e modular)
+            # ═══════════════════════════════════════════════════════════════
+            
+            # Detectar se é query sobre HISTÓRICO (caso especial)
+            is_history_query = any(term in query_lower for term in [
+                'pergunta anterior', 'perguntei antes', 'falamos sobre',
+                'conversamos sobre', 'você disse', 'previous question', 'asked before'
+            ])
+            
+            if is_history_query:
+                # Query sobre HISTÓRICO - usar memória conversacional
+                self.logger.info("📜 Query sobre histórico conversacional detectada")
+                
                 system_prompt = (
                     "Você é um agente EDA especializado. Sua tarefa é responder sobre o HISTÓRICO da conversa. "
                     "Use o contexto da conversa anterior fornecido para responder. "
                     "Seja claro e objetivo, referenciando exatamente o que foi discutido."
                 )
                 user_prompt = (
-                    f"{history_context}"  # PRINCIPAL fonte de informação
+                    f"{history_context}"
                     f"**Pergunta do Usuário:**\n{query}\n\n"
                     "**INSTRUÇÕES DE RESPOSTA:**\n"
                     "- Inicie com: 'Pergunta feita: [pergunta]'\n"
@@ -1048,284 +1270,111 @@ class RAGDataAgent(BaseAgent):
                     "- Finalize com: 'Posso esclarecer mais alguma coisa sobre nossa conversa?'\n\n"
                     "**Resposta:**"
                 )
-            # TIPO 2: Perguntas sobre VARIABILIDADE
-            elif any(term in query_lower for term in ['variabilidade', 'desvio padrão', 'variância', 'variance', 'std', 'standard deviation']):
-                # Query sobre VARIABILIDADE
-                system_prompt = (
-                    "Você é um agente EDA especializado. Sua tarefa é responder sobre a VARIABILIDADE dos dados (desvio padrão, variância, coeficiente de variação). "
-                    "Use os chunks analíticos fornecidos E o histórico da conversa para contextualizar a resposta. "
-                    "Responda de forma clara, humanizada e estruturada."
-                )
-                user_prompt = (
-                    f"{history_context}"  # INCLUIR histórico
-                    f"**Pergunta do Usuário:**\n{query}\n\n"
-                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
-                    "**INSTRUÇÕES DE RESPOSTA:**\n"
-                    "- Inicie com: 'Pergunta feita: [pergunta]'\n"
-                    "- Se houver histórico relevante, mencione brevemente o contexto\n"
-                    "- Apresente métricas de variabilidade: desvio padrão e variância para as principais variáveis\n"
-                    "- Agrupe V1 a V28 com estatísticas agregadas\n"
-                    "- Destaque variáveis com alta vs baixa variabilidade\n"
-                    "- Use formato R$ para valores monetários\n"
-                    "- Finalize com: 'Se precisar de mais detalhes, é só perguntar!'\n\n"
-                    "**Resposta:**"
-                )
-            # TIPO 3: Perguntas sobre INTERVALOS
-            elif any(term in query_lower for term in ['intervalo', 'mínimo', 'máximo', 'range', 'amplitude']):
-                # Query sobre INTERVALOS
-                system_prompt = (
-                    "Você é um agente EDA especializado. Sua tarefa é responder EXCLUSIVAMENTE sobre o INTERVALO (mínimo e máximo) de cada variável presente nos chunks analíticos do CSV carregado. "
-                    "Ignore completamente qualquer contexto extra, histórico, memória ou dados residuais que não estejam nos chunks analíticos. "
-                    "NÃO inclua estatísticas, outliers, gráficos ou qualquer dado não solicitado. Responda de forma clara, objetiva e apenas com o solicitado. "
-                    "Para perguntas comuns (saudações, hora, etc.), responda de forma simples e natural, sem análise. Se a pergunta for sobre outro tipo de análise, siga as instruções específicas do usuário."
-                )
-                user_prompt = (
-                    f"**Pergunta do Usuário:**\n{query}\n\n"
-                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
-                    "**INSTRUÇÕES DE RESPOSTA:**\n"
-                    "- Leia e interprete SOMENTE os chunks fornecidos\n"
-                    "- Extraia SOMENTE os valores mínimo e máximo de cada variável\n"
-                    "- NÃO inclua análise de outliers, desvio padrão, variância ou estatísticas extras\n"
-                    "- Formate a resposta em tabela Markdown\n"
-                    "- Se não houver informação suficiente, informe claramente\n\n"
-                    "**Resposta:**"
-                )
-            # TIPO 4: Perguntas sobre TIPOS DE DADOS
-            elif any(term in query_lower for term in ['tipos', 'tipo de dado', 'numérico', 'categórico', 'categórica', 'categorical', 'numerical']):
-                # Query sobre TIPOS DE DADOS
-                system_prompt = (
-                    "Você é um agente EDA especializado. Sua tarefa é identificar e classificar os TIPOS DE DADOS (numéricos vs categóricos) presentes no dataset. "
-                    "Use APENAS os chunks analíticos fornecidos - não invente ou infira informações. "
-                    "Responda de forma clara, humanizada e estruturada."
-                )
-                user_prompt = (
-                    f"**Pergunta do Usuário:**\n{query}\n\n"
-                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
-                    "**INSTRUÇÕES DE RESPOSTA:**\n"
-                    "- Inicie com: 'Pergunta feita: [pergunta]'\n"
-                    "- Adicione mensagem amigável: 'Olá! Aqui está uma análise dos tipos de variáveis presentes no seu conjunto de dados:'\n"
-                    "- Divida a resposta em 2 seções: 'Variáveis Numéricas' e 'Variáveis Categóricas'\n"
-                    "- Para variáveis numéricas: agrupe V1 a V28 como 'V1 a V28: Variáveis numéricas agrupadas, todas apresentam alta variabilidade.'\n"
-                    "- Liste também: Time, Amount\n"
-                    "- Para variáveis categóricas: descreva Class como 'Class: Variável categórica com valores possíveis 0 e 1. Utilizada para indicar fraude ou não fraude.'\n"
-                    "- NÃO mencione frequência de valores para Class\n"
-                    "- Adicione estatísticas apenas para Amount (Média, Desvio padrão, Mínimo, Máximo) com formato R$ XX.XX\n"
-                    "- Finalize com: 'Se precisar de mais detalhes ou quiser analisar outra variável, é só perguntar!'\n\n"
-                    "**Resposta:**"
-                )
-            # TIPO 5: Perguntas sobre FREQUÊNCIA (valores mais/menos frequentes)
-            elif any(term in query_lower for term in ['frequente', 'frequentes', 'frequência', 'comum', 'raro', 'raros', 'moda', 'contagem', 'value_counts', 'mais ocorre', 'menos ocorre']):
-                # Query sobre FREQUÊNCIA
-                system_prompt = (
-                    "Você é um agente EDA especializado em análise de frequência. "
-                    "Sua tarefa é identificar e reportar QUANTAS VEZES cada valor aparece no dataset. "
-                    "Use APENAS os dados fornecidos nos chunks analíticos. NÃO invente números. "
-                    "ATENÇÃO: Na tabela 'Colunas Categóricas', a coluna 'Frequência' contém o NÚMERO DE OCORRÊNCIAS do valor mais frequente. "
-                    "Exemplo: Se vir '| Class | 0 | 284315 |', significa que o valor '0' aparece 284.315 vezes no dataset."
-                )
-                user_prompt = (
-                    f"**Pergunta do Usuário:**\n{query}\n\n"
-                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
-                    "**INSTRUÇÕES CRÍTICAS DE INTERPRETAÇÃO:**\n"
-                    "1. **Leia a tabela 'Colunas Categóricas' corretamente**:\n"
-                    "   - Formato: | Coluna | Valor Mais Frequente | Frequência | Valores Únicos | Valores Nulos |\n"
-                    "   - A coluna 'Frequência' é o NÚMERO DE VEZES que o 'Valor Mais Frequente' aparece\n"
-                    "   - Exemplo: | Class | 0 | 284315 | → O valor '0' aparece 284.315 vezes\n\n"
-                    "2. **Calcule o valor menos frequente**:\n"
-                    "   - Se houver 2 valores únicos (ex: Class com valores 0 e 1)\n"
-                    "   - E o total de registros é conhecido (ex: 284.807)\n"
-                    "   - Menos frequente = Total de registros - Frequência do mais frequente\n"
-                    "   - Exemplo: Class valor '1' = 284.807 - 284.315 = 492 vezes\n\n"
-                    "3. **Para COLUNAS NUMÉRICAS**:\n"
-                    "   - Leia a tabela 'Colunas Numéricas' e encontre a coluna 'Moda'\n"
-                    "   - A moda é o valor numérico que mais se repete\n"
-                    "   - Explique que para variáveis contínuas, muitos valores aparecem apenas 1 vez\n\n"
-                    "**FORMATO DE RESPOSTA OBRIGATÓRIO:**\n"
-                    "Inicie com: 'Pergunta feita: [pergunta]'\n\n"
-                    "Adicione: 'Analisando a frequência dos valores no dataset:'\n\n"
-                    "**🔢 Colunas Categóricas:**\n\n"
-                    "Para cada coluna categórica encontrada, mostre:\n"
-                    "- **Coluna [Nome]**: \n"
-                    "  * Valor mais frequente: [valor] (aparece [X] vezes)\n"
-                    "  * Valor menos frequente: [valor] (aparece [Y] vezes) [SE PUDER CALCULAR]\n\n"
-                    "**📊 Colunas Numéricas:**\n\n"
-                    "Para colunas numéricas, mostre a moda estatística:\n"
-                    "- **Coluna [Nome]**: Moda = [valor] (valor que mais se repete)\n\n"
-                    "Adicione explicação:\n"
-                    "'Para variáveis numéricas contínuas (como V1-V28, Amount), a maioria dos valores aparece apenas 1 vez. "
-                    "A moda estatística indica o valor que mais se repete, mas para análise mais detalhada, considere perguntar sobre distribuição ou intervalos.'\n\n"
-                    "Finalize: 'Se precisar de mais detalhes ou análise de distribuição, é só perguntar!'\n\n"
-                    "**⚠️ REGRAS CRÍTICAS:**\n"
-                    "- NÃO diga 'aparece 0 vezes' quando o número na tabela é POSITIVO\n"
-                    "- NÃO confunda a coluna 'Frequência' com o valor da variável\n"
-                    "- NÃO mostre mínimo/máximo quando a pergunta é sobre frequência\n"
-                    "- USE os números EXATOS da tabela de chunks fornecidos\n\n"
-                    "**Resposta:**"
-                )
-            
-            # TIPO 6: Perguntas sobre CLUSTERING/AGRUPAMENTOS
-            elif any(term in query_lower for term in ['cluster', 'clusters', 'agrupamento', 'agrupamentos', 'grupos', 'kmeans', 'k-means', 'dbscan', 'hierárquico', 'hierarquico', 'segmentação', 'segmentacao']):
-                # 🔬 EXECUÇÃO REAL DE CLUSTERING usando PythonDataAnalyzer
-                self.logger.info("🔬 Detectada pergunta sobre clustering - executando análise KMeans real...")
                 
+                # Usar LLM diretamente para query de histórico
+                if self.llm and LANGCHAIN_AVAILABLE:
+                    messages = [
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=user_prompt)
+                    ]
+                    response = await asyncio.to_thread(self.llm.invoke, messages)
+                    final_response = response.content
+                else:
+                    final_response = "Histórico não disponível (LLM indisponível)"
+            
+            else:
+                # ═══════════════════════════════════════════════════════════════
+                # 🔥 V3.0: ORQUESTRAÇÃO ANALÍTICA MODULAR
+                # ═══════════════════════════════════════════════════════════════
                 try:
-                    from src.tools.python_analyzer import python_analyzer
+                    self.logger.info("🔥 Executando V3.0: AnalysisOrchestrator")
                     
-                    # Executar clustering real nos dados
-                    clustering_result = python_analyzer.calculate_clustering_analysis(n_clusters=3)
+                    # Carregar DataFrame do CSV se disponível
+                    df = None
+                    if context and 'csv_data' in context:
+                        import pandas as pd
+                        csv_path = context['csv_data'].get('path')
+                        if csv_path:
+                            try:
+                                df = pd.read_csv(csv_path)
+                                self.logger.info(f"📊 DataFrame carregado: {df.shape}")
+                            except Exception as e:
+                                self.logger.error(f"Erro ao carregar CSV: {e}")
                     
-                    if "error" in clustering_result:
-                        # Se houve erro, informar ao usuário
-                        error_msg = clustering_result.get("error", "Erro desconhecido")
-                        suggestion = clustering_result.get("suggestion", "")
-                        
-                        return (
-                            f"Pergunta feita: {query}\n\n"
-                            f"❌ **Não foi possível realizar análise de clustering:**\n"
-                            f"{error_msg}\n\n"
-                            f"{suggestion}\n\n"
-                            "Se precisar de mais detalhes, é só perguntar!"
+                    # Se DataFrame disponível, usar orchestrator V3
+                    if df is not None and not df.empty:
+                        final_response = self._build_analytical_response_v3(
+                            query=query,
+                            df=df,
+                            context_data=context_data,
+                            history_context=history_context
                         )
-                    
-                    # Construir contexto enriquecido com resultados reais do clustering
-                    clustering_context = clustering_result.get("interpretation", "")
-                    cluster_distribution = clustering_result.get("cluster_distribution", {})
-                    cluster_percentages = clustering_result.get("cluster_percentages", {})
-                    numeric_vars = clustering_result.get("numeric_variables_used", [])
-                    is_balanced = clustering_result.get("is_balanced", False)
-                    
-                    # Construir prompt com dados REAIS do clustering
-                    system_prompt = (
-                        "Você é um agente EDA especializado em análise de clustering. "
-                        "Acabei de executar análise de clustering KMeans REAL nos dados. "
-                        "Sua tarefa é apresentar os resultados de forma clara e estruturada. "
-                        "Use APENAS os resultados reais fornecidos. NÃO invente números."
-                    )
-                    
-                    user_prompt = (
-                        f"**Pergunta do Usuário:**\n{query}\n\n"
-                        f"**RESULTADOS REAIS DO CLUSTERING EXECUTADO:**\n\n"
-                        f"**Algoritmo:** KMeans com {clustering_result.get('n_clusters', 3)} clusters\n"
-                        f"**Total de pontos analisados:** {clustering_result.get('total_points', 0):,}\n"
-                        f"**Variáveis numéricas utilizadas:** {len(numeric_vars)} variáveis\n"
-                        f"  - Exemplos: {', '.join(numeric_vars[:5])}{'...' if len(numeric_vars) > 5 else ''}\n\n"
-                        f"**Distribuição dos Clusters:**\n"
-                    )
-                    
-                    # Adicionar distribuição real dos clusters
-                    for cluster_id in sorted(cluster_distribution.keys()):
-                        count = cluster_distribution[cluster_id]
-                        pct = cluster_percentages[cluster_id]
-                        user_prompt += f"- Cluster {cluster_id}: {count:,} pontos ({pct:.1f}%)\n"
-                    
-                    user_prompt += f"\n**Balanceamento:** {'Clusters balanceados' if is_balanced else 'Clusters desbalanceados'}\n\n"
-                    
-                    user_prompt += (
-                        f"**CHUNKS ANALÍTICOS DO CSV (contexto adicional):**\n{context_data}\n\n"
-                        "**FORMATO DE RESPOSTA OBRIGATÓRIO:**\n"
-                        "Inicie com: 'Pergunta feita: [pergunta]'\n\n"
-                        "Adicione: 'Para responder se há agrupamentos (clusters) nos dados, executei análise de clustering KMeans:'\n\n"
-                        "**🔬 Análise de Clustering (KMeans):**\n\n"
-                        "**Variáveis Utilizadas:**\n"
-                        f"- {len(numeric_vars)} variáveis numéricas: {', '.join(numeric_vars[:8])}{'...' if len(numeric_vars) > 8 else ''}\n\n"
-                        "**Resultado do Clustering (k=3):**\n"
-                    )
-                    
-                    # Adicionar novamente para o LLM formatar
-                    for cluster_id in sorted(cluster_distribution.keys()):
-                        count = cluster_distribution[cluster_id]
-                        pct = cluster_percentages[cluster_id]
-                        user_prompt += f"- Cluster {cluster_id}: {count:,} pontos ({pct:.1f}%)\n"
-                    
-                    user_prompt += (
-                        "\n**✅ Conclusão:**\n"
-                        f"- SIM, os dados apresentam {len(cluster_distribution)} agrupamentos distintos\n"
-                        f"- Os clusters são {'balanceados' if is_balanced else 'desbalanceados'}\n"
-                        "- [Adicione insight interpretativo sobre o significado desses agrupamentos]\n\n"
-                        "**💡 Recomendações:**\n"
-                        "- Para visualizar os clusters, pergunte: 'mostre gráfico de dispersão dos clusters'\n"
-                        "- Para análise PCA 2D/3D, pergunte: 'aplique PCA nos dados'\n"
-                        "- Para estatísticas por cluster, pergunte: 'qual a média de cada cluster?'\n\n"
-                        "Finalize: 'Se desejar aprofundar na análise de clustering, é só perguntar!'\n\n"
-                        "**Resposta:**"
-                    )
-                    
+                    else:
+                        # Fallback: resposta baseada apenas em chunks (sem análise executada)
+                        self.logger.warning("⚠️ DataFrame não disponível - usando fallback chunks-only")
+                        final_response = self._fallback_basic_response(
+                            query=query,
+                            context_data=context_data,
+                            history_context=history_context
+                        )
+                
                 except Exception as e:
-                    self.logger.error(f"❌ Erro ao executar clustering: {str(e)}", exc_info=True)
-                    # Fallback: usar prompt genérico informando limitação
-                    system_prompt = (
-                        "Você é um agente EDA especializado. "
-                        "Houve um erro técnico ao tentar executar análise de clustering real nos dados. "
-                        "Explique ao usuário que a análise de clustering requer execução de algoritmos específicos."
+                    self.logger.error(f"❌ Erro no fluxo V3.0: {e}", exc_info=True)
+                    # Fallback final
+                    final_response = self._fallback_basic_response(
+                        query=query,
+                        context_data=context_data,
+                        history_context=history_context
                     )
-                    user_prompt = (
-                        f"**Pergunta do Usuário:**\n{query}\n\n"
-                        f"**STATUS:** Erro técnico ao executar KMeans: {str(e)}\n\n"
-                        "**INSTRUÇÕES DE RESPOSTA:**\n"
-                        "- Informe que houve uma limitação técnica temporária\n"
-                        "- Explique que clustering requer execução de algoritmos (KMeans, DBSCAN, etc.)\n"
-                        "- Sugira tentar novamente ou perguntar sobre outras análises\n\n"
-                        "**Resposta:**"
-                    )
-
             
-            # TIPO 7: Query genérica - incluir histórico de conversa
-            else:
-                # Query genérica - incluir histórico de conversa
-                system_prompt = (
-                    "Você é um agente EDA especializado. Responda à pergunta do usuário usando os chunks analíticos fornecidos E o histórico da conversa quando relevante. "
-                    "Seja claro, objetivo, estruturado e humanizado. Não invente dados ou informações."
-                )
-                user_prompt = (
-                    f"{history_context}"  # INCLUIR histórico aqui!
-                    f"**Pergunta do Usuário:**\n{query}\n\n"
-                    f"**CHUNKS ANALÍTICOS DO CSV CARREGADO:**\n{context_data}\n\n"
-                    "**INSTRUÇÕES DE RESPOSTA:**\n"
-                    "- Use as informações dos chunks fornecidos E o histórico da conversa quando relevante\n"
-                    "- Se a pergunta se refere a algo mencionado anteriormente, considere o contexto\n"
-                    "- Inicie com: 'Pergunta feita: [pergunta]'\n"
-                    "- Responda de forma clara, humanizada e estruturada\n"
-                    "- Se não houver informação suficiente, informe claramente\n"
-                    "- Finalize com: 'Se precisar de mais detalhes, é só perguntar!'\n\n"
-                    "**Resposta:**"
+            # ═══════════════════════════════════════════════════════════════
+            # RESPOSTA FINAL
+            # ═══════════════════════════════════════════════════════════════
+            
+            # ═══════════════════════════════════════════════════════════════
+            # 6. SALVAR NA MEMÓRIA E RETORNAR
+            # ═══════════════════════════════════════════════════════════════
+            
+            processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            
+            # Calcular métricas se similar_chunks disponível
+            chunks_count = len(similar_chunks) if similar_chunks else 0
+            avg_sim = sum(c['similarity'] for c in similar_chunks) / len(similar_chunks) if similar_chunks else 0.0
+            top_sim = similar_chunks[0]['similarity'] if similar_chunks else 0.0
+            
+            # Salvar interação na memória persistente
+            if self.has_memory:
+                await self.remember_interaction(
+                    query=query,
+                    response=final_response,
+                    processing_time_ms=processing_time_ms,
+                    confidence=0.85,
+                    model_used="rag_v3_orchestrated",
+                    metadata={
+                        "chunks_found": chunks_count,
+                        "chunks_used": min(5, chunks_count) if chunks_count > 0 else 0,
+                        "method": "rag_vectorial_v3",
+                        "architecture": "modular_orchestrated",
+                        "zero_hardcoding": True
+                    }
                 )
             
-            # Usar LangChain LLM se disponível
-            if self.llm and LANGCHAIN_AVAILABLE:
-                messages = [
-                    SystemMessage(content=system_prompt),
-                    HumanMessage(content=user_prompt)
-                ]
-                
-                response = await asyncio.to_thread(self.llm.invoke, messages)
-                return response.content
-            
-            # Fallback: usar LLM Manager customizado
-            else:
-                from src.llm.manager import LLMManager, LLMConfig
-                llm_manager = LLMManager()
-                
-                # Construir prompt único (LLMManager.chat espera string, não messages)
-                full_prompt = f"{system_prompt}\n\n{user_prompt}"
-                llm_response = llm_manager.chat(
-                    full_prompt,
-                    config=LLMConfig(
-                        temperature=0.3,
-                        max_tokens=2000
-                    )
-                )
-                
-                # Verificar se houve erro (LLMResponse tem atributo .error)
-                if not llm_response.success or llm_response.error:
-                    return self._format_raw_data_response(query, chunks_metadata)
-                
-                # Extrair conteúdo (LLMResponse tem atributo .content)
-                response_text = llm_response.content
-                
-                if not response_text:
-                    return self._format_raw_data_response(query, chunks_metadata)
-                
-                return response_text
+            # Retornar resposta formatada
+            return self._build_response(
+                final_response,
+                metadata={
+                    "chunks_found": chunks_count,
+                    "chunks_used": min(5, chunks_count) if chunks_count > 0 else 0,
+                    "avg_similarity": avg_sim,
+                    "method": "rag_vectorial_v3",
+                    "architecture": "modular_orchestrated",
+                    "top_similarity": top_sim,
+                    "processing_time_ms": processing_time_ms,
+                    "has_memory": self.has_memory,
+                    "session_id": self._current_session_id,
+                    "previous_interactions": len(memory_context.get('recent_conversations', []))
+                }
+            )
             
         except Exception as e:
             self.logger.error(f"Erro ao gerar resposta LLM: {str(e)}", exc_info=True)

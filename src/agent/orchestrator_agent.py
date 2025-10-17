@@ -828,6 +828,15 @@ class OrchestratorAgent(BaseAgent):
         self.logger.info("🔍 Delegando para agente RAG")
         
         try:
+            # Garantir que o contexto inclua ingestion_id/source_id do dataset ativo
+            context = context or {}
+            # Buscar do contexto atual do orquestrador se disponível
+            ingestion_id = self.current_data_context.get('ingestion_id')
+            source_id = self.current_data_context.get('source_id')
+            if ingestion_id:
+                context['ingestion_id'] = ingestion_id
+            if source_id:
+                context['source_id'] = source_id
             result = self.agents["rag"].process(query, context)
         except Exception as e:
             self.logger.error(f"❌ Erro ao executar agente RAG: {e}")

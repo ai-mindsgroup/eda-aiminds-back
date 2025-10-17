@@ -187,102 +187,77 @@ class AutoIngestService:
         """
         try:
             logger.info(f"📄 Processando arquivo: {file_path.name}")
-            
             # 1. Move para pasta 'processando'
             logger.info("  → Movendo para pasta 'processando'...")
             processing_path = self.file_manager.move_to_processing(file_path)
-            
-            # 2. Executa ingestão (limpa base vetorial + análise + chunking + embeddings)
-            logger.info("  → Executando ingestão no Supabase...")
-            self.data_ingestor.ingest_csv(str(processing_path))
-            logger.info("  ✅ Ingestão concluída com sucesso")
-            
+            # 2. Executa fluxo atômico de ingestão
+            logger.info("  → Executando fluxo atômico de ingestão...")
+            from src.vectorstore.supabase_client import supabase
+            from src.embeddings.vector_store import VectorStore
+            from src.agent.data_ingestor import atomic_ingestion_and_query
+            vector_store = VectorStore()
+            atomic_ingestion_and_query(str(processing_path), supabase, vector_store)
+            logger.info("  ✅ Fluxo atômico de ingestão concluído com sucesso")
             # 3. Move para pasta 'processado'
             logger.info("  → Movendo para pasta 'processado'...")
             processed_path = self.file_manager.move_to_processed(processing_path)
-            
             # 4. Atualiza estatísticas
             self.stats["total_files_processed"] += 1
             self.stats["last_success"] = datetime.now().isoformat()
-            
             logger.info(f"✅ Arquivo processado com sucesso: {file_path.name}")
             logger.info(f"   Localização final: {processed_path}")
-            
             return True
-            
         except Exception as e:
             logger.error(f"❌ Erro ao processar arquivo {file_path.name}: {e}")
             self.stats["total_files_failed"] += 1
             self.stats["last_error"] = str(e)
             return False
-    
+
     def _check_and_process_new_files(self) -> int:
-        """Verifica e processa novos arquivos do Google Drive.
-        
-        Returns:
-            Número de arquivos processados com sucesso
+        """Verifica o Google Drive por novos CSVs e processa cada um.
+
+        Retorna o número de arquivos processados neste ciclo.
         """
         files_processed = 0
-        
         try:
-            # Lista novos arquivos no Google Drive
             logger.debug("Verificando novos arquivos no Google Drive...")
+            if not self.google_drive_client:
+                logger.debug("Google Drive client não inicializado")
+                return 0
+
             csv_files = self.google_drive_client.list_csv_files(only_new=True)
-            
             if not csv_files:
                 logger.debug("Nenhum arquivo novo encontrado")
                 return 0
-            
+
             logger.info(f"📥 Encontrados {len(csv_files)} novos arquivos CSV")
-            
-            # Processa cada arquivo
+
             for file_info in csv_files:
                 file_id = file_info['id']
                 file_name = file_info['name']
-                
                 try:
-                    # Baixa arquivo diretamente para pasta 'processando'
                     logger.info(f"  ⬇️ Baixando: {file_name}")
                     from src.settings import EDA_DATA_DIR_PROCESSANDO
                     download_path = EDA_DATA_DIR_PROCESSANDO / file_name
-                    
-                    # Garante que o diretório existe
                     download_path.parent.mkdir(parents=True, exist_ok=True)
-                    
                     self.google_drive_client.download_file(file_id, download_path)
                     logger.info(f"  ✅ Arquivo baixado para: {download_path}")
-                    
-                    # Processa arquivo (já está em 'processando', então vai fazer ingest + mover para 'processado')
-                    logger.info(f"  🔄 Iniciando processamento...")
-                    
-                    # 1. Limpar base vetorial antes da ingestão
-                    logger.info("  → Limpando base vetorial...")
-                    try:
-                        from src.vectorstore.supabase_client import supabase
-                        supabase.table('embeddings').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-                        supabase.table('chunks').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-                        supabase.table('metadata').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
-                        logger.info("  ✅ Base vetorial limpa")
-                    except Exception as clean_error:
-                        logger.warning(f"  ⚠️ Aviso ao limpar base: {clean_error}")
-                    
-                    # 2. Executa ingestão usando DataIngestor (mesma lógica interface_interativa.py)
-                    logger.info("  → Executando ingestão no Supabase (DataIngestor)...")
-                    
-                    # Executar ingestão (limpa base + analisa + chunking + embeddings)
-                    self.data_ingestor.ingest_csv(str(download_path))
-                    logger.info("  ✅ Ingestão concluída com sucesso")
-                    
-                    # 3. Move para pasta 'processado'
-                    logger.info("  → Movendo para pasta 'processado'...")
+
+                    # Processa usando o fluxo atômico (clean + ingest + refresh)
+                    logger.info(f"  🔄 Iniciando processamento (fluxo atômico)...")
+                    from src.vectorstore.supabase_client import supabase
+                    from src.embeddings.vector_store import VectorStore
+                    from src.agent.data_ingestor import atomic_ingestion_and_query
+                    vector_store = VectorStore()
+                    atomic_ingestion_and_query(str(download_path), supabase, vector_store)
+
+                    # Move para processado
                     processed_path = self.file_manager.move_to_processed(download_path)
-                    logger.info(f"  ✅ Movido para: {processed_path}")
-                    
                     files_processed += 1
                     self.stats["total_files_processed"] += 1
                     self.stats["last_success"] = datetime.now().isoformat()
-                    
-                    # ✅ SUCESSO: Remove arquivo do Google Drive (delete ou move)
+
+                    # Pós-processamento no Drive (move ou delete)
                     try:
                         if GOOGLE_DRIVE_POST_PROCESS_ACTION == "move" and self.google_drive_processed_folder_id:
                             logger.info(f"  📦 Movendo arquivo no Google Drive: {file_name} (ID: {file_id})")
@@ -292,52 +267,52 @@ class AutoIngestService:
                             logger.info(f"  🗑️ Removendo arquivo do Google Drive: {file_name} (ID: {file_id})")
                             self.google_drive_client.delete_file(file_id)
                             logger.info(f"  ✅ Arquivo removido do Google Drive com sucesso")
-                        
                         logger.info(f"  📋 Arquivo local salvo em: {processed_path}")
                     except Exception as del_error:
-                        logger.error(f"  ⚠️ AVISO: Erro ao processar arquivo no Drive (processamento local foi bem-sucedido)")
-                        logger.error(f"     Arquivo: {file_name} (ID: {file_id})")
-                        logger.error(f"     Erro: {del_error}")
-                        logger.warning(f"  ⚠️ O arquivo permanecerá no Google Drive e pode ser reprocessado no próximo ciclo")
-                    
-                    logger.info(f"✅ Arquivo processado completamente: {file_name}")
-                    
+                        logger.error(f"  ⚠️ Erro ao finalizar arquivo no Drive: {del_error}")
+                        logger.warning(f"  ⚠️ O arquivo permanecerá no Google Drive e pode ser reprocessado")
+
                 except Exception as e:
                     logger.error(f"❌ Erro ao processar {file_name}: {e}")
                     self.stats["total_files_failed"] += 1
                     self.stats["last_error"] = str(e)
-                    continue
-            
-            return files_processed
-            
-        except GoogleDriveClientError as e:
-            logger.error(f"Erro no Google Drive: {e}")
-            return files_processed
+                    # Tentativa de fallback: se o arquivo local foi baixado, tentar fluxo atômico
+                    try:
+                        if 'download_path' in locals() and download_path.exists():
+                            from src.vectorstore.supabase_client import supabase
+                            from src.embeddings.vector_store import VectorStore
+                            from src.agent.data_ingestor import atomic_ingestion_and_query
+                            vector_store = VectorStore()
+                            atomic_ingestion_and_query(str(download_path), supabase, vector_store)
+                            logger.info("  ✅ Fluxo atômico de ingestão (fallback) concluído com sucesso")
+                    except Exception as fallback_err:
+                        logger.error(f"  ⚠️ Fallback de ingestão falhou: {fallback_err}")
+
         except Exception as e:
-            logger.error(f"Erro ao verificar novos arquivos: {e}")
-            return files_processed
-    
+            logger.error(f"Erro ao verificar/processar arquivos do Drive: {e}")
+
+        return files_processed
+
     def _check_local_files(self) -> int:
-        """Verifica e processa arquivos já existentes na pasta data/.
-        
-        Útil para processar arquivos colocados manualmente na pasta.
-        
-        Returns:
-            Número de arquivos processados
+        """Verifica arquivos locais em `data/` e processa aqueles encontrados.
+
+        Retorna o número de arquivos processados.
         """
         files_processed = 0
-        
         try:
             local_files = self.file_manager.list_files_in_data()
-            
             if not local_files:
                 return 0
-            
+
             logger.info(f"📂 Encontrados {len(local_files)} arquivos locais para processar")
-            
             for file_path in local_files:
                 if self._process_file(file_path):
                     files_processed += 1
+
+            return files_processed
+        except Exception as e:
+            logger.error(f"Erro ao verificar arquivos locais: {e}")
+            return files_processed
             
             return files_processed
             

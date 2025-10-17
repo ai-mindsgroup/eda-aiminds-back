@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 from src.tools.python_analyzer import PythonDataAnalyzer
 from src.tools.graph_generator import GraphGenerator
 from src.utils.logging_config import get_logger
@@ -66,7 +66,7 @@ def fake_visualization_handler(query: str, context: Optional[Dict[str, Any]] = N
 agent._handle_visualization_query = fake_visualization_handler
 
 # Import the handler function and call it
-from src.agent.csv_analysis_agent import EmbeddingsAnalysisAgent
+# Removido: agente obsoleto csv_analysis_agent.py
 
 # Call the distribution handler function unbound with our dummy agent
 result = EmbeddingsAnalysisAgent._handle_distribution_query_from_embeddings(agent, "Qual a distribuição de cada variável (histogramas, distribuições)?", context={})

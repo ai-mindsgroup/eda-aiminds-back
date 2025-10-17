@@ -11,11 +11,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from src.utils.logging_config import get_logger
+from utils.logging_config import get_logger
 
 # Import do LLM Manager para abstração de provedores
 try:
-    from src.llm.manager import get_llm_manager, LLMConfig, LLMResponse
+    from llm.manager import get_llm_manager, LLMConfig, LLMResponse
     LLM_MANAGER_AVAILABLE = True
 except ImportError:
     LLM_MANAGER_AVAILABLE = False
@@ -24,7 +24,7 @@ except ImportError:
     LLMResponse = None
 
 try:
-    from src.memory.supabase_memory import SupabaseMemoryManager
+    from memory.supabase_memory import SupabaseMemoryManager
     MEMORY_AVAILABLE = True
 except ImportError:
     MEMORY_AVAILABLE = False

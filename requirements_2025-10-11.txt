@@ -1,0 +1,3 @@
+# Backup do requirements.txt gerado em 2025-10-11
+# Não versionar este arquivo. Usado apenas para auditoria e recuperação.
+
