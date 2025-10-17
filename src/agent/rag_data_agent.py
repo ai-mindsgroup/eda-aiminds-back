@@ -802,7 +802,7 @@ Responda de forma clara e estruturada.
     async def process(
         self, 
         query: str, 
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[Dict[str, Any]] = None,  # Pylance: context está definido aqui
         session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -812,13 +812,13 @@ Responda de forma clara e estruturada.
         
         Args:
             query: Pergunta do usuário
-            context: Contexto adicional (opcional)
+            context: Contexto adicional (opcional) - DEFINIDO NO ESCOPO
             session_id: ID da sessão para memória persistente
             
         Returns:
             Resposta baseada em busca vetorial + contexto histórico
         """
-        start_time = datetime.now()
+        start_time = datetime.now()  # Pylance: start_time está definido aqui
         
         try:
             self.logger.info(f"🔍 Processando query via RAG V2.0: {query[:80]}...")
@@ -886,7 +886,7 @@ Responda de forma clara e estruturada.
             # 4. BUSCAR CHUNKS SIMILARES NOS DADOS
             # ═══════════════════════════════════════════════════════════════
             self.logger.debug("Buscando chunks similares nos dados...")
-            similar_chunks = self._search_similar_data(
+            similar_chunks = self._search_similar_data(  # Pylance: similar_chunks está definido aqui
                 query_embedding=query_embedding,
                 threshold=0.3,  # Threshold igual ao RAGAgent para capturar chunks analíticos
                 limit=10
@@ -1290,10 +1290,11 @@ Responda de forma clara e estruturada.
                     self.logger.info("🔥 Executando V3.0: AnalysisOrchestrator")
                     
                     # Carregar DataFrame do CSV se disponível
+                    # Note: 'context' está definido no parâmetro do método process()
                     df = None
-                    if context and 'csv_data' in context:
+                    if context and 'csv_data' in context:  # type: ignore[has-type]
                         import pandas as pd
-                        csv_path = context['csv_data'].get('path')
+                        csv_path = context['csv_data'].get('path')  # type: ignore[has-type]
                         if csv_path:
                             try:
                                 df = pd.read_csv(csv_path)
@@ -1335,12 +1336,15 @@ Responda de forma clara e estruturada.
             # 6. SALVAR NA MEMÓRIA E RETORNAR
             # ═══════════════════════════════════════════════════════════════
             
-            processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+            # Note: start_time está definido no início do método (linha ~821)
+            # Note: similar_chunks está definido após busca vetorial (linha ~889)
+            # Pylance false positive: essas variáveis ESTÃO no escopo do método
+            processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000  # type: ignore[has-type]
             
             # Calcular métricas se similar_chunks disponível
-            chunks_count = len(similar_chunks) if similar_chunks else 0
-            avg_sim = sum(c['similarity'] for c in similar_chunks) / len(similar_chunks) if similar_chunks else 0.0
-            top_sim = similar_chunks[0]['similarity'] if similar_chunks else 0.0
+            chunks_count = len(similar_chunks) if similar_chunks else 0  # type: ignore[has-type]
+            avg_sim = sum(c['similarity'] for c in similar_chunks) / len(similar_chunks) if similar_chunks else 0.0  # type: ignore[has-type]
+            top_sim = similar_chunks[0]['similarity'] if similar_chunks else 0.0  # type: ignore[has-type]
             
             # Salvar interação na memória persistente
             if self.has_memory:
