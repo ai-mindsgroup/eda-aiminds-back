@@ -18,4 +18,4 @@ src_dir = repo_root / "src"
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-print(f"✅ conftest.py: Adicionado {src_dir} ao sys.path")
+print(f"[OK] conftest.py: Adicionado {src_dir} ao sys.path")

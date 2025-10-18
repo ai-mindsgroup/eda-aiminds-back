@@ -1,0 +1,7 @@
+ImportError while loading conftest 'C:\workstashion\eda-aiminds-i2a2-rb\tests\conftest.py'.
+tests\conftest.py:21: in <module>
+    print(f"\u2705 conftest.py: Adicionado {src_dir} ao sys.path")
+C:\Python312\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 0: character maps to <undefined>
