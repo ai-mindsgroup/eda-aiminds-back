@@ -34,7 +34,7 @@ SEGURANÇA:
 EXEMPLO DE USO:
 ==============
 ```python
-from security.sandbox import execute_in_sandbox
+from src.security.sandbox import execute_in_sandbox
 
 # Código seguro - será executado
 result = execute_in_sandbox('''

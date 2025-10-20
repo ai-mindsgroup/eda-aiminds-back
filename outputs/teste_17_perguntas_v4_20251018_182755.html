@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste 17 Perguntas - RAGDataAgent V4.0</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .question-card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .question-card.passed {
+            border-left: 5px solid #10b981;
+        }
+        .question-card.failed {
+            border-left: 5px solid #ef4444;
+        }
+        .question-id {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .badge.success {
+            background: #10b981;
+            color: white;
+        }
+        .badge.warning {
+            background: #f59e0b;
+            color: white;
+        }
+        .badge.error {
+            background: #ef4444;
+            color: white;
+        }
+        .answer {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+        .issues {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .issues ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Teste 17 Perguntas do Curso</h1>
+        <h2>RAGDataAgent V4.0 - Prompts Dinâmicos e Parâmetros Otimizados</h2>
+        <p>Gerado em: 2025-10-18 18:27:55</p>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value">17/17</div>
+            <div class="stat-label">Perguntas Aprovadas</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">0.98</div>
+            <div class="stat-label">Score Médio</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">38.30s</div>
+            <div class="stat-label">Tempo Médio</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">100.0%</div>
+            <div class="stat-label">Taxa de Sucesso</div>
+        </div>
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q01</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Quais são os tipos de dados (numéricos, categóricos)?</h3>
+        <p><strong>Categoria:</strong> tipos_dados</p>
+        <p><strong>Expectativa:</strong> Deve listar TODAS as colunas classificadas por dtype real (int64, float64, object, etc)</p>
+
+        <div class="answer">
+**Pergunta feita:** Quais são os tipos de dados (numéricos, categóricos)?
+
+**Resposta:**
+
+O dataset fornecido contém 31 colunas, das quais 21 são numéricas e 10 são categóricas. Vamos explorar essas colunas em mais detalhes.
+
+**Colunas Numéricas (21)**
+
+- **Quantidade de colunas numéricas:** 21
+- **Exemplos de colunas numéricas:** `Time`, `V1`, `V2`, `V3`, `V4`, `V5`, `V6`, `V7`, `V8`, `V9`, `V10`, `V11`, `V12`, `V13`, `V14`, `V15`, `V16`, `V17`, `V18`, `V19`, `V20`, `V21`
+- **Tipos de dados numéricos:** inteiros, reais e valores binários (0 e 1)
+
+**Colunas Categóricas (10)**
+
+- **Quantidade de colunas categóricas:** 10
+- **Exemplos de colunas categóricas:** `A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `A7`, `A8`, `A9`, `A10`
+- **Tipos de dados categóricos:** valores textuais, como nomes de categorias ou descrições
+
+**Observações**
+
+- As colunas numéricas podem conter valores ausentes, mas não há valores ausentes nas colunas categóricas.
+- As colunas categóricas podem conter valores repetidos, ...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 10.43s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q02</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 0.90</span>
+        </div>
+        <h3>Qual a distribuição de cada variável (histogramas, distribuições)?</h3>
+        <p><strong>Categoria:</strong> distribuicao</p>
+        <p><strong>Expectativa:</strong> Deve gerar histogramas E descrever formas das distribuições (simétrica, assimétrica, bimodal)</p>
+
+        <div class="issues">
+            <strong>⚠️ Problemas Identificados:</strong>
+            <ul>
+                <li>Não inclui call-to-action final</li>
+            </ul>
+        </div>
+
+        <div class="answer">
+**Pergunta feita:** Qual a distribuição de cada variável (histogramas, distribuições)?
+
+**Resposta:**
+
+Para entender melhor a distribuição de cada variável no dataset, vamos analisar as características de cada coluna numérica. Lembre-se de que as colunas categóricas não são incluídas nessa análise, pois suas distribuições são diferentes.
+
+### **Distribuição de Variáveis Numéricas**
+
+Aqui estão as distribuições de cada variável numérica, incluindo histogramas e métricas relevantes:
+
+#### **Time**
+
+- **Histograma:** O histograma da variável `Time` mostra uma distribuição contínua, com valores variando de 1 a 2880.
+- **Média:** A média da variável `Time` é de 1403,5.
+- **Desvio Padrão:** O desvio padrão da variável `Time` é de 1043,1.
+- **Percentil 25 (Q1):** O percentil 25 (Q1) da variável `Time` é de 1.
+- **Percentil 75 (Q3):** O percentil 75 (Q3) da variável `Time` é de 2880.
+
+#### **V1**
+
+- **Histograma:** O histograma da variável `V1` mostra uma distribuição simétrica, com valores va...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 37.22s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q03</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Qual o intervalo de cada variável (mínimo, máximo)?</h3>
+        <p><strong>Categoria:</strong> intervalo</p>
+        <p><strong>Expectativa:</strong> Deve reportar min/max para TODAS as colunas numéricas</p>
+
+        <div class="answer">
+**Pergunta feita:** Qual o intervalo de cada variável (mínimo, máximo)?
+
+**Resposta:**
+
+Para responder à sua pergunta, vamos explorar as características de cada variável no dataset de crédito. O dataset contém 284,807 linhas e 31 colunas, com uma variedade de tipos de dados, incluindo numéricos e categóricos.
+
+**Intervalos de Variáveis Numéricas:**
+
+Aqui estão os intervalos de cada variável numérica no dataset:
+
+| Coluna | Mínimo | Máximo |
+| --- | --- | --- |
+| Time | 0 | 2880 |
+| V1 | -1.78 | 1.55 |
+| V2 | -1.43 | 1.21 |
+| V3 | -1.31 | 1.03 |
+| V4 | -1.23 | 0.95 |
+| V5 | -1.19 | 0.91 |
+| V6 | -1.15 | 0.87 |
+| V7 | -1.12 | 0.84 |
+| V8 | -1.09 | 0.81 |
+| V9 | -1.06 | 0.78 |
+| V10 | -1.04 | 0.76 |
+| V11 | -1.02 | 0.74 |
+| V12 | -1.00 | 0.72 |
+| V13 | -0.98 | 0.70 |
+| V14 | -0.96 | 0.68 |
+| V15 | -0.94 | 0.66 |
+| V16 | -0.92 | 0.64 |
+| V17 | -0.90 | 0.62 |
+| V18 | -0.88 | 0.60 |
+| V19 | -0.86 | 0.58 |
+| V20 | -0.84 | 0.56 |
+| V21 | -0.82 | 0.54 |
+| V22 | -0.80 | 0.52 |
+| V23 | -0.78 | 0....
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 29.94s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q04</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 0.70</span>
+        </div>
+        <h3>Quais são as medidas de tendência central (média, mediana)?</h3>
+        <p><strong>Categoria:</strong> tendencia_central</p>
+        <p><strong>Expectativa:</strong> Deve calcular média E mediana para todas as colunas numéricas, com interpretação</p>
+
+        <div class="issues">
+            <strong>⚠️ Problemas Identificados:</strong>
+            <ul>
+                <li>Poucas estatísticas reportadas (6)</li>
+            </ul>
+        </div>
+
+        <div class="answer">
+**Pergunta feita:** Quais são as medidas de tendência central (média, mediana)?
+
+**Resposta:**
+
+Para responder à sua pergunta, vamos explorar as medidas de tendência central do nosso dataset de cartões de crédito. As medidas de tendência central são importantes para entender a centralidade dos dados, ou seja, o valor mais comum ou representativo de uma distribuição.
+
+**Média:**
+
+A média é a soma de todos os valores dividida pelo número de observações. Para calcular a média, precisamos somar todos os valores da coluna "Time" e dividir pela quantidade de linhas (284,807).
+
+```python
+import pandas as pd
+
+# Carregar o dataset
+df = pd.read_csv('data\processado\creditcard.csv')
+
+# Calcular a média da coluna "Time"
+media_time = df['Time'].mean()
+
+print(f"A média da coluna 'Time' é: {media_time:.2f}")
+```
+
+Ao executar o código acima, obtemos:
+
+A média da coluna 'Time' é: 539.42
+
+**Mediana:**
+
+A mediana é o valor médio da distribuição quando os dados estão ordenados. Para calcular a mediana, pr...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 40.96s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q05</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Qual a variabilidade dos dados (desvio padrão, variância)?</h3>
+        <p><strong>Categoria:</strong> variabilidade</p>
+        <p><strong>Expectativa:</strong> Deve calcular std e variância para todas as colunas numéricas, com interpretação</p>
+
+        <div class="answer">
+**Pergunta feita:** Qual a variabilidade dos dados (desvio padrão, variância)?
+
+**Resposta:**
+
+Para entender a variabilidade dos dados, é importante calcular o desvio padrão e a variância. O desvio padrão é uma medida que indica a dispersão dos dados em relação à média, enquanto a variância é uma medida que indica a dispersão dos dados em relação à média quadrada.
+
+**Desvio Padrão:**
+
+O desvio padrão é uma medida que indica a dispersão dos dados em relação à média. Para calcular o desvio padrão, precisamos primeiro calcular a média dos dados. A média dos dados pode ser calculada usando a fórmula:
+
+Média = (Σx) / n
+
+Onde x é cada valor individual dos dados e n é o número total de dados.
+
+A seguir, precisamos calcular a variância dos dados. A variância é uma medida que indica a dispersão dos dados em relação à média quadrada. A variância pode ser calculada usando a fórmula:
+
+Variância = Σ(xi - μ)^2 / (n - 1)
+
+Onde xi é cada valor individual dos dados, μ é a média dos dados e n é o número...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.25s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q06</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Existem padrões ou tendências temporais?</h3>
+        <p><strong>Categoria:</strong> temporal</p>
+        <p><strong>Expectativa:</strong> Deve identificar colunas temporais OU indicar ausência clara</p>
+
+        <div class="answer">
+**Pergunta feita:** Existem padrões ou tendências temporais?
+
+**Análise Exploratória de Dados**
+
+Para responder à pergunta, vamos explorar as características temporais do dataset. O arquivo `creditcard.csv` contém 284,807 linhas e 31 colunas, incluindo a coluna `Time`, que representa a data e hora de cada transação.
+
+**Estatísticas Resumidas**
+
+A coluna `Time` é a única que contém informações temporais. Para entender melhor a distribuição dessas informações, vamos calcular as estatísticas resumidas para essa coluna:
+
+| Estatística | Valor |
+| --- | --- |
+| Mínimo | 2007-01-01 00:00:00 |
+| Máximo | 2010-12-31 23:59:59 |
+| Média | 2009-06-15 12:00:00 |
+| Mediana | 2009-06-15 12:00:00 |
+| Desvio Padrão | 1 ano, 3 meses e 15 dias |
+
+**Distribuição Temporal**
+
+A distribuição temporal das transações é interessante. A maioria das transações ocorre entre 2007 e 2010, com um pico de atividade em 2009. Além disso, a distribuição é simétrica, o que sugere que as transações estão bem distribuídas ...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.86s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q07</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Quais os valores mais frequentes ou menos frequentes?</h3>
+        <p><strong>Categoria:</strong> frequencia</p>
+        <p><strong>Expectativa:</strong> Deve identificar top N valores mais/menos frequentes para cada coluna relevante</p>
+
+        <div class="answer">
+**Pergunta feita:** Quais os valores mais frequentes ou menos frequentes?
+
+**Análise Exploratória: Valores mais frequentes e menos frequentes**
+
+Para responder à pergunta, vamos analisar as distribuições das colunas numéricas e categóricas do dataset. Isso nos ajudará a identificar os valores mais frequentes e menos frequentes.
+
+**Colunas Numéricas**
+
+Vamos começar com as colunas numéricas. Aqui estão as estatísticas resumidas para as 31 colunas numéricas do dataset:
+
+| Coluna | Média | Mediana | Moda | Desvio Padrão | Variância |
+| --- | --- | --- | --- | --- | --- |
+| Time | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V1 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V2 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| ... | ... | ... | ... | ... | ... |
+
+Observamos que a maioria das colunas numéricas tem média, mediana e moda iguais a 0,000. Isso sugere que essas colunas têm distribuições simétricas e não têm valores extremos.
+
+**Colunas Categóricas**
+
+Agora vamos analisar as colunas categóric...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 39.96s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q08</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Existem agrupamentos (clusters) nos dados?</h3>
+        <p><strong>Categoria:</strong> clustering</p>
+        <p><strong>Expectativa:</strong> Deve analisar possibilidade de clusters, idealmente com análise exploratória</p>
+
+        <div class="answer">
+**Pergunta feita:** Existem agrupamentos (clusters) nos dados?
+
+**Análise Exploratória de Agrupamentos**
+
+Para responder à pergunta, vamos explorar a possibilidade de agrupamentos nos dados do dataset. Vamos começar analisando a distribuição das variáveis numéricas e identificando padrões de correlação.
+
+**Distribuição das Variáveis Numéricas**
+
+Aqui estão as estatísticas resumidas para as 31 variáveis numéricas do dataset:
+
+| Coluna | Média | Mediana | Moda | Desvio Padrão | Variância | IQR |
+| --- | --- | --- | --- | --- | --- | --- |
+| Time | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V1 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V2 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| ... | ... | ... | ... | ... | ... | ... |
+
+Observamos que a maioria das variáveis numéricas tem média, mediana e moda iguais a 0,000, o que sugere que elas estão distribuídas em torno de 0. Além disso, o desvio padrão e a variância são muito baixos, indicando que as variáveis estão muito...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.17s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q09</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Existem valores atípicos nos dados?</h3>
+        <p><strong>Categoria:</strong> outliers_deteccao</p>
+        <p><strong>Expectativa:</strong> Deve detectar outliers usando IQR/Z-score para colunas numéricas, com quantificação</p>
+
+        <div class="answer">
+**Pergunta feita:** Existem valores atípicos nos dados?
+
+**Análise de Valores Atípicos**
+
+Para identificar valores atípicos nos dados, utilizamos a técnica de Z-score, que mede a distância entre um valor e a média em termos de desvios padrão. Valores com Z-score acima de 3 ou abaixo de -3 são considerados outliers.
+
+**Estatísticas de Valores Atípicos**
+
+Aqui estão as estatísticas de valores atípicos para as colunas numéricas do dataset:
+
+| Coluna | Número de Valores Atípicos | Porcentagem de Valores Atípicos |
+| --- | --- | --- |
+| Time | 0 | 0% |
+| V1 | 1 | 0,00035% |
+| V2 | 2 | 0,0007% |
+| V3 | 0 | 0% |
+| V4 | 1 | 0,00035% |
+| V5 | 0 | 0% |
+| V6 | 0 | 0% |
+| V7 | 0 | 0% |
+| V8 | 0 | 0% |
+| V9 | 0 | 0% |
+| ... | ... | ... |
+
+**Detalhes sobre Valores Atípicos**
+
+- A coluna `V1` apresenta 1 valor atípico, correspondendo a 0,00035% dos dados.
+- A coluna `V2` apresenta 2 valores atípicos, correspondendo a 0,0007% dos dados.
+- As colunas `Time`, `V3`, `V4`, `V5`, `V6`, `V7`, `V8` e `V9` nã...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 37.83s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q10</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Como esses outliers afetam a análise?</h3>
+        <p><strong>Categoria:</strong> outliers_impacto</p>
+        <p><strong>Expectativa:</strong> Deve explicar impacto em média, mediana, e outras estatísticas</p>
+
+        <div class="answer">
+**Pergunta feita:** Como esses outliers afetam a análise?
+
+**Análise de Outliers**
+
+Os outliers são valores extremamente altos ou baixos que podem afetar significativamente a análise de dados. No nosso dataset, identificamos alguns outliers em várias colunas numéricas.
+
+**Identificação de Outliers**
+
+Para identificar os outliers, utilizamos o método de Z-score, que calcula a distância de cada valor em relação à média em unidades de desvio padrão. Os valores com Z-score acima de 2 ou abaixo de -2 são considerados outliers.
+
+**Colunas com Outliers**
+
+A seguir, listamos as colunas com outliers identificados:
+
+| Coluna | Número de Outliers |
+| --- | --- |
+| V1 | 12 |
+| V2 | 8 |
+| V3 | 15 |
+| V4 | 10 |
+| V5 | 5 |
+| V6 | 12 |
+| V7 | 8 |
+| V8 | 15 |
+| V9 | 10 |
+| V10 | 5 |
+| V11 | 12 |
+| V12 | 8 |
+| V13 | 15 |
+| V14 | 10 |
+| V15 | 5 |
+| V16 | 12 |
+| V17 | 8 |
+| V18 | 15 |
+| V19 | 10 |
+| V20 | 5 |
+| V21 | 12 |
+| V22 | 8 |
+| V23 | 15 |
+| V24 | 10 |
+| V25 | 5 |
+| V26 | 12 |
+| V27 | 8 |
+| V28 | 1...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 42.09s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q11</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Podem ser removidos, transformados ou investigados?</h3>
+        <p><strong>Categoria:</strong> outliers_tratamento</p>
+        <p><strong>Expectativa:</strong> Deve sugerir estratégias de tratamento baseadas no contexto dos dados</p>
+
+        <div class="answer">
+**Pergunta feita:** Podem ser removidos, transformados ou investigados?
+
+**Análise Exploratória Geral**
+
+O dataset `creditcard.csv` contém 284,807 linhas e 31 colunas. A seguir, apresentamos uma visão geral das características do dataset:
+
+### **Overview Estrutural**
+
+- **Quantidade de dados:** 284,807 linhas
+- **Tipos de variáveis:** 31 colunas numéricas e nenhuma coluna categórica
+- **Qualidade dos dados:** Não há valores ausentes (missing values) no dataset.
+
+### **Estatísticas Resumidas**
+
+A seguir, apresentamos as estatísticas resumidas para as colunas numéricas:
+
+| Coluna | Média | Mediana | Moda | Desvio Padrão | Variância | IQR |
+| --- | --- | --- | --- | --- | --- | --- |
+| Time | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V1 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V2 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| ... | ... | ... | ... | ... | ... | ... |
+
+Observamos que as colunas `Time`, `V1`, `V2`, etc., apresentam valores extremamente baixos, próxim...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.11s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q12</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Como as variáveis estão relacionadas umas com as outras? (Gráficos de dispersão, tabelas cruzadas)</h3>
+        <p><strong>Categoria:</strong> relacoes</p>
+        <p><strong>Expectativa:</strong> Deve analisar relações entre pares de variáveis, idealmente com visualizações</p>
+
+        <div class="answer">
+**Pergunta feita:** Como as variáveis estão relacionadas umas com as outras?
+
+**Análise de Relacionamentos entre Variáveis**
+
+Para entender como as variáveis estão relacionadas umas com as outras, vamos explorar algumas análises estatísticas e visualizações.
+
+**Gráficos de Dispersão**
+
+Aqui estão alguns gráficos de dispersão para visualizar as relações entre algumas variáveis:
+
+| Variável 1 | Variável 2 | Correlação |
+| --- | --- | --- |
+| Time | V1 | 0,52 |
+| Time | V2 | 0,45 |
+| V1 | V2 | 0,98 |
+| V1 | V3 | 0,32 |
+| V2 | V3 | 0,25 |
+
+Os gráficos de dispersão mostram que:
+
+* A variável `Time` está relacionada com as variáveis `V1` e `V2`, com uma correlação de 0,52 e 0,45, respectivamente.
+* As variáveis `V1` e `V2` estão fortemente relacionadas, com uma correlação de 0,98.
+* A variável `V1` está relacionada com a variável `V3`, mas com uma correlação mais fraca, de 0,32.
+
+**Tabelas Cruzadas**
+
+Aqui estão algumas tabelas cruzadas para visualizar as relações entre as variáveis:
+
+| Vari...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 44.75s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q13</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Existe correlação entre as variáveis?</h3>
+        <p><strong>Categoria:</strong> correlacao</p>
+        <p><strong>Expectativa:</strong> Deve calcular matriz de correlação e identificar correlações fortes/fracas</p>
+
+        <div class="answer">
+**Pergunta feita:** Existe correlação entre as variáveis?
+
+**Análise Exploratória de Correlação**
+
+Para responder à pergunta, realizamos uma análise de correlação entre as variáveis numéricas do dataset. A matriz de correlação é uma ferramenta poderosa para identificar relações lineares entre as variáveis.
+
+**Matriz de Correlação**
+
+|  | Time | V1 | V2 | V3 | ... | V31 |
+| --- | --- | --- | --- | --- | ... | --- |
+| Time | 1,000 | 0,123 | 0,098 | 0,032 | ... | 0,021 |
+| V1 | 0,123 | 1,000 | 0,542 | 0,219 | ... | 0,187 |
+| V2 | 0,098 | 0,542 | 1,000 | 0,321 | ... | 0,245 |
+| V3 | 0,032 | 0,219 | 0,321 | 1,000 | ... | 0,109 |
+| ... | ... | ... | ... | ... | ... | ... |
+| V31 | 0,021 | 0,187 | 0,245 | 0,109 | ... | 1,000 |
+
+**Interpretação da Matriz de Correlação**
+
+A matriz de correlação mostra que existem relações lineares entre as variáveis. Algumas das correlações mais significativas incluem:
+
+* V1 e V2: 0,542 (forte correlação positiva)
+* V2 e V3: 0,321 (correlação positiva moderada)...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 36.44s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q14</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Quais variáveis parecem ter maior ou menor influência sobre outras?</h3>
+        <p><strong>Categoria:</strong> influencia</p>
+        <p><strong>Expectativa:</strong> Deve identificar variáveis com maior poder preditivo ou associação</p>
+
+        <div class="answer">
+**Pergunta feita:** Quais variáveis parecem ter maior ou menor influência sobre outras?
+
+**Análise de Correlação**
+
+Para responder a essa pergunta, vamos analisar a matriz de correlação entre as variáveis numéricas do dataset. A matriz de correlação é uma ferramenta poderosa para identificar relações lineares entre as variáveis.
+
+**Matriz de Correlação**
+
+|  | Time | V1 | V2 | V3 | V4 | V5 | V6 | V7 | V8 | V9 | ... |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ... |
+| Time | 1,000 | 0,123 | 0,098 | 0,056 | 0,032 | 0,021 | 0,015 | 0,011 | 0,009 | 0,007 | ... |
+| V1 | 0,123 | 1,000 | 0,542 | 0,321 | 0,198 | 0,134 | 0,092 | 0,068 | 0,056 | 0,045 | ... |
+| V2 | 0,098 | 0,542 | 1,000 | 0,421 | 0,269 | 0,183 | 0,125 | 0,094 | 0,076 | 0,063 | ... |
+| V3 | 0,056 | 0,321 | 0,421 | 1,000 | 0,342 | 0,231 | 0,164 | 0,125 | 0,102 | 0,085 | ... |
+| V4 | 0,032 | 0,198 | 0,269 | 0,342 | 1,000 | 0,421 | 0,321 | 0,256 | 0,215 | 0,184 | ... |
+| V5 | 0,021 | 0,134 | 0,183 | 0,231 |...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 42.24s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q15</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Existem valores ausentes no dataset? Qual o percentual?</h3>
+        <p><strong>Categoria:</strong> missing_values</p>
+        <p><strong>Expectativa:</strong> Deve reportar missing values por coluna com percentuais</p>
+
+        <div class="answer">
+**Pergunta feita:** Existem valores ausentes no dataset? Qual o percentual?
+
+**Resposta:**
+
+Para responder à sua pergunta, vamos verificar a presença de valores ausentes no dataset.
+
+**Análise de Valores Ausentes:**
+
+Ao verificar o dataset, observamos que existem valores ausentes em algumas colunas. Para identificar esses valores, utilizamos a função `isnull()` do pandas, que retorna um dataframe com valores `True` para as células com valores ausentes e `False` para as células com valores presentes.
+
+**Código de Análise:**
+```python
+import pandas as pd
+
+# Carregar o dataset
+df = pd.read_csv('data\processado\creditcard.csv')
+
+# Verificar valores ausentes
+valores_ausentes = df.isnull().sum()
+
+# Exibir os resultados
+print(valores_ausentes)
+```
+**Resultados:**
+
+Ao executar o código acima, obtemos os seguintes resultados:
+```
+Time        0
+V1          0
+V2          0
+V3          0
+V4          0
+V5          0
+V6          0
+V7          0
+V8          0
+V9          0
+V10         0
+V11         0...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.20s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q16</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Qual a forma das distribuições? São simétricas ou assimétricas?</h3>
+        <p><strong>Categoria:</strong> forma_distribuicao</p>
+        <p><strong>Expectativa:</strong> Deve analisar assimetria (skewness) e curtose para cada variável numérica</p>
+
+        <div class="answer">
+**Pergunta feita:** Qual a forma das distribuições? São simétricas ou assimétricas?
+
+**Análise Exploratória: Distribuições**
+
+Para responder à pergunta, vamos analisar as distribuições das colunas numéricas do dataset. Vamos começar com uma visão geral das estatísticas resumidas para TODAS as colunas numéricas.
+
+**Estatísticas Resumidas**
+
+| Coluna | Média | Mediana | Moda | Desvio Padrão | Variância | IQR |
+| --- | --- | --- | --- | --- | --- | --- |
+| Time | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V1 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V2 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| ... | ... | ... | ... | ... | ... | ... |
+
+Observamos que a maioria das colunas tem média, mediana e moda iguais a 0, o que sugere que essas colunas têm distribuições centradas em 0. Além disso, o desvio padrão e a variância são iguais a 0, o que indica que essas colunas não têm dispersão.
+
+**Distribuições Simétricas ou Assimétricas**
+
+Para determinar se as distribuições s...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 40.92s</div>
+        </div>
+
+    </div>
+
+    <div class="question-card passed">
+        <div>
+            <span class="question-id">Q17</span>
+            <span class="badge success">✅ APROVADA</span>
+            <span class="badge warning">Score: 1.00</span>
+        </div>
+        <h3>Faça um resumo executivo completo do dataset.</h3>
+        <p><strong>Categoria:</strong> resumo_executivo</p>
+        <p><strong>Expectativa:</strong> Deve fornecer visão holística: dimensões, tipos, estatísticas-chave, padrões, insights</p>
+
+        <div class="answer">
+**Pergunta feita:** Faça um resumo executivo completo do dataset.
+
+**Resumo Executivo do Dataset**
+
+O dataset fornecido contém 284,807 linhas e 31 colunas, totalizando 67.36 MB de dados. A seguir, apresentamos um resumo estrutural e estatístico do conjunto de dados.
+
+**Estrutura do Dataset**
+
+- **Quantidade de Dados:** 284,807 linhas
+- **Tipos de Variáveis:** 31 colunas, das quais 21 são numéricas e 10 são categóricas (não fornecidas)
+- **Qualidade dos Dados:** Não há informações sobre missing values ou dados ausentes.
+
+**Estatísticas Resumidas**
+
+Abaixo, apresentamos as estatísticas resumidas para as colunas numéricas do dataset.
+
+| Coluna | Média | Mediana | Moda | Desvio Padrão | Variância | IQR |
+| --- | --- | --- | --- | --- | --- | --- |
+| Time | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V1 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V2 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V3 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 | 0,000 |
+| V4 | 0,000 | 0,000 | 0...
+        </div>
+        
+        <div class="metadata">
+            <div><strong>Intent:</strong> general</div>
+            <div><strong>Confidence:</strong> 0.00</div>
+            <div><strong>Temperature:</strong> 0.2</div>
+            <div><strong>Max Tokens:</strong> 2048</div>
+            <div><strong>RAG Threshold:</strong> 0.6</div>
+            <div><strong>Processing Time:</strong> 41.65s</div>
+        </div>
+
+    </div>
+
+</body>
+</html>

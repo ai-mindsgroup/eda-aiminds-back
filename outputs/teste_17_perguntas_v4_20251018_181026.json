@@ -1,0 +1,444 @@
+[
+  {
+    "pergunta": {
+      "id": "Q01",
+      "pergunta": "Quais são os tipos de dados (numéricos, categóricos)?",
+      "categoria": "tipos_dados",
+      "expectativa": "Deve listar TODAS as colunas classificadas por dtype real (int64, float64, object, etc)"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Quais são os tipos de dados (numéricos, categóricos)?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:09:54.956932"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:09:54.957928"
+  },
+  {
+    "pergunta": {
+      "id": "Q02",
+      "pergunta": "Qual a distribuição de cada variável (histogramas, distribuições)?",
+      "categoria": "distribuicao",
+      "expectativa": "Deve gerar histogramas E descrever formas das distribuições (simétrica, assimétrica, bimodal)"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Qual a distribuição de cada variável (histogramas, distribuições)?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:09:57.083731"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:09:57.087733"
+  },
+  {
+    "pergunta": {
+      "id": "Q03",
+      "pergunta": "Qual o intervalo de cada variável (mínimo, máximo)?",
+      "categoria": "intervalo",
+      "expectativa": "Deve reportar min/max para TODAS as colunas numéricas"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Qual o intervalo de cada variável (mínimo, máximo)?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:09:58.946122"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:09:58.947121"
+  },
+  {
+    "pergunta": {
+      "id": "Q04",
+      "pergunta": "Quais são as medidas de tendência central (média, mediana)?",
+      "categoria": "tendencia_central",
+      "expectativa": "Deve calcular média E mediana para todas as colunas numéricas, com interpretação"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Quais são as medidas de tendência central (média, mediana)?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:00.875140"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:00.876142"
+  },
+  {
+    "pergunta": {
+      "id": "Q05",
+      "pergunta": "Qual a variabilidade dos dados (desvio padrão, variância)?",
+      "categoria": "variabilidade",
+      "expectativa": "Deve calcular std e variância para todas as colunas numéricas, com interpretação"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Qual a variabilidade dos dados (desvio padrão, variância)?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:02.723485"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:02.724482"
+  },
+  {
+    "pergunta": {
+      "id": "Q06",
+      "pergunta": "Existem padrões ou tendências temporais?",
+      "categoria": "temporal",
+      "expectativa": "Deve identificar colunas temporais OU indicar ausência clara"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Existem padrões ou tendências temporais?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:04.478998"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:04.479996"
+  },
+  {
+    "pergunta": {
+      "id": "Q07",
+      "pergunta": "Quais os valores mais frequentes ou menos frequentes?",
+      "categoria": "frequencia",
+      "expectativa": "Deve identificar top N valores mais/menos frequentes para cada coluna relevante"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Quais os valores mais frequentes ou menos frequentes?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:06.376081"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:06.377076"
+  },
+  {
+    "pergunta": {
+      "id": "Q08",
+      "pergunta": "Existem agrupamentos (clusters) nos dados?",
+      "categoria": "clustering",
+      "expectativa": "Deve analisar possibilidade de clusters, idealmente com análise exploratória"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Existem agrupamentos (clusters) nos dados?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:08.147740"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:08.149740"
+  },
+  {
+    "pergunta": {
+      "id": "Q09",
+      "pergunta": "Existem valores atípicos nos dados?",
+      "categoria": "outliers_deteccao",
+      "expectativa": "Deve detectar outliers usando IQR/Z-score para colunas numéricas, com quantificação"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Existem valores atípicos nos dados?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:10.557717"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:10.560713"
+  },
+  {
+    "pergunta": {
+      "id": "Q10",
+      "pergunta": "Como esses outliers afetam a análise?",
+      "categoria": "outliers_impacto",
+      "expectativa": "Deve explicar impacto em média, mediana, e outras estatísticas"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Como esses outliers afetam a análise?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:12.672751"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:12.677750"
+  },
+  {
+    "pergunta": {
+      "id": "Q11",
+      "pergunta": "Podem ser removidos, transformados ou investigados?",
+      "categoria": "outliers_tratamento",
+      "expectativa": "Deve sugerir estratégias de tratamento baseadas no contexto dos dados"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Podem ser removidos, transformados ou investigados?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:14.714730"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:14.715730"
+  },
+  {
+    "pergunta": {
+      "id": "Q12",
+      "pergunta": "Como as variáveis estão relacionadas umas com as outras? (Gráficos de dispersão, tabelas cruzadas)",
+      "categoria": "relacoes",
+      "expectativa": "Deve analisar relações entre pares de variáveis, idealmente com visualizações"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Como as variáveis estão relacionadas umas com as outras? (Gráficos de dispersão, tabelas cruzadas)",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:16.634834"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:16.634834"
+  },
+  {
+    "pergunta": {
+      "id": "Q13",
+      "pergunta": "Existe correlação entre as variáveis?",
+      "categoria": "correlacao",
+      "expectativa": "Deve calcular matriz de correlação e identificar correlações fortes/fracas"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Existe correlação entre as variáveis?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:18.069162"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:18.077161"
+  },
+  {
+    "pergunta": {
+      "id": "Q14",
+      "pergunta": "Quais variáveis parecem ter maior ou menor influência sobre outras?",
+      "categoria": "influencia",
+      "expectativa": "Deve identificar variáveis com maior poder preditivo ou associação"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Quais variáveis parecem ter maior ou menor influência sobre outras?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:19.652909"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:19.653906"
+  },
+  {
+    "pergunta": {
+      "id": "Q15",
+      "pergunta": "Existem valores ausentes no dataset? Qual o percentual?",
+      "categoria": "missing_values",
+      "expectativa": "Deve reportar missing values por coluna com percentuais"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Existem valores ausentes no dataset? Qual o percentual?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:21.140981"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:21.140981"
+  },
+  {
+    "pergunta": {
+      "id": "Q16",
+      "pergunta": "Qual a forma das distribuições? São simétricas ou assimétricas?",
+      "categoria": "forma_distribuicao",
+      "expectativa": "Deve analisar assimetria (skewness) e curtose para cada variável numérica"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Qual a forma das distribuições? São simétricas ou assimétricas?",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:23.059535"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:23.069540"
+  },
+  {
+    "pergunta": {
+      "id": "Q17",
+      "pergunta": "Faça um resumo executivo completo do dataset.",
+      "categoria": "resumo_executivo",
+      "expectativa": "Deve fornecer visão holística: dimensões, tipos, estatísticas-chave, padrões, insights"
+    },
+    "result": {
+      "success": false,
+      "error": "'NoneType' object has no attribute 'invoke'",
+      "query": "Faça um resumo executivo completo do dataset.",
+      "metadata": {
+        "version": "4.0",
+        "timestamp": "2025-10-18T18:10:26.337168"
+      }
+    },
+    "validation": {
+      "passed": false,
+      "issues": [
+        "Query falhou: 'NoneType' object has no attribute 'invoke'"
+      ],
+      "score": 0.0,
+      "metrics": {}
+    },
+    "timestamp": "2025-10-18T18:10:26.338166"
+  }
+]

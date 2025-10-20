@@ -15,11 +15,11 @@ import pandas as pd
 import logging
 from datetime import datetime
 
-from analysis.intent_classifier import IntentClassifier, AnalysisIntent, IntentClassificationResult
-from analysis.statistical_analyzer import StatisticalAnalyzer, StatisticalAnalysisResult
-from analysis.frequency_analyzer import FrequencyAnalyzer, FrequencyAnalysisResult
-from analysis.temporal_analyzer import TemporalAnalyzer, TemporalAnalysisResult
-from analysis.clustering_analyzer import ClusteringAnalyzer, ClusteringAnalysisResult
+from src.analysis.intent_classifier import IntentClassifier, AnalysisIntent, IntentClassificationResult
+from src.analysis.statistical_analyzer import StatisticalAnalyzer, StatisticalAnalysisResult
+from src.analysis.frequency_analyzer import FrequencyAnalyzer, FrequencyAnalysisResult
+from src.analysis.temporal_analyzer import TemporalAnalyzer, TemporalAnalysisResult
+from src.analysis.clustering_analyzer import ClusteringAnalyzer, ClusteringAnalysisResult
 
 
 @dataclass

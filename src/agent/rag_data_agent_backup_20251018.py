@@ -66,10 +66,6 @@ from src.analysis.orchestrator import AnalysisOrchestrator
 # Substitui PythonREPLTool inseguro detectado no Sprint 2
 from src.security.sandbox import execute_in_sandbox
 
-# ✅ V4.0: Imports para prompts dinâmicos e configurações otimizadas
-from src.prompts.dynamic_prompts import DynamicPromptGenerator, DatasetContext
-from src.llm.optimized_config import get_configs_for_intent, LLMOptimizedConfig, RAGOptimizedConfig
-
 # Imports LangChain
 try:
     from langchain_openai import ChatOpenAI
@@ -629,8 +625,8 @@ Responda de forma clara e estruturada.
             String formatada em Markdown com análises temporais e/ou estatísticas
         """
         import pandas as pd
-        from src.analysis.temporal_detection import TemporalColumnDetector, TemporalDetectionConfig
-        from src.analysis.temporal_analyzer import TemporalAnalyzer
+        from analysis.temporal_detection import TemporalColumnDetector, TemporalDetectionConfig
+        from analysis.temporal_analyzer import TemporalAnalyzer
         
         # Carregar dados
         df = pd.read_csv(csv_path)
@@ -640,12 +636,8 @@ Responda de forma clara e estruturada.
             'event': 'inicio_analise_csv_v2',
             'csv_path': csv_path,
             'shape': df.shape,
-            'dtypes': df.dtypes.to_dict(),  # ✅ V4.0: Log dtypes REAIS
             'override_temporal_col': override_temporal_col
         })
-        
-        # ✅ V4.0: Atualizar contexto do dataset com dados REAIS do DataFrame
-        dataset_context = self._update_dataset_context(df, csv_path)
         
         # ═══════════════════════════════════════════════════════════════
         # ETAPA 1: DETECÇÃO DE COLUNAS TEMPORAIS
@@ -825,79 +817,47 @@ Responda de forma clara e estruturada.
         # Inicializar LLM LangChain
         self._init_langchain_llm()
         
-        # ✅ V4.0: Inicializar gerador de prompts dinâmicos e cache de contexto
-        self.prompt_generator = DynamicPromptGenerator()
-        self.current_dataset_context: Optional[DatasetContext] = None
-        
-        self.logger.info("✅ RAGDataAgent V4.0 inicializado - prompts dinâmicos + parâmetros otimizados + memória")
+        self.logger.info("✅ RAGDataAgent V2.0 inicializado - RAG vetorial + memória + LangChain")
     
     def _init_langchain_llm(self):
-        """Inicializa LLM via camada de abstração LangChainLLMManager.
-        
-        ✅ V4.1: Refatorado para usar abstração existente (elimina duplicação).
-        Ordem de prioridade: GROQ → Google → OpenAI (via LangChainLLMManager)
-        """
-        try:
-            from src.llm.langchain_manager import get_langchain_llm_manager, LLMConfig
-            
-            # Obter instância singleton do manager
-            manager = get_langchain_llm_manager()
-            
-            # Criar configuração para o LLM
-            config = LLMConfig(temperature=0.3, max_tokens=2000, top_p=0.25)
-            
-            # Obter cliente LangChain do provedor ativo
-            self.llm = manager._get_client(manager.active_provider, config)
-            
-            self.logger.info(
-                f"✅ LLM inicializado via abstração: {manager.active_provider.value.upper()} "
-                f"(fallback automático: GROQ → Google → OpenAI)"
-            )
-            
-        except Exception as e:
-            self.logger.error(f"❌ Falha ao inicializar LLM via abstração: {e}")
+        """Inicializa LLM do LangChain com fallback."""
+        if not LANGCHAIN_AVAILABLE:
+            self.logger.warning("⚠️ LangChain não disponível - usando fallback")
             self.llm = None
-            self.logger.warning("⚠️ Sistema operando sem LLM - funcionalidade limitada")
-    
-    # ═══════════════════════════════════════════════════════════════
-    # ✅ V4.0: MÉTODO PARA ATUALIZAR CONTEXTO DO DATASET
-    # ═══════════════════════════════════════════════════════════════
-    
-    def _update_dataset_context(self, df: pd.DataFrame, file_path: str) -> DatasetContext:
-        """
-        Atualiza contexto do dataset baseado no DataFrame REAL.
+            return
         
-        ELIMINA HARDCODING:
-        - Detecta automaticamente número de colunas com df.shape
-        - Extrai dtypes reais com df.dtypes
-        - Identifica categóricas binárias (ex: Class com {0,1})
-        - Calcula estatísticas reais com df.describe()
-        
-        Args:
-            df: DataFrame carregado do CSV
-            file_path: Caminho do arquivo CSV
-            
-        Returns:
-            DatasetContext com tipos, colunas e estatísticas REAIS
-        """
         try:
-            context = DatasetContext.from_dataframe(df, file_path)
-            self.current_dataset_context = context
-            
-            self.logger.info({
-                'event': 'dataset_context_updated',
-                'file': file_path,
-                'shape': df.shape,
-                'numeric_cols': len(context.numeric_columns),
-                'categorical_cols': len(context.categorical_columns),
-                'temporal_cols': len(context.temporal_columns),
-                'memory_usage_mb': context.memory_usage_mb
-            })
-            
-            return context
+            # Tentar Google Gemini primeiro (melhor custo-benefício)
+            from src.settings import GOOGLE_API_KEY
+            if GOOGLE_API_KEY:
+                self.llm = ChatGoogleGenerativeAI(
+                    model="gemini-1.5-flash",
+                    temperature=0.3,
+                    max_tokens=2000,
+                    google_api_key=GOOGLE_API_KEY
+                )
+                self.logger.info("✅ LLM LangChain inicializado: Google Gemini")
+                return
         except Exception as e:
-            self.logger.error(f"❌ Erro ao atualizar contexto do dataset: {e}", exc_info=True)
-            return None
+            self.logger.warning(f"Google Gemini não disponível: {e}")
+        
+        try:
+            # Fallback: OpenAI
+            from src.settings import OPENAI_API_KEY
+            if OPENAI_API_KEY:
+                self.llm = ChatOpenAI(
+                    model="gpt-4o-mini",
+                    temperature=0.3,
+                    max_tokens=2000,
+                    openai_api_key=OPENAI_API_KEY
+                )
+                self.logger.info("✅ LLM LangChain inicializado: OpenAI GPT-4o-mini")
+                return
+        except Exception as e:
+            self.logger.warning(f"OpenAI não disponível: {e}")
+        
+        self.llm = None
+        self.logger.warning("⚠️ Nenhum LLM LangChain disponível - usando fallback manual")
     
     # ═══════════════════════════════════════════════════════════════
     # 🔒 SPRINT 3 P0-4: MÉTODO DE EXECUÇÃO SEGURA VIA SANDBOX
@@ -1107,40 +1067,13 @@ Responda de forma clara e estruturada.
                 return self._build_error_response("Falha ao gerar embedding da query")
             
             # ═══════════════════════════════════════════════════════════════
-            # ✅ V4.0: CLASSIFICAR INTENT E OBTER CONFIGURAÇÕES OTIMIZADAS
+            # 4. BUSCAR CHUNKS SIMILARES NOS DADOS
             # ═══════════════════════════════════════════════════════════════
-            llm_config, rag_config = None, None
-            if self.llm:
-                try:
-                    classifier = IntentClassifier(llm=self.llm, logger=self.logger)
-                    classification_result = classifier.classify(query=query, context={})
-                    
-                    # Obter configurações otimizadas baseadas na intenção
-                    llm_config, rag_config = get_configs_for_intent(classification_result.primary_intent.value)
-                    
-                    self.logger.info({
-                        'event': 'v4_configs_applied',
-                        'intent': classification_result.primary_intent.value,
-                        'temperature': llm_config.temperature,
-                        'max_tokens': llm_config.max_tokens,
-                        'rag_threshold': rag_config.similarity_threshold,  # ✅ V4.1: Corrigido nome do atributo
-                        'rag_max_chunks': rag_config.max_chunks
-                    })
-                except Exception as e:
-                    self.logger.warning(f"⚠️ Falha ao classificar intent, usando configs default: {e}")
-            
-            # Usar configurações otimizadas ou defaults (✅ V4.1: Corrigido atributo)
-            rag_threshold = rag_config.similarity_threshold if rag_config else 0.3
-            rag_limit = rag_config.max_chunks if rag_config else 10
-            
-            # ═══════════════════════════════════════════════════════════════
-            # 4. BUSCAR CHUNKS SIMILARES NOS DADOS (com configs otimizados)
-            # ═══════════════════════════════════════════════════════════════
-            self.logger.debug(f"Buscando chunks similares (threshold={rag_threshold}, limit={rag_limit})...")
-            similar_chunks = self._search_similar_data(
+            self.logger.debug("Buscando chunks similares nos dados...")
+            similar_chunks = self._search_similar_data(  # Pylance: similar_chunks está definido aqui
                 query_embedding=query_embedding,
-                threshold=rag_threshold,  # ✅ V4.0: Threshold otimizado (0.6-0.65 vs 0.3)
-                limit=rag_limit  # ✅ V4.0: Max chunks otimizado (10)
+                threshold=0.3,  # Threshold igual ao RAGAgent para capturar chunks analíticos
+                limit=10
             )
             
             # SALVAR CONTEXTO DE DADOS NA TABELA agent_context

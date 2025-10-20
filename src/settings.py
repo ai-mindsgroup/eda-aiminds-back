@@ -102,11 +102,16 @@ def build_db_dsn() -> str:
 
     Exemplo: postgresql://user:pass@host:5432/dbname
     """
+    from urllib.parse import quote
+    
     user = DB_USER or "postgres"
     host = DB_HOST or "localhost"
     name = DB_NAME or "postgres"
     port = DB_PORT or "5432"
     password = DB_PASSWORD or ""
+    
+    # URL-encode da senha para caracteres especiais (@, !, etc.)
     if password:
-        return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+        password_encoded = quote(password, safe='')
+        return f"postgresql://{user}:{password_encoded}@{host}:{port}/{name}"
     return f"postgresql://{user}@{host}:{port}/{name}"
