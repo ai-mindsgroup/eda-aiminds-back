@@ -332,97 +332,52 @@ RESPOSTA:"""
         start_time = time.perf_counter()
         
         try:
-            # ✅ ESTRATÉGIA DUAL: GERAR CHUNKS DE METADATA + ROW + COLUMN
-            all_chunks = []
-            
-            # 1. CHUNKS DE METADADOS ANALÍTICOS (6 chunks estruturados)
+            # ✅ GERAR APENAS CHUNKS DE METADADOS ANALÍTICOS
             self.logger.info("📊 Gerando chunks de metadados analíticos...")
             metadata_chunks = self._generate_metadata_chunks(csv_text, source_id)
             
             if not metadata_chunks:
-                self.logger.warning("⚠️ Nenhum chunk de metadata foi criado")
-            else:
-                self.logger.info(f"✅ {len(metadata_chunks)} chunks de metadados criados")
-                all_chunks.extend(metadata_chunks)
-            
-            # 2. CHUNKS POR LINHA (CSV_ROW strategy) - Dados completos linha a linha
-            self.logger.info("📝 Gerando chunks por LINHA (CSV_ROW)...")
-            from src.embeddings.chunker import ChunkStrategy
-            row_chunks = self.chunker.chunk_text(
-                text=csv_text,
-                source_id=source_id,
-                strategy=ChunkStrategy.CSV_ROW
-            )
-            
-            if not row_chunks:
-                self.logger.warning("⚠️ Nenhum chunk de linha foi criado")
-            else:
-                self.logger.info(f"✅ {len(row_chunks)} chunks de linhas criados")
-                all_chunks.extend(row_chunks)
-            
-            # 3. CHUNKS POR COLUNA (CSV_COLUMN strategy) - Análise focada por coluna
-            self.logger.info("📊 Gerando chunks por COLUNA (CSV_COLUMN)...")
-            column_chunks = self.chunker.chunk_text(
-                text=csv_text,
-                source_id=source_id,
-                strategy=ChunkStrategy.CSV_COLUMN
-            )
-            
-            if not column_chunks:
-                self.logger.warning("⚠️ Nenhum chunk de coluna foi criado")
-            else:
-                self.logger.info(f"✅ {len(column_chunks)} chunks de colunas criados")
-                all_chunks.extend(column_chunks)
-            
-            # Validar se ao menos algum chunk foi criado
-            if not all_chunks:
                 return self._build_response(
-                    "Nenhum chunk foi criado (metadata/row/column)",
+                    "Nenhum chunk de metadata foi criado",
                     metadata={"error": True}
                 )
             
-            self.logger.info(f"✅ TOTAL: {len(all_chunks)} chunks criados (metadata={len(metadata_chunks)}, row={len(row_chunks)}, column={len(column_chunks)})")
+            self.logger.info(f"✅ {len(metadata_chunks)} chunks de metadados criados")
             
-            # Gerar embeddings para TODOS os chunks
-            self.logger.info("🔢 Gerando embeddings para TODOS os chunks...")
-            all_embeddings = self.embedding_generator.generate_embeddings_batch(all_chunks)
+            # Gerar embeddings para chunks de metadados
+            self.logger.info("� Gerando embeddings para chunks de metadados...")
+            metadata_embeddings = self.embedding_generator.generate_embeddings_batch(metadata_chunks)
             
-            if not all_embeddings:
+            if not metadata_embeddings:
                 return self._build_response(
-                    "Falha ao gerar embeddings para chunks",
+                    "Falha ao gerar embeddings para chunks de metadados",
                     metadata={"error": True}
                 )
             
-            self.logger.info(f"✅ {len(all_embeddings)} embeddings gerados")
+            self.logger.info(f"✅ {len(metadata_embeddings)} embeddings gerados")
             
-            # Armazenar embeddings no vector store
+            # Armazenar embeddings de metadados
             self.logger.info("💾 Armazenando embeddings no vector store...")
-            stored_ids = self.vector_store.store_embeddings(all_embeddings, "csv")
+            metadata_stored_ids = self.vector_store.store_embeddings(metadata_embeddings, "csv")
             
             processing_time = time.perf_counter() - start_time
             
             # Estatísticas consolidadas
             stats = {
                 "source_id": source_id,
-                "source_type": "csv_dual_chunking",
+                "source_type": "csv_metadata_only",
                 "processing_time": processing_time,
                 "metadata_chunks_created": len(metadata_chunks),
-                "row_chunks_created": len(row_chunks),
-                "column_chunks_created": len(column_chunks),
-                "total_chunks_created": len(all_chunks),
-                "total_embeddings_generated": len(all_embeddings),
-                "total_embeddings_stored": len(stored_ids),
-                "success_rate": len(stored_ids) / len(all_chunks) * 100 if all_chunks else 0
+                "metadata_embeddings_generated": len(metadata_embeddings),
+                "metadata_embeddings_stored": len(metadata_stored_ids),
+                "success_rate": len(metadata_stored_ids) / len(metadata_chunks) * 100 if metadata_chunks else 0
             }
             
-            response = f"✅ Ingestão DUAL concluída para '{source_id}'\n" \
-                      f"📊 Metadata: {len(metadata_chunks)} chunks\n" \
-                      f"📝 Linhas: {len(row_chunks)} chunks\n" \
-                      f"📊 Colunas: {len(column_chunks)} chunks\n" \
-                      f"🔢 TOTAL: {len(all_chunks)} chunks → {len(all_embeddings)} embeddings → {len(stored_ids)} armazenados\n" \
+            response = f"✅ Ingestão de metadados concluída para '{source_id}'\n" \
+                      f"📊 {len(metadata_chunks)} chunks de metadata → {len(metadata_embeddings)} embeddings → {len(metadata_stored_ids)} armazenados\n" \
                       f"⏱️ Processado em {processing_time:.2f}s"
             
-            self.logger.info(f"✅ Ingestão DUAL concluída: {stats['success_rate']:.1f}% sucesso")
+            self.logger.info(f"✅ Ingestão de metadados concluída: {stats['success_rate']:.1f}% sucesso")
             
             return self._build_response(response, metadata=stats)
             

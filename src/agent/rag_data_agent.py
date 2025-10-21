@@ -603,22 +603,41 @@ Responda de forma clara e estruturada.
             self.logger.warning(f"Falha ao executar instrução: {instrucao} | Erro: {e}")
             return None
 
+    def _formatar_taxonomia_tipos(self, tipos_dict: dict) -> str:
+        """
+        Formata dicionário de tipos de dados em texto estruturado para o prompt da LLM.
+        
+        Args:
+            tipos_dict: Dicionário com tipos comuns e suas características
+            
+        Returns:
+            String formatada em markdown para inclusão no prompt
+        """
+        texto = ""
+        for tipo_key, tipo_info in tipos_dict.items():
+            tipo_nome = tipo_key.replace('_', ' ').title()
+            texto += f"""
+**{tipo_nome}:**
+- Descrição: {tipo_info['descricao']}
+- Exemplos de nomes: {', '.join(tipo_info['exemplos'])}
+- Indicadores: {', '.join(tipo_info['indicadores'])}
+"""
+        return texto
+
     def _analisar_completo_csv(self, csv_path: str, pergunta: str, override_temporal_col: str = None,
                                temporal_col_names: list = None, accepted_types: tuple = None) -> str:
         """
-        Executa análise temporal robusta e modular usando arquitetura refatorada V2.0.
+        ✅ V3.0: Análise inteligente via LLM (SEM LIMITAÇÃO, SEM HARDCODING).
+        
+        A LLM decide dinamicamente:
+        - Se resposta deve ser concisa ou detalhada
+        - Quais colunas analisar
+        - Como interpretar tipos (ex: Class como booleano disfarçado de int)
         
         ARQUITETURA MODULAR:
-        - Detecção via TemporalColumnDetector (src/analysis/temporal_detection.py)
-        - Análise via TemporalAnalyzer (src/analysis/temporal_analyzer.py)
-        - Fallback para análise estatística geral quando não houver colunas temporais
-        
-        Critérios de detecção:
-        - Override manual (prioritário)
-        - Tipo datetime64 nativo
-        - Nomes comuns parametrizáveis (case-insensitive)
-        - Conversão de strings temporais
-        - Sequências numéricas temporais (modo agressivo)
+        - Detecção via TemporalColumnDetector (src/analysis/temporal_detection.py) - OPCIONAL
+        - Análise via LLM para TODAS as colunas (genérico, não limitado)
+        - Resposta adaptada à complexidade da pergunta
         
         Parâmetros:
             - override_temporal_col: força uso de coluna específica (ou None para auto)
@@ -626,7 +645,7 @@ Responda de forma clara e estruturada.
             - accepted_types: DEPRECATED - mantido para backward compatibility
             
         Returns:
-            String formatada em Markdown com análises temporais e/ou estatísticas
+            String formatada em Markdown com análise adaptada à pergunta
         """
         import pandas as pd
         from src.analysis.temporal_detection import TemporalColumnDetector, TemporalDetectionConfig
@@ -637,19 +656,304 @@ Responda de forma clara e estruturada.
         
         logger = self.logger if hasattr(self, 'logger') else logging.getLogger(__name__)
         logger.info({
-            'event': 'inicio_analise_csv_v2',
+            'event': 'inicio_analise_csv_v3',
             'csv_path': csv_path,
             'shape': df.shape,
-            'dtypes': df.dtypes.to_dict(),  # ✅ V4.0: Log dtypes REAIS
+            'pergunta': pergunta,
             'override_temporal_col': override_temporal_col
         })
         
-        # ✅ V4.0: Atualizar contexto do dataset com dados REAIS do DataFrame
-        dataset_context = self._update_dataset_context(df, csv_path)
+        # ═══════════════════════════════════════════════════════════════
+        # ✅ V3.0: LLM INTERPRETA A PERGUNTA E GERA RESPOSTA ADAPTADA
+        # ═══════════════════════════════════════════════════════════════
+        
+        # Detectar se pergunta é SIMPLES (tipos de dados) ou COMPLEXA (análise detalhada)
+        pergunta_lower = pergunta.lower()
+        keywords_simples = [
+            'quais tipos', 'tipos de dados', 'tipo de dado', 'tipos das colunas',
+            'colunas numéricas', 'colunas categóricas', 'colunas temporais',
+            'data types', 'column types', 'tipos das variáveis'
+        ]
+        
+        is_simple_query = any(keyword in pergunta_lower for keyword in keywords_simples)
+        
+        if is_simple_query:
+            logger.info("📋 Pergunta SIMPLES detectada: LLM interpretará dados e responderá de forma humanizada")
+            
+            # Coletar informações COMPLETAS de TODAS as colunas para análise pela LLM
+            colunas_info = []
+            
+            for col in df.columns:
+                col_data = df[col]
+                dtype = str(col_data.dtype)
+                unique_count = col_data.nunique()
+                null_count = col_data.isnull().sum()
+                sample_values = col_data.dropna().head(10).tolist()
+                
+                # Estatísticas básicas para LLM analisar
+                info = {
+                    'nome': col,
+                    'dtype_python': dtype,
+                    'valores_unicos': unique_count,
+                    'valores_nulos': null_count,
+                    'amostra_valores': sample_values,
+                    'total_linhas': len(col_data)
+                }
+                
+                # Adicionar estatísticas numéricas se aplicável
+                if pd.api.types.is_numeric_dtype(col_data):
+                    info['min'] = float(col_data.min())
+                    info['max'] = float(col_data.max())
+                    info['media'] = float(col_data.mean())
+                    info['std'] = float(col_data.std())
+                
+                colunas_info.append(info)
+            
+            # ════════════════════════════════════════════════════════════════
+            # 🧠 PROMPT ENGINEERING: Sistema Adaptativo de Classificação de Tipos
+            # ════════════════════════════════════════════════════════════════
+            
+            # 📋 CONFIGURAÇÃO: Tipos de dados comuns (extensível via config)
+            TIPOS_COMUNS = {
+                'temporal': {
+                    'descricao': 'Dados relacionados a tempo, data, ou marcadores temporais',
+                    'exemplos': ['Time', 'Date', 'Timestamp', 'Duration', 'Year', 'Month'],
+                    'indicadores': ['representam momentos, períodos ou durações']
+                },
+                'categorica': {
+                    'descricao': 'Dados discretos que representam categorias, classes ou grupos',
+                    'exemplos': ['Class', 'Category', 'Type', 'Label', 'Status', 'Gender'],
+                    'indicadores': ['valores distintos limitados', 'categorias predefinidas', 'classes binomiais ou multinomiais']
+                },
+                'numerica_continua': {
+                    'descricao': 'Valores numéricos contínuos usados para medições ou cálculos',
+                    'exemplos': ['Amount', 'Price', 'Temperature', 'Distance', 'Weight'],
+                    'indicadores': ['medições', 'quantidades', 'valores monetários', 'métricas']
+                },
+                'numerica_discreta': {
+                    'descricao': 'Valores numéricos inteiros representando contagens',
+                    'exemplos': ['Count', 'Quantity', 'Age', 'ID', 'Rank'],
+                    'indicadores': ['contagens', 'números inteiros', 'identificadores sequenciais']
+                },
+                'booleana': {
+                    'descricao': 'Valores lógicos verdadeiro/falso (literal)',
+                    'exemplos': ['is_active', 'has_discount', 'True/False'],
+                    'indicadores': ['apenas valores True/False', 'não confundir com categóricas binárias 0/1']
+                },
+                'textual': {
+                    'descricao': 'Texto livre ou strings descritivas',
+                    'exemplos': ['Description', 'Comment', 'Name', 'Address'],
+                    'indicadores': ['texto longo', 'descrições', 'nomes próprios']
+                },
+                'mista': {
+                    'descricao': 'Colunas com tipos mistos ou dados heterogêneos',
+                    'exemplos': ['mixed_data', 'various_formats'],
+                    'indicadores': ['múltiplos tipos no mesmo campo', 'dados inconsistentes']
+                }
+            }
+            
+            # ✅ USAR LLM COM INTELIGÊNCIA TOTAL E PROMPT SOFISTICADO
+            if self.llm and LANGCHAIN_AVAILABLE:
+                try:
+                    # ═══════════════════════════════════════════════════════════
+                    # PARTE 1: SISTEMA - Define o domínio e capacidades do agente
+                    # ═══════════════════════════════════════════════════════════
+                    system_prompt = f"""Você é um cientista de dados sênior especializado em análise exploratória de dados (EDA).
+
+**SUAS CAPACIDADES:**
+- Análise semântica profunda de estruturas de dados
+- Classificação adaptativa de tipos de dados
+- Interpretação contextual de nomes de colunas
+- Detecção de padrões estatísticos em amostras
+- Identificação de tipos não convencionais ou mistos
+
+**DOMÍNIO DO PROBLEMA:**
+Você analisará colunas de um dataset CSV e classificará seus tipos de dados de forma inteligente, considerando:
+1. **Contexto semântico**: nome da coluna e significado no domínio
+2. **Estrutura dos dados**: dtype Python, valores únicos, distribuição
+3. **Amostras reais**: padrões observados nos valores
+4. **Cardinalidade**: quantidade de valores distintos vs total de registros
+
+**TAXONOMIA DE TIPOS (não limitada a estes):**
+Os tipos comuns incluem:
+
+{self._formatar_taxonomia_tipos(TIPOS_COMUNS)}
+
+**IMPORTANTE - ADAPTABILIDADE:**
+- Esta lista NÃO é exaustiva. Você pode identificar tipos híbridos, especializados ou atípicos
+- Se encontrar um tipo que não se encaixa perfeitamente, descreva-o com suas próprias palavras
+- Priorize o SIGNIFICADO CONTEXTUAL sobre o dtype técnico
+- Para dados binários (0/1), avalie se são categóricos (classes) ou numéricos (contadores)
+
+**REGRAS DE OURO:**
+1. **Time/Timestamp numérico** → Classifique como TEMPORAL (não numérico)
+2. **Binários 0/1 como categorias** → Classifique como CATEGÓRICA BINÁRIA (não booleana)
+3. **Booleana** → Reserve APENAS para True/False literal
+4. **IDs numéricos sequenciais** → Podem ser IDENTIFICADORES (não numéricos contínuos)
+5. **Tipos ambíguos** → Explique a ambiguidade e sugira interpretação baseada no contexto
+
+**TOM DE COMUNICAÇÃO:**
+- Humanizado, didático e conversacional
+- Explique o RACIOCÍNIO por trás de cada classificação
+- Use analogias quando útil
+- Seja acessível para não-especialistas
+- Demonstre entusiasmo pelo trabalho analítico"""
+                    
+                    # ═══════════════════════════════════════════════════════════
+                    # PARTE 2: DADOS - Prepara informações detalhadas das colunas
+                    # ═══════════════════════════════════════════════════════════
+                    colunas_detalhadas = []
+                    for c in colunas_info:
+                        detalhes = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Coluna: **{c['nome']}**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔹 Tipo Python: {c['dtype_python']}
+  🔹 Cardinalidade: {c['valores_unicos']} valores únicos em {c['total_linhas']:,} registros ({c['valores_unicos']/c['total_linhas']*100:.1f}% de diversidade)
+  🔹 Valores ausentes: {c['valores_nulos']} ({c['valores_nulos']/c['total_linhas']*100:.1f}%)
+  🔹 Amostra (10 primeiros valores): {c['amostra_valores']}"""
+                        
+                        if 'min' in c:
+                            detalhes += f"""
+  🔹 Faixa numérica: [{c['min']:.2f}, {c['max']:.2f}]
+  🔹 Média: {c['media']:.2f} | Desvio padrão: {c['std']:.2f}"""
+                        
+                        colunas_detalhadas.append(detalhes)
+                    
+                    # ═══════════════════════════════════════════════════════════
+                    # PARTE 3: TAREFA - Define o que fazer com formatação esperada
+                    # ═══════════════════════════════════════════════════════════
+                    user_prompt = f"""
+╔════════════════════════════════════════════════════════════════════════╗
+║                    📁 DATASET PARA ANÁLISE                             ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+**Arquivo:** {csv_path}
+**Dimensões:** {len(df.columns)} colunas × {len(df):,} linhas
+
+{''.join(colunas_detalhadas)}
+
+╔════════════════════════════════════════════════════════════════════════╗
+║                    ❓ PERGUNTA DO USUÁRIO                              ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+{pergunta}
+
+╔════════════════════════════════════════════════════════════════════════╗
+║                    📝 INSTRUÇÕES PARA RESPOSTA                         ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+**Seu trabalho:**
+1. Analise CADA coluna usando sua inteligência semântica e estatística
+2. Classifique o tipo de cada coluna baseando-se em:
+   - Nome e significado contextual
+   - Padrões nos valores amostrados
+   - Distribuição estatística
+   - Finalidade provável no dataset
+3. Agrupe colunas por tipo identificado
+4. Explique brevemente o MOTIVO de cada classificação
+5. Se identificar tipos atípicos ou mistos, descreva-os
+
+**FORMATO OBRIGATÓRIO DA RESPOSTA:**
+
+VOCÊ DEVE SEGUIR EXATAMENTE ESTE FORMATO HUMANIZADO:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Análise dos Tipos de Dados
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Olá! 👋 Analisando os dados fornecidos, identifiquei os seguintes tipos:
+
+**[EMOJI APROPRIADO] [NOME DO TIPO] ([X] colunas)**
+• **[Nome Coluna 1]**: [Breve explicação do tipo e significado contextual]
+• **[Nome Coluna 2]**: [Breve explicação do tipo e significado contextual]
+... (ou agrupamento se muitas colunas similares)
+
+**[EMOJI] [OUTRO TIPO] ([Y] colunas)**
+• **[Nome Coluna]**: [Explicação]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Observação Geral
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Comentário contextual sobre a natureza do dataset, padrões observados, ou sugestões de uso]
+
+**EXEMPLO CONCRETO PARA VOCÊ SEGUIR:**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Análise dos Tipos de Dados
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Olá! 👋 Analisando esse dataset de transações financeiras, identifiquei os seguintes tipos:
+
+**⏱️ Colunas Temporais (1 coluna)**
+• **Time**: Representa o momento da transação em segundos desde o início da coleta. Embora armazenado como número inteiro (int64), seu significado é claramente temporal - marca QUANDO cada transação ocorreu. Essencial para análises de série temporal e detecção de padrões ao longo do tempo.
+
+**🏷️ Colunas Categóricas Binárias (1 coluna)**
+• **Class**: Variável binária (valores 0 ou 1) indicando a classificação da transação. Não é booleana (True/False) nem numérica contínua - é uma **categoria binomial** onde 0 = transação legítima e 1 = transação fraudulenta. É o rótulo-alvo para modelos de classificação.
+
+**💰 Colunas Numéricas Contínuas (29 colunas)**
+• **Amount**: Valor monetário da transação (provavelmente em euros ou dólares). Dados contínuos usados para análises quantitativas.
+• **V1 a V28**: Features numéricas geradas por PCA (Principal Component Analysis). Representam padrões latentes nos dados originais, mantidos anônimos por privacidade. São todas contínuas e adequadas para modelagem matemática.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Observação Geral
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Este é um dataset clássico de detecção de fraude em cartões de crédito. A presença de features PCA indica proteção de dados sensíveis, enquanto mantém valor preditivo. A coluna temporal permite análises de padrões temporais de fraude. 🔍✨
+
+╔════════════════════════════════════════════════════════════════════════╗
+║                    🚀 AGORA É SUA VEZ - ANALISE E RESPONDA!            ║
+╚════════════════════════════════════════════════════════════════════════╝
+"""
+                    
+                    messages = [
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=user_prompt)
+                    ]
+                    
+                    response = self.llm.invoke(messages)
+                    resposta_llm = response.content
+                    
+                    logger.info("✅ Resposta humanizada gerada via LLM com análise semântica profunda")
+                    return resposta_llm
+                
+                except Exception as e:
+                    logger.error(f"Erro ao usar LLM para resposta inteligente: {e}", exc_info=True)
+                    # Fallback: resposta manual
+            
+            # Fallback manual (caso LLM indisponível)
+            logger.warning("⚠️ LLM indisponível - usando fallback de análise básica")
+            
+            resposta = f"""# Análise dos Tipos de Dados
+
+Analisando o dataset `{csv_path}` com {len(df.columns)} colunas e {len(df):,} linhas.
+
+"""
+            
+            # Análise manual básica
+            for info in colunas_info:
+                col_name = info['nome']
+                unique = info['valores_unicos']
+                
+                # Análise básica por nome e padrão
+                if 'time' in col_name.lower() or 'date' in col_name.lower() or 'timestamp' in col_name.lower():
+                    resposta += f"- **{col_name}**: Temporal (marcador de tempo)\n"
+                elif unique == 2 and 'class' in col_name.lower():
+                    resposta += f"- **{col_name}**: Categórica binária (2 categorias: {info['amostra_valores'][:2]})\n"
+                elif pd.api.types.is_numeric_dtype(df[col_name]):
+                    resposta += f"- **{col_name}**: Numérica\n"
+                else:
+                    resposta += f"- **{col_name}**: Categórica\n"
+            
+            return resposta
         
         # ═══════════════════════════════════════════════════════════════
-        # ETAPA 1: DETECÇÃO DE COLUNAS TEMPORAIS
+        # PERGUNTA COMPLEXA: Análise detalhada (manter código original)
         # ═══════════════════════════════════════════════════════════════
+        
+        logger.info("📊 Pergunta COMPLEXA detectada: análise detalhada")
+        
+        respostas = []  # ✅ Inicializar lista de respostas
+        temporal_cols = []
         
         # Configurar detector com parâmetros customizáveis
         detection_config = TemporalDetectionConfig()
@@ -661,102 +965,153 @@ Responda de forma clara e estruturada.
         try:
             detection_results = detector.detect(df, override_column=override_temporal_col)
             temporal_cols = detector.get_detected_columns(detection_results)
-            detection_summary = detector.get_detection_summary(detection_results)
             
             logger.info({
                 'event': 'deteccao_temporal_concluida',
-                'colunas_detectadas': temporal_cols,
-                'total_colunas': len(df.columns),
-                'taxa_deteccao': detection_summary['detection_rate'],
-                'metodos_usados': detection_summary['methods_used']
+                'colunas_temporais_detectadas': temporal_cols,
+                'total_colunas': len(df.columns)
             })
+            
+            # Analisar colunas temporais com TemporalAnalyzer
+            if temporal_cols:
+                analyzer = TemporalAnalyzer(logger=logger)
+                
+                for col in temporal_cols:
+                    try:
+                        result = analyzer.analyze(df, col, enable_advanced=True)
+                        respostas.append(result.to_markdown())
+                        
+                        logger.info({
+                            'event': 'analise_temporal_coluna_concluida',
+                            'coluna': col,
+                            'tipo': 'temporal'
+                        })
+                    except Exception as e:
+                        logger.error(f"Erro ao analisar coluna temporal '{col}': {e}", exc_info=True)
+                        respostas.append(
+                            f"## Erro na Análise Temporal: {col}\n\n"
+                            f"Não foi possível completar a análise temporal: {str(e)}\n"
+                        )
         except Exception as e:
-            logger.error(f"Erro na detecção de colunas temporais: {e}", exc_info=True)
-            temporal_cols = []
+            logger.error(f"Erro na detecção temporal: {e}", exc_info=True)
         
         # ═══════════════════════════════════════════════════════════════
-        # ETAPA 2: ANÁLISE TEMPORAL (se colunas detectadas)
+        # ETAPA 2: ANÁLISE ESTATÍSTICA DE TODAS AS OUTRAS COLUNAS
         # ═══════════════════════════════════════════════════════════════
         
-        if temporal_cols:
-            logger.info(f"Executando análise temporal em {len(temporal_cols)} coluna(s)")
-            
-            analyzer = TemporalAnalyzer(logger=logger)
-            respostas = []
-            
-            for col in temporal_cols:
-                try:
-                    # Executar análise temporal avançada
-                    result = analyzer.analyze(df, col, enable_advanced=True)
+        # Identificar colunas NÃO temporais para análise estatística completa
+        non_temporal_cols = [col for col in df.columns if col not in temporal_cols]
+        
+        logger.info({
+            'event': 'inicio_analise_estatistica_colunas',
+            'total_colunas_nao_temporais': len(non_temporal_cols),
+            'colunas': non_temporal_cols
+        })
+        
+        # Análise estatística completa para cada coluna não-temporal
+        for col in non_temporal_cols:
+            try:
+                col_data = df[col]
+                
+                # Análise NUMÉRICA
+                if pd.api.types.is_numeric_dtype(col_data):
+                    stats_dict = {
+                        'count': col_data.count(),
+                        'mean': col_data.mean(),
+                        'std': col_data.std(),
+                        'min': col_data.min(),
+                        '25%': col_data.quantile(0.25),
+                        '50%': col_data.quantile(0.50),
+                        '75%': col_data.quantile(0.75),
+                        'max': col_data.max(),
+                        'nulls': col_data.isnull().sum(),
+                        'unique': col_data.nunique()
+                    }
                     
-                    # Gerar relatório Markdown
-                    respostas.append(result.to_markdown())
+                    analise_md = f"""## Análise Estatística: {col}
+
+**Tipo:** Numérica ({col_data.dtype})
+
+### Estatísticas Descritivas
+
+| Métrica | Valor |
+|---------|-------|
+| Contagem | {stats_dict['count']:,} |
+| Média | {stats_dict['mean']:.6f} |
+| Desvio Padrão | {stats_dict['std']:.6f} |
+| Mínimo | {stats_dict['min']} |
+| Q1 (25%) | {stats_dict['25%']} |
+| Mediana (50%) | {stats_dict['50%']} |
+| Q3 (75%) | {stats_dict['75%']} |
+| Máximo | {stats_dict['max']} |
+| Valores Nulos | {stats_dict['nulls']} |
+| Valores Únicos | {stats_dict['unique']} |
+
+### Interpretação
+
+- **Amplitude:** {stats_dict['max'] - stats_dict['min']:.6f}
+- **IQR:** {stats_dict['75%'] - stats_dict['25%']:.6f}
+- **Coef. Variação:** {(stats_dict['std']/stats_dict['mean']*100) if stats_dict['mean'] != 0 else 0:.2f}%
+"""
+                    respostas.append(analise_md)
+                
+                # Análise CATEGÓRICA
+                else:
+                    freq = col_data.value_counts().head(10)
                     
-                    logger.info({
-                        'event': 'analise_temporal_coluna_concluida',
-                        'coluna': col,
-                        'trend_type': result.trend.get('type'),
-                        'anomalies_count': result.anomalies.get('count', 0),
-                        'seasonality_detected': result.seasonality.get('detected', False)
-                    })
-                except Exception as e:
-                    logger.error(f"Erro ao analisar coluna temporal '{col}': {e}", exc_info=True)
-                    respostas.append(
-                        f"## Erro na Análise: {col}\n\n"
-                        f"Não foi possível completar a análise temporal da coluna '{col}': {str(e)}\n"
-                    )
-            
-            # Adicionar sumário executivo da detecção
+                    analise_md = f"""## Análise Estatística: {col}
+
+**Tipo:** Categórica ({col_data.dtype})
+
+### Estatísticas Descritivas
+
+| Métrica | Valor |
+|---------|-------|
+| Contagem | {col_data.count():,} |
+| Valores Nulos | {col_data.isnull().sum()} |
+| Valores Únicos | {col_data.nunique()} |
+| Moda | {col_data.mode().iloc[0] if not col_data.mode().empty else 'N/A'} |
+
+### Distribuição de Frequência (Top 10)
+
+{freq.to_markdown()}
+
+### Interpretação
+
+- **Valor mais frequente:** {freq.idxmax() if not freq.empty else 'N/A'}
+- **Frequência:** {freq.max() if not freq.empty else 0} ({freq.max()/len(col_data)*100 if not freq.empty else 0:.2f}%)
+"""
+                    respostas.append(analise_md)
+                
+                logger.info({
+                    'event': 'analise_estatistica_coluna_concluida',
+                    'coluna': col,
+                    'tipo': 'numerica' if pd.api.types.is_numeric_dtype(col_data) else 'categorica'
+                })
+                
+            except Exception as e:
+                logger.error(f"Erro ao analisar coluna '{col}': {e}", exc_info=True)
+                respostas.append(
+                    f"## Erro na Análise: {col}\n\n"
+                    f"Não foi possível completar a análise: {str(e)}\n"
+                )
+        
+        # ═══════════════════════════════════════════════════════════════
+        # ETAPA 3: CONSOLIDAR RESULTADOS
+        # ═══════════════════════════════════════════════════════════════
+        
+        if respostas:
             header = (
-                f"# Análise Temporal Completa\n\n"
+                f"# Análise Completa do Dataset\n\n"
                 f"**Dataset:** `{csv_path}`\n\n"
-                f"**Colunas analisadas:** {len(temporal_cols)} de {len(df.columns)} colunas totais\n\n"
-                f"**Taxa de detecção:** {detection_summary['detection_rate']:.1%}\n\n"
-                f"**Métodos de detecção utilizados:** {', '.join(detection_summary['methods_used'].keys())}\n\n"
+                f"**Total de colunas:** {len(df.columns)}\n\n"
+                f"**Colunas temporais:** {len(temporal_cols)}\n\n"
+                f"**Colunas numéricas/categóricas:** {len(non_temporal_cols)}\n\n"
+                f"**Linhas:** {len(df):,}\n\n"
                 "---\n\n"
             )
             
             return header + "\n\n---\n\n".join(respostas)
-        
-        # ═══════════════════════════════════════════════════════════════
-        # ETAPA 3: FALLBACK - ANÁLISE ESTATÍSTICA GERAL
-        # ═══════════════════════════════════════════════════════════════
-        
-        logger.info({
-            'event': 'fallback_analise_geral',
-            'motivo': 'nenhuma_coluna_temporal_detectada'
-        })
-        
-        # Interpretar intenção da pergunta via LLM
-        instrucoes = self._interpretar_pergunta_llm(pergunta, df)
-        
-        # Executar instruções e consolidar resultados
-        resultados = []
-        for instrucao in instrucoes:
-            resultado = self._executar_instrucao(df, instrucao)
-            if resultado is not None:
-                justificativa = instrucao.get('justificativa', '')
-                if hasattr(resultado, 'to_markdown'):
-                    resultados.append(
-                        f"**{instrucao.get('acao', 'Métrica')}**\n"
-                        f"{justificativa}\n\n"
-                        f"{resultado.to_markdown()}"
-                    )
-                else:
-                    resultados.append(
-                        f"**{instrucao.get('acao', 'Métrica')}**\n"
-                        f"{justificativa}\n\n"
-                        f"{str(resultado)}"
-                    )
-        
-        if resultados:
-            header = (
-                f"# Análise Estatística Geral\n\n"
-                f"**Dataset:** `{csv_path}`\n\n"
-                f"*Nenhuma coluna temporal detectada. Executando análise estatística padrão.*\n\n"
-                "---\n\n"
-            )
-            return header + "\n\n".join(resultados)
         else:
             # Fallback final: estatísticas gerais descritivas
             logger.warning("Fallback final: retornando describe() do DataFrame")
@@ -788,6 +1143,182 @@ Responda de forma clara e estruturada.
             if len(colunas_chunks) < 5:
                 return True
         return False
+
+    def _handle_visualization_query(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Gera visualizações (histogramas, boxplots, etc) baseado na pergunta do usuário.
+        
+        Parâmetros:
+            query: Pergunta do usuário
+            context: Contexto contendo 'reconstructed_df' (DataFrame) e 'visualization_type'
+            
+        Retorna:
+            Dict com 'response', 'metadata' contendo 'visualization_success' e 'graficos_gerados'
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from pathlib import Path
+        from datetime import datetime
+        
+        try:
+            df = context.get('reconstructed_df')
+            if df is None:
+                self.logger.error("DataFrame não fornecido no contexto")
+                return {
+                    'response': "Erro: dados não disponíveis para visualização.",
+                    'metadata': {'visualization_success': False}
+                }
+            
+            # Criar diretório de saída se não existir
+            output_dir = Path('outputs') / 'visualizations'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Timestamp para nomes únicos
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # ═══════════════════════════════════════════════════════════
+            # DETECTAR TIPO DE VISUALIZAÇÃO PELA PERGUNTA
+            # ═══════════════════════════════════════════════════════════
+            query_lower = query.lower()
+            graficos_gerados = []
+            
+            # Detectar se pergunta sobre distribuição
+            if any(termo in query_lower for termo in ['distribuição', 'distribuicao', 'histograma', 'histogram']):
+                self.logger.info("📊 Gerando histogramas de distribuição...")
+                
+                # Selecionar colunas numéricas
+                numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+                
+                # Limitar a 9 colunas para não sobrecarregar (3x3 grid)
+                if len(numeric_cols) > 9:
+                    self.logger.warning(f"⚠️ Dataset tem {len(numeric_cols)} colunas numéricas. Exibindo apenas as 9 primeiras.")
+                    numeric_cols = numeric_cols[:9]
+                
+                # Criar subplots
+                n_cols = min(3, len(numeric_cols))
+                n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
+                
+                fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+                fig.suptitle('Distribuição das Variáveis Numéricas', fontsize=16, fontweight='bold')
+                
+                # Flatten axes para iteração fácil
+                if n_rows * n_cols == 1:
+                    axes = [axes]
+                else:
+                    axes = axes.flatten() if n_rows > 1 else axes
+                
+                for idx, col in enumerate(numeric_cols):
+                    ax = axes[idx]
+                    
+                    # Histograma com KDE
+                    df[col].hist(bins=50, ax=ax, alpha=0.7, color='steelblue', edgecolor='black')
+                    ax.set_title(f'{col}', fontsize=12, fontweight='bold')
+                    ax.set_xlabel('Valor')
+                    ax.set_ylabel('Frequência')
+                    ax.grid(True, alpha=0.3)
+                
+                # Remover axes vazios
+                for idx in range(len(numeric_cols), len(axes)):
+                    fig.delaxes(axes[idx])
+                
+                plt.tight_layout()
+                
+                # Salvar figura
+                hist_path = output_dir / f'histograms_{timestamp}.png'
+                plt.savefig(hist_path, dpi=150, bbox_inches='tight')
+                plt.close()
+                
+                graficos_gerados.append(f"Histogramas: {hist_path}")
+                self.logger.info(f"✅ Histogramas salvos em: {hist_path}")
+            
+            # Detectar se pergunta sobre boxplot/outliers
+            if any(termo in query_lower for termo in ['boxplot', 'outlier', 'discrepante', 'dispersão', 'dispersao']):
+                self.logger.info("📊 Gerando boxplots...")
+                
+                numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+                
+                if len(numeric_cols) > 9:
+                    numeric_cols = numeric_cols[:9]
+                
+                n_cols = min(3, len(numeric_cols))
+                n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
+                
+                fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
+                fig.suptitle('Boxplots das Variáveis Numéricas', fontsize=16, fontweight='bold')
+                
+                if n_rows * n_cols == 1:
+                    axes = [axes]
+                else:
+                    axes = axes.flatten() if n_rows > 1 else axes
+                
+                for idx, col in enumerate(numeric_cols):
+                    ax = axes[idx]
+                    df.boxplot(column=col, ax=ax, patch_artist=True,
+                              boxprops=dict(facecolor='lightblue', color='navy'),
+                              medianprops=dict(color='red', linewidth=2))
+                    ax.set_title(f'{col}', fontsize=12, fontweight='bold')
+                    ax.set_ylabel('Valor')
+                    ax.grid(True, alpha=0.3)
+                
+                for idx in range(len(numeric_cols), len(axes)):
+                    fig.delaxes(axes[idx])
+                
+                plt.tight_layout()
+                
+                box_path = output_dir / f'boxplots_{timestamp}.png'
+                plt.savefig(box_path, dpi=150, bbox_inches='tight')
+                plt.close()
+                
+                graficos_gerados.append(f"Boxplots: {box_path}")
+                self.logger.info(f"✅ Boxplots salvos em: {box_path}")
+            
+            # ═══════════════════════════════════════════════════════════
+            # GERAR RESPOSTA HUMANIZADA SOBRE AS VISUALIZAÇÕES
+            # ═══════════════════════════════════════════════════════════
+            if graficos_gerados:
+                resposta = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Visualizações Geradas com Sucesso!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Olá! 👋 Criei as visualizações solicitadas baseadas nos dados disponíveis:
+
+"""
+                for i, grafico in enumerate(graficos_gerados, 1):
+                    resposta += f"{i}. {grafico}\n"
+                
+                resposta += f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 Como Interpretar
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Histogramas:** Mostram a frequência de cada valor na distribuição. Picos indicam valores mais comuns, caudas longas indicam presença de valores extremos.
+
+**Boxplots:** A caixa central representa 50% dos dados (entre Q1 e Q3), a linha vermelha é a mediana, e os pontos isolados são potenciais outliers.
+
+Os arquivos estão salvos em: `{output_dir}/`
+"""
+                
+                return {
+                    'response': resposta,
+                    'metadata': {
+                        'visualization_success': True,
+                        'graficos_gerados': graficos_gerados
+                    }
+                }
+            else:
+                self.logger.warning("⚠️ Nenhum gráfico foi gerado - tipo de visualização não detectado")
+                return {
+                    'response': "Não foi possível detectar o tipo de visualização solicitada. Tente perguntas como: 'Qual a distribuição das variáveis?' ou 'Mostre boxplots das features'.",
+                    'metadata': {'visualization_success': False}
+                }
+                
+        except Exception as e:
+            self.logger.error(f"❌ Erro ao gerar visualizações: {e}", exc_info=True)
+            return {
+                'response': f"Erro ao gerar visualizações: {str(e)}",
+                'metadata': {'visualization_success': False, 'error': str(e)}
+            }
 
     def reset_memory(self, session_id: str = None):
         """

@@ -21,6 +21,7 @@ class ChunkStrategy(Enum):
     PARAGRAPH = "paragraph"
     SEMANTIC = "semantic"
     CSV_ROW = "csv_row"
+    CSV_COLUMN = "csv_column"  # ✅ NOVO: Chunking por coluna para análise multi-dimensional
 
 
 @dataclass
@@ -108,6 +109,8 @@ class TextChunker:
             return self._chunk_by_paragraph(text, source_id)
         elif strategy == ChunkStrategy.CSV_ROW:
             return self._chunk_csv_data(text, source_id)
+        elif strategy == ChunkStrategy.CSV_COLUMN:
+            return self._chunk_csv_by_columns(text, source_id)
         else:
             logger.warning(f"Estratégia não implementada: {strategy}, usando FIXED_SIZE")
             return self._chunk_fixed_size(text, source_id)
@@ -335,6 +338,149 @@ class TextChunker:
             overlap_rows,
             total_chunk_rows,
         )
+        return chunks
+    
+    def _chunk_csv_by_columns(self, csv_text: str, source_id: str) -> List[TextChunk]:
+        """Chunking especializado por COLUNA para análise multi-dimensional.
+        
+        Gera um chunk para cada coluna do CSV contendo suas estatísticas,
+        permitindo busca vetorial focada em colunas específicas.
+        
+        Args:
+            csv_text: Texto CSV completo
+            source_id: Identificador da fonte
+            
+        Returns:
+            Lista de chunks, um por coluna + metadados gerais
+        """
+        import io
+        import pandas as pd
+        import numpy as np
+        
+        try:
+            df = pd.read_csv(io.StringIO(csv_text))
+        except Exception as e:
+            logger.error(f"Erro ao parsear CSV para chunking por coluna: {e}")
+            return []
+        
+        chunks: List[TextChunk] = []
+        
+        # Chunk 0: Metadados gerais do dataset
+        metadata_text = f"""Dataset: {source_id}
+Colunas: {', '.join(df.columns.tolist())}
+Total de Linhas: {len(df)}
+Total de Colunas: {len(df.columns)}
+
+Tipos de Dados:
+{df.dtypes.to_string()}
+
+Visão Geral:
+{df.info(verbose=False, memory_usage=False, buf=None)}
+"""
+        
+        metadata_chunk = ChunkMetadata(
+            source=source_id,
+            chunk_index=0,
+            strategy=ChunkStrategy.CSV_COLUMN,
+            char_count=len(metadata_text),
+            word_count=len(metadata_text.split()),
+            start_position=0,
+            end_position=0,
+            additional_info={
+                'chunk_type': 'metadata',
+                'columns_count': len(df.columns),
+                'rows_count': len(df)
+            }
+        )
+        
+        chunks.append(TextChunk(content=metadata_text, metadata=metadata_chunk))
+        logger.debug(f"Criado chunk de metadados para {source_id}")
+        
+        # Chunks 1-N: Um para cada COLUNA
+        for idx, col in enumerate(df.columns, start=1):
+            col_data = df[col]
+            
+            # Determinar tipo da coluna
+            if pd.api.types.is_numeric_dtype(col_data):
+                # Coluna NUMÉRICA
+                stats_text = f"""Coluna: {col}
+Tipo: numérico ({col_data.dtype})
+Dataset: {source_id}
+
+ESTATÍSTICAS DESCRITIVAS:
+- Contagem: {col_data.count()}
+- Valores Nulos: {col_data.isnull().sum()} ({col_data.isnull().sum()/len(col_data)*100:.2f}%)
+- Valores Únicos: {col_data.nunique()}
+
+MEDIDAS DE TENDÊNCIA CENTRAL:
+- Mínimo: {col_data.min()}
+- Máximo: {col_data.max()}
+- Média: {col_data.mean():.6f}
+- Mediana: {col_data.median()}
+- Moda: {col_data.mode().iloc[0] if not col_data.mode().empty else 'N/A'}
+
+MEDIDAS DE DISPERSÃO:
+- Desvio Padrão: {col_data.std():.6f}
+- Variância: {col_data.var():.6f}
+- Coeficiente de Variação: {(col_data.std()/col_data.mean()*100):.2f}% (se média != 0)
+
+QUARTIS:
+- 25% (Q1): {col_data.quantile(0.25)}
+- 50% (Q2/Mediana): {col_data.quantile(0.50)}
+- 75% (Q3): {col_data.quantile(0.75)}
+- IQR (Q3-Q1): {col_data.quantile(0.75) - col_data.quantile(0.25)}
+
+AMOSTRA DE VALORES (primeiros 10):
+{col_data.head(10).tolist()}
+"""
+            else:
+                # Coluna CATEGÓRICA/TEXTO
+                freq = col_data.value_counts(dropna=True).head(10)
+                stats_text = f"""Coluna: {col}
+Tipo: categórico ({col_data.dtype})
+Dataset: {source_id}
+
+ESTATÍSTICAS DESCRITIVAS:
+- Contagem: {col_data.count()}
+- Valores Nulos: {col_data.isnull().sum()} ({col_data.isnull().sum()/len(col_data)*100:.2f}%)
+- Valores Únicos: {col_data.nunique()}
+
+DISTRIBUIÇÃO DE FREQUÊNCIA (Top 10):
+{freq.to_string()}
+
+VALORES MAIS FREQUENTES:
+- Mais Frequente: {freq.idxmax() if not freq.empty else 'N/A'}
+- Frequência: {freq.max() if not freq.empty else 0} ({freq.max()/len(col_data)*100:.2f}% se disponível)
+
+AMOSTRA DE VALORES (primeiros 10):
+{col_data.head(10).tolist()}
+"""
+            
+            # Metadados do chunk da coluna
+            col_metadata = ChunkMetadata(
+                source=source_id,
+                chunk_index=idx,
+                strategy=ChunkStrategy.CSV_COLUMN,
+                char_count=len(stats_text),
+                word_count=len(stats_text.split()),
+                start_position=idx,
+                end_position=idx,
+                additional_info={
+                    'chunk_type': 'column_analysis',
+                    'column_name': col,
+                    'column_dtype': str(col_data.dtype),
+                    'is_numeric': pd.api.types.is_numeric_dtype(col_data),
+                    'null_count': int(col_data.isnull().sum()),
+                    'unique_count': int(col_data.nunique())
+                }
+            )
+            
+            chunks.append(TextChunk(content=stats_text, metadata=col_metadata))
+        
+        logger.info(
+            f"Criados {len(chunks)} chunks por COLUNA ({len(df.columns)} colunas + 1 metadata) para {source_id}"
+        )
+        
         return chunks
     
     def get_stats(self, chunks: List[TextChunk]) -> Dict[str, Any]:

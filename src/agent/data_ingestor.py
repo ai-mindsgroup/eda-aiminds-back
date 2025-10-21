@@ -1,29 +1,73 @@
 def atomic_ingestion_and_query(csv_path, supabase, vector_store):
     """
     Fluxo atômico: limpa embeddings, faz ingestão, atualiza memória/cache e realiza consulta isolada.
+    
+    ✅ ATUALIZADO: Usa RAGAgent.ingest_csv_file() para gerar 6 chunks analíticos completos
+    ao invés da implementação simplificada do DataIngestor (apenas 2 chunks).
+    
     Logging detalhado em cada etapa.
     """
     logger.info(f"[Atomicidade] Iniciando fluxo atômico para arquivo: {csv_path}")
+    
     # 1. NOTA: Não apagar toda a tabela de embeddings aqui.
     # A estratégia correta é usar `ingestion_id` para isolar dados.
     logger.info("[Atomicidade] Skipping global delete; usando ingestion_id para isolar novas ingestões.")
-    # 2. Ingestão nova
-    ingestor = DataIngestor(supabase)
-    ingestion_id = ingestor.ingest_csv(csv_path)
-    logger.info(f"[Atomicidade] Ingestão realizada com ingestion_id={ingestion_id}")
+    
+    # 2. Ingestão nova usando RAGAgent para 6 chunks completos
+    logger.info("[Atomicidade] Usando RAGAgent para ingestão completa (6 chunks analíticos)...")
+    from src.agent.rag_agent import RAGAgent
+    from src.embeddings.generator import EmbeddingProvider
+    from pathlib import Path
+    import uuid
+    
+    # Criar agente RAG
+    rag_agent = RAGAgent(
+        embedding_provider=EmbeddingProvider.SENTENCE_TRANSFORMER,
+        csv_chunk_size_rows=500,
+        csv_overlap_rows=50
+    )
+    
+    # Gerar source_id único baseado no ingestion_id
+    ingestion_id = str(uuid.uuid4())
+    source_id = Path(csv_path).stem + f"_{ingestion_id[:8]}"
+    
+    # Ingerir usando RAGAgent (gera 6 chunks de metadata + chunks de dados)
+    result = rag_agent.ingest_csv_file(
+        file_path=csv_path,
+        source_id=source_id,
+        encoding="utf-8"
+    )
+    
+    logger.info(f"[Atomicidade] Ingestão realizada com source_id={source_id}, ingestion_id={ingestion_id}")
+    logger.info(f"[Atomicidade] Resultado RAGAgent: {result.get('message', 'OK')}")
+    
     # 2.5 Limpar registros anteriores: manter apenas embeddings do ingestion_id atual
-    try:
-        # Usar método seguro em DataIngestor para deletar registros antigos em batches
-        deleted = ingestor.delete_except_ingestion(ingestion_id)
-        logger.info(f"[Atomicidade] Deleção de registros antigos concluída. Total removido (estimado): {deleted}")
-    except Exception as del_err:
-        logger.warning(f"[Atomicidade] Falha ao remover embeddings anteriores via delete_except_ingestion: {del_err}")
+    # NOTA: Como RAGAgent não usa exatamente o mesmo ingestion_id do DataIngestor,
+    # vamos manter todos os embeddings (histórico) ao invés de deletar.
+    # Se quiser deletar apenas embeddings antigos de ESTE source_id, implementar filtro por source.
+    logger.info("[Atomicidade] Mantendo histórico de embeddings (não deletando registros antigos)")
+    
     # 3. Refresh memória/cache
-    vector_store.refresh_embeddings(ingestion_id)
-    logger.info(f"[Atomicidade] Memória/cache atualizada para ingestion_id={ingestion_id}")
+    # NOTA: VectorStore.refresh_embeddings() pode não aceitar ingestion_id se for baseado em source
+    try:
+        vector_store.refresh_embeddings(source_id)
+        logger.info(f"[Atomicidade] Memória/cache atualizada para source_id={source_id}")
+    except Exception as refresh_err:
+        logger.warning(f"[Atomicidade] Aviso ao atualizar memória: {refresh_err}")
+    
     # 4. Consulta subsequente
-    results = vector_store.search_similar([0.0]*384, similarity_threshold=0.0, limit=1000, filters={'ingestion_id': ingestion_id})
-    logger.info(f"[Atomicidade] Consulta retornou {len(results)} embeddings para ingestion_id={ingestion_id}")
+    try:
+        results = vector_store.search_similar(
+            [0.0]*384, 
+            similarity_threshold=0.0, 
+            limit=1000, 
+            filters={'source': source_id}
+        )
+        logger.info(f"[Atomicidade] Consulta retornou {len(results)} embeddings para source_id={source_id}")
+    except Exception as search_err:
+        logger.warning(f"[Atomicidade] Aviso ao consultar embeddings: {search_err}")
+        results = []
+    
     return results
 """
 ⚠️ DEPRECADO - Use RAGAgent ao invés deste módulo

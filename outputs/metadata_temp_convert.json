@@ -1,0 +1,35 @@
+{
+  "dataset_name": "temp_convert",
+  "file_path": "temp_convert.csv",
+  "file_size_mb": 0.0,
+  "shape": {
+    "rows": 3,
+    "cols": 1
+  },
+  "memory_usage_mb": 0.0,
+  "columns": {
+    "str_date": {
+      "dtype": "object",
+      "semantic_type": "temporal",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "unique_values": 3,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "median": null,
+      "std": null,
+      "mode": "2023-01-01",
+      "top_values": null
+    }
+  },
+  "statistics": {
+    "total_null_cells": 0,
+    "null_percentage": 0.0,
+    "duplicate_rows": 0,
+    "duplicate_percentage": 0.0
+  },
+  "semantic_summary": {
+    "temporal": 1
+  }
+}

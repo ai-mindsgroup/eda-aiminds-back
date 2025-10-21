@@ -119,6 +119,10 @@ docs/2024-MM-DD_HHMM_sessao-desenvolvimento.md
 ### Arquitetura Técnica
 [Diagrama/descrição da arquitetura atual]
 
+## Camada de abstração da LLM
+- Suporte a múltiplos LLMs via LangChain
+- Sempre o sistema deve fazer uso da camada de abstração das LLMS do LangChain.
+
 ### Funcionalidades Disponíveis
 1. **Análise de CSV**: Carregamento, estatísticas, detecção de fraude
 2. **Sistema de Logging**: Centralizado e estruturado
