@@ -21,7 +21,7 @@ from src.agent.base_agent import BaseAgent, AgentError
 from src.embeddings.chunker import TextChunker, ChunkStrategy, TextChunk
 from src.embeddings.generator import EmbeddingGenerator, EmbeddingProvider
 from src.embeddings.vector_store import VectorStore, VectorSearchResult
-from src.api.sonar_client import send_sonar_query
+from src.llm.manager import get_llm_manager, LLMConfig
 
 
 class RAGAgent(BaseAgent):
@@ -69,11 +69,141 @@ class RAGAgent(BaseAgent):
             
             self.vector_store = VectorStore()
             
+            # Obter instância do LLM Manager (camada de abstração)
+            self.llm_manager = get_llm_manager()
+            
             self.logger.info("Agente RAG inicializado com sucesso e sistema de memória")
             
         except Exception as e:
             self.logger.error(f"Erro na inicialização do RAG: {str(e)}")
             raise AgentError(self.name, f"Falha na inicialização: {str(e)}")
+        
+        # ✅ ETAPA 2: Hybrid Query Processor V2 para análises inteligentes
+        try:
+            from src.agent.hybrid_query_processor_v2 import HybridQueryProcessorV2
+            self.hybrid_processor = HybridQueryProcessorV2(
+                vector_store=self.vector_store,
+                embedding_generator=self.embedding_generator
+            )
+            self.logger.info("✅ Hybrid Query Processor V2 inicializado (Etapa 2)")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Hybrid Query Processor V2 não disponível: {e}")
+            self.hybrid_processor = None
+    
+    def process_query_hybrid(self, query: str, source_id: str, 
+                            session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        🎯 ETAPA 2 - Processamento Híbrido Inteligente de Queries
+        
+        Estratégia:
+        1. PRIORIZA chunks analíticos existentes (6 metadata chunks)
+        2. FALLBACK automático para CSV completo quando necessário
+        3. GERA chunks adicionais sob demanda
+        4. RESPONDE via LLM com contexto rico
+        
+        Args:
+            query: Pergunta do usuário
+            source_id: ID da fonte de dados (ex: 'creditcard_abc123')
+            session_id: ID da sessão (opcional)
+        
+        Returns:
+            Resposta completa com análise, contexto e metadados
+        """
+        if not self.hybrid_processor:
+            return self._build_response(
+                "Hybrid Query Processor não disponível. Use process() tradicional.",
+                metadata={'error': True}
+            )
+        
+        self.logger.info(f"🎯 ETAPA 2: Processando query híbrida: {query[:100]}...")
+        
+        try:
+            # 1. Processar com estratégia híbrida
+            processing_result = self.hybrid_processor.process_query(
+                query=query,
+                source_id=source_id,
+                session_id=session_id
+            )
+            
+            if processing_result['status'] != 'success':
+                error_response = self._build_response(
+                    f"Erro no processamento: {processing_result.get('error')}",
+                    metadata=processing_result
+                )
+                error_response['status'] = 'error'
+                error_response.update(error_response.get('metadata', {}))
+                return error_response
+            
+            # 2. Gerar resposta via LLM com contexto rico
+            context = processing_result['context']
+            
+            llm_prompt = f"""Você é um analista de dados especialista em análise exploratória (EDA).
+
+CONTEXTO DISPONÍVEL:
+{context}
+
+PERGUNTA DO USUÁRIO:
+{query}
+
+INSTRUÇÕES:
+1. Responda de forma clara, objetiva e profissional
+2. Use os dados fornecidos no contexto acima
+3. Se necessário, explique metodologias (ex: IQR para outliers)
+4. Forneça insights acionáveis quando possível
+5. Se houver limitações nos dados, mencione-as
+
+RESPOSTA:"""
+            
+            # Chamar LLM usando camada de abstração (NÃO hardcoded)
+            llm_config = LLMConfig(temperature=0.3, max_tokens=1000)
+            llm_response = self.llm_manager.chat(
+                prompt=llm_prompt,
+                config=llm_config
+            )
+            
+            # Verificar se houve erro na chamada LLM
+            if not llm_response.success:
+                self.logger.error(f"❌ Erro na chamada LLM: {llm_response.error}")
+                error_response = self._build_response(
+                    f"Erro ao gerar resposta via LLM: {llm_response.error}",
+                    metadata={**processing_result, 'llm_error': llm_response.error}
+                )
+                error_response['status'] = 'error'
+                error_response.update(error_response.get('metadata', {}))
+                return error_response
+            
+            # 3. Montar resposta final no formato esperado pelos testes
+            response_dict = self._build_response(
+                content=llm_response.content,
+                metadata={
+                    'strategy': processing_result['strategy'],
+                    'chunks_used': processing_result.get('chunks_used', []),
+                    'csv_accessed': processing_result.get('csv_accessed', False),
+                    'new_chunks_generated': processing_result.get('new_chunks_generated', 0),
+                    'query_analysis': processing_result.get('query_analysis', {}),
+                    'dataframe_shape': processing_result.get('dataframe_shape'),
+                    'covered_aspects': processing_result.get('covered_aspects', []),
+                    'required_gaps': processing_result.get('required_gaps', []),
+                    'csv_analysis': processing_result.get('csv_analysis', {}),
+                    'session_id': session_id
+                }
+            )
+            
+            # Adicionar 'status' e expor metadata no nível raiz para compatibilidade com testes
+            response_dict['status'] = 'success'
+            response_dict.update(response_dict.get('metadata', {}))
+            
+            return response_dict
+        
+        except Exception as e:
+            self.logger.error(f"❌ Erro no processamento híbrido: {e}")
+            error_response = self._build_response(
+                f"Erro no processamento: {str(e)}",
+                metadata={'error': True, 'exception': str(e)}
+            )
+            error_response['status'] = 'error'
+            error_response.update(error_response.get('metadata', {}))
+            return error_response
     
     def ingest_text(self, 
                    text: str, 
@@ -180,40 +310,85 @@ class RAGAgent(BaseAgent):
                        csv_text: str, 
                        source_id: str,
                        include_headers: bool = True) -> Dict[str, Any]:
-        """Ingesta dados CSV (conteúdo bruto) usando estratégia especializada.
+        """Ingesta APENAS metadados analíticos do CSV (6 chunks).
         
         ⚠️ CONFORMIDADE: RAGAgent é o AGENTE DE INGESTÃO AUTORIZADO.
         Este método tem permissão para processar CSV diretamente.
+        
+        ✅ ESTRATÉGIA: Gera SOMENTE 6 chunks de metadata analíticos:
+        1. metadata_types (tipos e estrutura)
+        2. metadata_distribution (distribuições e intervalos)
+        3. metadata_central_variability (tendência central e variabilidade)
+        4. metadata_frequency_outliers (valores frequentes e outliers)
+        5. metadata_correlations (correlações entre variáveis)
+        6. metadata_patterns_clusters (padrões e clusters)
+        
+        ❌ NÃO gera chunks de dados CSV linha a linha.
         """
         self.logger.info(f"✅ INGESTÃO AUTORIZADA: RAGAgent processando CSV: {source_id}")
         self.logger.info("✅ CONFORMIDADE: Agente de ingestão tem permissão para ler CSV")
+        self.logger.info("📊 Estratégia: SOMENTE metadados analíticos (6 chunks)")
         
-        # Primeiro, ingestar dados normais
-        result = self.ingest_text(
-            text=csv_text,
-            source_id=source_id,
-            source_type="csv",
-            chunk_strategy=ChunkStrategy.CSV_ROW
-        )
+        start_time = time.perf_counter()
         
-        # Se ingestão foi bem-sucedida, adicionar chunks de metadados
-        if not result.get("metadata", {}).get("error"):
-            try:
-                self.logger.info("📊 Gerando chunks de metadados do dataset...")
-                metadata_chunks = self._generate_metadata_chunks(csv_text, source_id)
-                if metadata_chunks:
-                    # Gerar embeddings para chunks de metadados
-                    metadata_embeddings = self.embedding_generator.generate_embeddings_batch(metadata_chunks)
-                    if metadata_embeddings:
-                        # Armazenar embeddings de metadados
-                        metadata_stored_ids = self.vector_store.store_embeddings(metadata_embeddings, "csv")
-                        self.logger.info(f"✅ {len(metadata_chunks)} chunks de metadados criados e armazenados")
-                    else:
-                        self.logger.warning("⚠️ Falha ao gerar embeddings para chunks de metadados")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Falha ao gerar chunks de metadados: {e}")
-        
-        return result
+        try:
+            # ✅ GERAR APENAS CHUNKS DE METADADOS ANALÍTICOS
+            self.logger.info("📊 Gerando chunks de metadados analíticos...")
+            metadata_chunks = self._generate_metadata_chunks(csv_text, source_id)
+            
+            if not metadata_chunks:
+                return self._build_response(
+                    "Nenhum chunk de metadata foi criado",
+                    metadata={"error": True}
+                )
+            
+            self.logger.info(f"✅ {len(metadata_chunks)} chunks de metadados criados")
+            
+            # Gerar embeddings para chunks de metadados
+            self.logger.info("� Gerando embeddings para chunks de metadados...")
+            metadata_embeddings = self.embedding_generator.generate_embeddings_batch(metadata_chunks)
+            
+            if not metadata_embeddings:
+                return self._build_response(
+                    "Falha ao gerar embeddings para chunks de metadados",
+                    metadata={"error": True}
+                )
+            
+            self.logger.info(f"✅ {len(metadata_embeddings)} embeddings gerados")
+            
+            # Armazenar embeddings de metadados
+            self.logger.info("💾 Armazenando embeddings no vector store...")
+            metadata_stored_ids = self.vector_store.store_embeddings(metadata_embeddings, "csv")
+            
+            processing_time = time.perf_counter() - start_time
+            
+            # Estatísticas consolidadas
+            stats = {
+                "source_id": source_id,
+                "source_type": "csv_metadata_only",
+                "processing_time": processing_time,
+                "metadata_chunks_created": len(metadata_chunks),
+                "metadata_embeddings_generated": len(metadata_embeddings),
+                "metadata_embeddings_stored": len(metadata_stored_ids),
+                "success_rate": len(metadata_stored_ids) / len(metadata_chunks) * 100 if metadata_chunks else 0
+            }
+            
+            response = f"✅ Ingestão de metadados concluída para '{source_id}'\n" \
+                      f"📊 {len(metadata_chunks)} chunks de metadata → {len(metadata_embeddings)} embeddings → {len(metadata_stored_ids)} armazenados\n" \
+                      f"⏱️ Processado em {processing_time:.2f}s"
+            
+            self.logger.info(f"✅ Ingestão de metadados concluída: {stats['success_rate']:.1f}% sucesso")
+            
+            return self._build_response(response, metadata=stats)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Erro na ingestão de metadados: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._build_response(
+                f"Erro na ingestão de metadados: {str(e)}",
+                metadata={"error": True}
+            )
 
     def _enrich_csv_chunks_light(self, chunks: List[TextChunk]) -> List[TextChunk]:
         """VERSÃO BALANCEADA - Enriquecimento leve que mantém precisão sem comprometer velocidade."""
@@ -314,66 +489,102 @@ class RAGAgent(BaseAgent):
         9. Padrões temporais (se houver)
         10. Estrutura e informações gerais
         
-        Sistema genérico para QUALQUER CSV.
+        Sistema 100% dinâmico usando metadata_extractor para QUALQUER CSV.
         """
         from src.embeddings.chunker import ChunkMetadata, ChunkStrategy
+        from src.ingest.metadata_extractor import extract_dataset_metadata
         import pandas as pd
         import numpy as np
         import io
+        import tempfile
         
         chunks = []
         self.logger.info(f"📊 Gerando chunks de metadados analíticos para {source_id}...")
         
         try:
-            # Ler CSV completo para análise robusta
+            # ✅ ETAPA 1 INTEGRADA: Usar metadata_extractor dinâmico
+            # Salvar CSV temporariamente para usar metadata_extractor
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_csv:
+                temp_csv.write(csv_text)
+                temp_csv_path = temp_csv.name
+            
+            # Extrair metadados completos de forma dinâmica (sem hardcoding)
+            self.logger.info(f"🔍 Extraindo metadados dinâmicos usando metadata_extractor...")
+            metadata = extract_dataset_metadata(temp_csv_path, output_path=None)
+            
+            # Limpar arquivo temporário
+            import os
+            try:
+                os.unlink(temp_csv_path)
+            except:
+                pass
+            
+            # Ler CSV para análises complementares
             df = pd.read_csv(io.StringIO(csv_text))
             total_rows = len(df)
             
-            # Identificar colunas numéricas e categóricas
-            numeric_cols_raw = df.select_dtypes(include=[np.number]).columns.tolist()
-            categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            datetime_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+            # Extrair informações dos metadados estruturados
+            # Estrutura retornada: {dataset_name, file_path, file_size_mb, shape, memory_usage_mb, columns, statistics, semantic_summary}
+            dataset_name = metadata.get('dataset_name', source_id)
+            shape = metadata.get('shape', {'rows': total_rows, 'cols': len(df.columns)})
+            file_size_mb = metadata.get('file_size_mb', 'N/A')
+            columns_metadata = metadata.get('columns', {})
             
-            # 🔍 DETECÇÃO INTELIGENTE: Colunas numéricas com poucos valores únicos são CATEGÓRICAS
-            # Heurística: Se tem <= 10 valores únicos OU <= 0.5% de cardinalidade, é categórico
-            categorical_from_numeric = []
-            truly_numeric = []
+            # Separar colunas por tipo semântico
+            numeric_cols = []
+            categorical_cols = []
+            temporal_cols = []
             
-            for col in numeric_cols_raw:
-                n_unique = df[col].nunique()
-                cardinality_ratio = n_unique / total_rows if total_rows > 0 else 0
-                
-                # Critério: <= 10 valores únicos OU cardinalidade < 0.5% (Ex: Class com 2 valores)
-                if n_unique <= 10 or cardinality_ratio < 0.005:
-                    categorical_from_numeric.append(col)
-                else:
-                    truly_numeric.append(col)
+            for col_name, col_meta in columns_metadata.items():
+                semantic_type = col_meta.get('semantic_type', 'unknown')
+                if semantic_type in ['numeric', 'numeric_id']:
+                    numeric_cols.append(col_name)
+                elif semantic_type in ['categorical', 'categorical_binary']:
+                    categorical_cols.append(col_name)
+                elif semantic_type == 'temporal':
+                    temporal_cols.append(col_name)
             
-            # Consolidar categóricos
-            categorical_cols.extend(categorical_from_numeric)
-            numeric_cols = truly_numeric
+            datetime_cols = temporal_cols  # Alias para compatibilidade
             
             # === CHUNK 1: TIPOS DE DADOS E ESTRUTURA ===
+            # Usar metadados extraídos dinamicamente
             types_content = f"""ANÁLISE DE TIPOLOGIA E ESTRUTURA - DATASET: {source_id.upper()}
 
 ESTRUTURA GERAL:
-- Total de registros: {total_rows:,}
-- Total de colunas: {len(df.columns)}
+- Total de registros: {shape.get('rows', total_rows):,}
+- Total de colunas: {shape.get('cols', len(df.columns))}
 - Colunas numéricas: {len(numeric_cols)}
 - Colunas categóricas: {len(categorical_cols)}
 - Colunas temporais: {len(datetime_cols)}
+- Tamanho do arquivo: {file_size_mb} MB
 
 COLUNAS NUMÉRICAS ({len(numeric_cols)}):
-{chr(10).join([f"  • {col} ({df[col].dtype})" for col in numeric_cols]) or "  Nenhuma"}
-
-COLUNAS CATEGÓRICAS ({len(categorical_cols)}):
-{chr(10).join([f"  • {col} ({df[col].nunique()} valores únicos)" for col in categorical_cols]) or "  Nenhuma"}
-
-COLUNAS TEMPORAIS ({len(datetime_cols)}):
-{chr(10).join([f"  • {col}" for col in datetime_cols]) or "  Nenhuma"}
-
-Este chunk contém informações completas sobre a tipologia e estrutura das colunas do dataset.
 """
+            for col in numeric_cols:
+                col_meta = columns_metadata.get(col, {})
+                dtype = col_meta.get('dtype', 'unknown')
+                types_content += f"  • {col} ({dtype}, semantic: {col_meta.get('semantic_type', 'numeric')})\n"
+            
+            if not numeric_cols:
+                types_content += "  Nenhuma\n"
+            
+            types_content += f"\nCOLUNAS CATEGÓRICAS ({len(categorical_cols)}):\n"
+            for col in categorical_cols:
+                col_meta = columns_metadata.get(col, {})
+                unique_count = col_meta.get('unique_values', df[col].nunique() if col in df.columns else 0)
+                types_content += f"  • {col} ({unique_count} valores únicos, semantic: {col_meta.get('semantic_type', 'categorical')})\n"
+            
+            if not categorical_cols:
+                types_content += "  Nenhuma\n"
+            
+            types_content += f"\nCOLUNAS TEMPORAIS ({len(datetime_cols)}):\n"
+            for col in datetime_cols:
+                types_content += f"  • {col} (semantic: temporal)\n"
+            
+            if not datetime_cols:
+                types_content += "  Nenhuma\n"
+            
+            types_content += "\nEste chunk contém informações completas sobre a tipologia e estrutura das colunas do dataset, extraídas dinamicamente pelo metadata_extractor.\n"
             
             chunks.append(TextChunk(
                 content=types_content,
@@ -383,7 +594,8 @@ Este chunk contém informações completas sobre a tipologia e estrutura das col
                     start_position=0, end_position=len(types_content),
                     additional_info={
                         "chunk_type": "metadata_types",
-                        "topic": "data_types_structure"
+                        "topic": "data_types_structure",
+                        "source_id": source_id  # ✅ CORREÇÃO: Adicionar source_id explicitamente
                     }
                 )
             ))
@@ -394,21 +606,39 @@ Este chunk contém informações completas sobre a tipologia e estrutura das col
 ESTATÍSTICAS DESCRITIVAS (TODAS AS COLUNAS NUMÉRICAS):
 """
             if numeric_cols:
-                desc = df[numeric_cols].describe(percentiles=[.25, .50, .75, .90, .95, .99])
-                dist_content += desc.to_string()
+                dist_content += "COLUNA | MIN | MAX | MÉDIA | MEDIANA | DESVIO PADRÃO\n"
+                dist_content += "-" * 80 + "\n"
+                
+                for col in numeric_cols:
+                    col_meta = columns_metadata.get(col, {})
+                    stats = col_meta.get('statistics', {})
+                    
+                    min_val = stats.get('min', 'N/A')
+                    max_val = stats.get('max', 'N/A')
+                    mean_val = stats.get('mean', 'N/A')
+                    median_val = stats.get('median', 'N/A')
+                    std_val = stats.get('std', 'N/A')
+                    
+                    dist_content += f"{col} | {min_val} | {max_val} | {mean_val} | {median_val} | {std_val}\n"
                 
                 dist_content += "\n\nINTERVALOS (MIN-MAX) POR COLUNA:\n"
                 for col in numeric_cols:
-                    min_val = df[col].min()
-                    max_val = df[col].max()
-                    dist_content += f"  • {col}: [{min_val:.2f}, {max_val:.2f}]\n"
+                    col_meta = columns_metadata.get(col, {})
+                    stats = col_meta.get('statistics', {})
+                    min_val = stats.get('min', 'N/A')
+                    max_val = stats.get('max', 'N/A')
+                    dist_content += f"  • {col}: [{min_val}, {max_val}]\n"
                 
-                dist_content += "\n\nQUARTIS E PERCENTIS:\n"
-                for col in numeric_cols[:5]:  # Primeiras 5 colunas
-                    q25, q50, q75 = df[col].quantile([0.25, 0.50, 0.75])
-                    dist_content += f"  • {col}: Q1={q25:.2f}, Mediana={q50:.2f}, Q3={q75:.2f}\n"
+                dist_content += "\n\nQUARTIS E PERCENTIS (Primeiras 10 colunas):\n"
+                for col in numeric_cols[:10]:
+                    # Calcular quartis manualmente para primeiras 10
+                    if col in df.columns:
+                        q25, q50, q75 = df[col].quantile([0.25, 0.50, 0.75])
+                        dist_content += f"  • {col}: Q1={q25:.2f}, Mediana={q50:.2f}, Q3={q75:.2f}\n"
+            else:
+                dist_content += "  Nenhuma coluna numérica encontrada.\n"
             
-            dist_content += "\n\nEste chunk contém distribuições estatísticas completas, intervalos (min-max), quartis e percentis de todas as variáveis numéricas."
+            dist_content += "\n\nEste chunk contém distribuições estatísticas completas, intervalos (min-max), quartis e percentis de todas as variáveis numéricas, extraídas dinamicamente.\n"
             
             chunks.append(TextChunk(
                 content=dist_content,
@@ -418,7 +648,8 @@ ESTATÍSTICAS DESCRITIVAS (TODAS AS COLUNAS NUMÉRICAS):
                     start_position=0, end_position=len(dist_content),
                     additional_info={
                         "chunk_type": "metadata_distribution",
-                        "topic": "distributions_intervals"
+                        "topic": "distributions_intervals",
+                        "source_id": source_id  # ✅ CORREÇÃO
                     }
                 )
             ))
@@ -432,22 +663,42 @@ MEDIDAS DE TENDÊNCIA CENTRAL:
                 central_content += "COLUNA | MÉDIA | MEDIANA | MODA\n"
                 central_content += "-" * 60 + "\n"
                 for col in numeric_cols:
-                    mean_val = df[col].mean()
-                    median_val = df[col].median()
-                    mode_val = df[col].mode()[0] if len(df[col].mode()) > 0 else "N/A"
-                    central_content += f"{col} | {mean_val:.2f} | {median_val:.2f} | {mode_val}\n"
+                    col_meta = columns_metadata.get(col, {})
+                    stats = col_meta.get('statistics', {})
+                    
+                    mean_val = stats.get('mean', 'N/A')
+                    median_val = stats.get('median', 'N/A')
+                    mode_val = stats.get('mode', 'N/A')
+                    
+                    central_content += f"{col} | {mean_val} | {median_val} | {mode_val}\n"
                 
                 central_content += "\n\nMEDIDAS DE VARIABILIDADE:\n"
                 central_content += "COLUNA | DESVIO PADRÃO | VARIÂNCIA | IQR (Intervalo Interquartil)\n"
                 central_content += "-" * 80 + "\n"
                 for col in numeric_cols:
-                    std_val = df[col].std()
-                    var_val = df[col].var()
-                    q1, q3 = df[col].quantile([0.25, 0.75])
-                    iqr_val = q3 - q1
-                    central_content += f"{col} | {std_val:.2f} | {var_val:.2f} | {iqr_val:.2f}\n"
+                    col_meta = columns_metadata.get(col, {})
+                    stats = col_meta.get('statistics', {})
+                    
+                    std_val = stats.get('std', 'N/A')
+                    # Calcular variância a partir de desvio padrão se disponível e for número
+                    try:
+                        var_val = float(std_val) ** 2 if std_val != 'N/A' else 'N/A'
+                        var_str = f"{var_val:.2f}" if isinstance(var_val, (int, float)) else 'N/A'
+                    except (ValueError, TypeError):
+                        var_str = 'N/A'
+                    
+                    # Calcular IQR manualmente
+                    if col in df.columns:
+                        try:
+                            q1, q3 = df[col].quantile([0.25, 0.75])
+                            iqr_val = q3 - q1
+                            central_content += f"{col} | {std_val} | {var_str} | {iqr_val:.2f}\n"
+                        except Exception:
+                            central_content += f"{col} | {std_val} | {var_str} | N/A\n"
+            else:
+                central_content += "  Nenhuma coluna numérica encontrada.\n"
             
-            central_content += "\n\nEste chunk contém todas as medidas de tendência central (média, mediana, moda) e variabilidade (desvio padrão, variância, IQR) para todas as colunas numéricas."
+            central_content += "\n\nEste chunk contém todas as medidas de tendência central (média, mediana, moda) e variabilidade (desvio padrão, variância, IQR) extraídas dinamicamente pelo metadata_extractor.\n"
             
             chunks.append(TextChunk(
                 content=central_content,
@@ -457,7 +708,8 @@ MEDIDAS DE TENDÊNCIA CENTRAL:
                     start_position=0, end_position=len(central_content),
                     additional_info={
                         "chunk_type": "metadata_central_variability",
-                        "topic": "central_tendency_variability"
+                        "topic": "central_tendency_variability",
+                        "source_id": source_id  # ✅ CORREÇÃO
                     }
                 )
             ))
@@ -468,31 +720,45 @@ MEDIDAS DE TENDÊNCIA CENTRAL:
 VALORES MAIS FREQUENTES (TOP 5) POR COLUNA:
 """
             for col in categorical_cols[:5]:  # Primeiras 5 categóricas
-                top_values = df[col].value_counts().head(5)
-                freq_content += f"\n{col}:\n"
-                for val, count in top_values.items():
-                    pct = (count / total_rows) * 100
-                    freq_content += f"  • {val}: {count} ({pct:.2f}%)\n"
+                col_meta = columns_metadata.get(col, {})
+                top_values_list = col_meta.get('statistics', {}).get('top_values', [])
+                
+                if top_values_list:
+                    freq_content += f"\n{col}:\n"
+                    for value_pair in top_values_list:
+                        if isinstance(value_pair, (list, tuple)) and len(value_pair) == 2:
+                            val, count = value_pair
+                            pct = (count / total_rows) * 100 if total_rows > 0 else 0
+                            freq_content += f"  • {val}: {count} ({pct:.2f}%)\n"
+                else:
+                    # Fallback se não houver top_values no metadata
+                    if col in df.columns:
+                        top_values = df[col].value_counts().head(5)
+                        freq_content += f"\n{col}:\n"
+                        for val, count in top_values.items():
+                            pct = (count / total_rows) * 100
+                            freq_content += f"  • {val}: {count} ({pct:.2f}%)\n"
             
-            freq_content += "\n\nOUTLIERS DETECTADOS (Método IQR):\n"
+            freq_content += "\n\nOUTLIERS DETECTADOS (Método IQR - 1.5×IQR):\n"
             outliers_detected = False
             if numeric_cols:
                 for col in numeric_cols[:10]:  # Primeiras 10 numéricas
-                    q1, q3 = df[col].quantile([0.25, 0.75])
-                    iqr = q3 - q1
-                    lower_bound = q1 - 1.5 * iqr
-                    upper_bound = q3 + 1.5 * iqr
-                    outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)][col]
-                    if len(outliers) > 0:
-                        outliers_detected = True
-                        pct_outliers = (len(outliers) / total_rows) * 100
-                        freq_content += f"  • {col}: {len(outliers)} outliers ({pct_outliers:.2f}%)\n"
-                        freq_content += f"    Intervalo normal: [{lower_bound:.2f}, {upper_bound:.2f}]\n"
+                    if col in df.columns:
+                        q1, q3 = df[col].quantile([0.25, 0.75])
+                        iqr = q3 - q1
+                        lower_bound = q1 - 1.5 * iqr
+                        upper_bound = q3 + 1.5 * iqr
+                        outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)][col]
+                        if len(outliers) > 0:
+                            outliers_detected = True
+                            pct_outliers = (len(outliers) / total_rows) * 100
+                            freq_content += f"  • {col}: {len(outliers)} outliers ({pct_outliers:.2f}%)\n"
+                            freq_content += f"    Intervalo normal: [{lower_bound:.2f}, {upper_bound:.2f}]\n"
             
             if not outliers_detected:
                 freq_content += "  Nenhum outlier significativo detectado nas primeiras colunas.\n"
             
-            freq_content += "\n\nEste chunk identifica valores mais frequentes em colunas categóricas e detecta outliers usando o método IQR (1.5×IQR) com estatísticas de prevalência."
+            freq_content += "\n\nEste chunk identifica valores mais frequentes em colunas categóricas (extraídos do metadata_extractor) e detecta outliers usando o método IQR (1.5×IQR) com estatísticas de prevalência.\n"
             
             chunks.append(TextChunk(
                 content=freq_content,
@@ -502,7 +768,8 @@ VALORES MAIS FREQUENTES (TOP 5) POR COLUNA:
                     start_position=0, end_position=len(freq_content),
                     additional_info={
                         "chunk_type": "metadata_frequency_outliers",
-                        "topic": "frequent_values_outliers"
+                        "topic": "frequent_values_outliers",
+                        "source_id": source_id  # ✅ CORREÇÃO
                     }
                 )
             ))
@@ -540,7 +807,8 @@ MATRIZ DE CORRELAÇÃO (Primeiras 15 colunas numéricas):
                     start_position=0, end_position=len(corr_content),
                     additional_info={
                         "chunk_type": "metadata_correlations",
-                        "topic": "correlations_relationships"
+                        "topic": "correlations_relationships",
+                        "source_id": source_id  # ✅ CORREÇÃO
                     }
                 )
             ))
@@ -552,14 +820,32 @@ ANÁLISE TEMPORAL:
 """
             if datetime_cols:
                 for col in datetime_cols:
-                    pattern_content += f"\nColuna temporal: {col}\n"
-                    pattern_content += f"  • Período: {df[col].min()} até {df[col].max()}\n"
-                    pattern_content += f"  • Intervalo: {(df[col].max() - df[col].min()).days} dias\n"
-            elif 'Time' in df.columns or 'time' in df.columns:
-                time_col = 'Time' if 'Time' in df.columns else 'time'
-                pattern_content += f"\nColuna temporal detectada: {time_col}\n"
-                pattern_content += f"  • Min: {df[time_col].min()}, Max: {df[time_col].max()}\n"
-                pattern_content += f"  • Valores crescentes: {'Sim' if df[time_col].is_monotonic_increasing else 'Não'}\n"
+                    try:
+                        col_min = df[col].min()
+                        col_max = df[col].max()
+                        pattern_content += f"\nColuna temporal: {col}\n"
+                        pattern_content += f"  • Período: {col_min} até {col_max}\n"
+                        
+                        # Tentar calcular intervalo (detectar se é datetime ou numérico)
+                        try:
+                            interval_days = (col_max - col_min).days
+                            pattern_content += f"  • Intervalo: {interval_days} dias\n"
+                        except (AttributeError, TypeError):
+                            # Coluna temporal numérica (ex: segundos)
+                            interval_numeric = col_max - col_min
+                            pattern_content += f"  • Intervalo: {interval_numeric} unidades\n"
+                    except Exception as e:
+                        pattern_content += f"\nColuna temporal: {col} (erro ao processar: {str(e)[:50]})\n"
+            elif any(time_keyword in col.lower() for col in df.columns for time_keyword in ['time', 'timestamp', 'date']):
+                # Detectar colunas com nomes temporais
+                time_cols = [col for col in df.columns if any(kw in col.lower() for kw in ['time', 'timestamp', 'date'])]
+                for time_col in time_cols[:3]:  # Primeiras 3
+                    try:
+                        pattern_content += f"\nColuna temporal detectada: {time_col}\n"
+                        pattern_content += f"  • Min: {df[time_col].min()}, Max: {df[time_col].max()}\n"
+                        pattern_content += f"  • Valores crescentes: {'Sim' if df[time_col].is_monotonic_increasing else 'Não'}\n"
+                    except Exception:
+                        pattern_content += f"  • Erro ao processar {time_col}\n"
             else:
                 pattern_content += "  Nenhuma coluna temporal explícita detectada.\n"
             
@@ -584,7 +870,8 @@ ANÁLISE TEMPORAL:
                     start_position=0, end_position=len(pattern_content),
                     additional_info={
                         "chunk_type": "metadata_patterns_clusters",
-                        "topic": "temporal_patterns_clustering"
+                        "topic": "temporal_patterns_clustering",
+                        "source_id": source_id  # ✅ CORREÇÃO
                     }
                 )
             ))
@@ -593,6 +880,8 @@ ANÁLISE TEMPORAL:
             
         except Exception as e:
             self.logger.warning(f"⚠️ Falha ao gerar metadados para {source_id}: {e}")
+            import traceback
+            self.logger.debug(f"Traceback completo: {traceback.format_exc()}")
             return []
         
         return chunks

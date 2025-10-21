@@ -101,6 +101,17 @@ except RuntimeError as e:
     SEMANTIC_ROUTER_AVAILABLE = False
     print(f"⚠️ Semantic Router não disponível: {str(e)[:100]}...")
 
+# Import do Query Analyzer para classificação inteligente de queries
+try:
+    from src.agent.query_analyzer import QueryAnalyzer
+    QUERY_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    QUERY_ANALYZER_AVAILABLE = False
+    print(f"⚠️ Query Analyzer não disponível: {str(e)[:100]}...")
+except RuntimeError as e:
+    QUERY_ANALYZER_AVAILABLE = False
+    print(f"⚠️ Query Analyzer não disponível: {str(e)[:100]}...")
+
 
 class QueryType(Enum):
     """Tipos de consultas que o orquestrador pode processar."""
@@ -257,8 +268,19 @@ class OrchestratorAgent(BaseAgent):
                 # Removido: use_semantic_routing obsoleto
         else:
             self.semantic_router = None
-            # Removido: use_semantic_routing obsoleto
-            self.logger.warning("⚠️ Semantic Router não disponível, usando roteamento estático")
+        
+        # Query Analyzer (para análise inteligente de queries com fallback heurístico)
+        if QUERY_ANALYZER_AVAILABLE:
+            try:
+                self.analyzer = QueryAnalyzer()
+                self.logger.info("✅ Query Analyzer inicializado (classificação com heurística)")
+            except Exception as e:
+                error_msg = f"Query Analyzer: {str(e)}"
+                initialization_errors.append(error_msg)
+                self.logger.warning(f"⚠️ {error_msg}")
+                self.analyzer = None
+        else:
+            self.analyzer = None
         
         # Log do resultado da inicialização
         if self.agents or self.data_processor:
@@ -272,6 +294,59 @@ class OrchestratorAgent(BaseAgent):
                     self.name, 
                     f"Falha na inicialização de todos os componentes: {'; '.join(initialization_errors)}"
                 )
+    
+    def get_diagnostic_info(self) -> Dict[str, Any]:
+        """Retorna informações de diagnóstico sobre componentes internos.
+        
+        Usado para validação de integração e debugging.
+        
+        Returns:
+            Dict contendo status dos componentes: analyzer, rag_agent, llm_manager
+        """
+        diagnostic = {
+            "analyzer": {
+                "available": self.analyzer is not None,
+                "class": self.analyzer.__class__.__name__ if self.analyzer else None,
+                "has_fallback": hasattr(self.analyzer, '_fallback_heuristic_analysis') if self.analyzer else False
+            },
+            "rag_agent": {
+                "available": "rag" in self.agents,
+                "processor_version": None,
+                "processor_class": None
+            },
+            "csv_agent": {
+                "available": "csv" in self.agents,
+                "class": self.agents["csv"].__class__.__name__ if "csv" in self.agents else None
+            },
+            "llm_manager": {
+                "available": self.llm_manager is not None,
+                "active_provider": None,
+                "class": self.llm_manager.__class__.__name__ if self.llm_manager else None
+            },
+            "semantic_router": {
+                "available": self.semantic_router is not None,
+                "class": self.semantic_router.__class__.__name__ if self.semantic_router else None
+            },
+            "agents_count": len(self.agents),
+            "agents_list": list(self.agents.keys())
+        }
+        
+        # Detalhes do RAG Agent
+        if "rag" in self.agents:
+            rag_agent = self.agents["rag"]
+            if hasattr(rag_agent, 'hybrid_processor') and rag_agent.hybrid_processor:
+                diagnostic["rag_agent"]["processor_version"] = rag_agent.hybrid_processor.__class__.__name__
+                diagnostic["rag_agent"]["processor_class"] = str(type(rag_agent.hybrid_processor))
+        
+        # Detalhes do LLM Manager
+        if self.llm_manager:
+            try:
+                status = self.llm_manager.get_status()
+                diagnostic["llm_manager"]["active_provider"] = status.get("active_provider", "unknown")
+            except Exception as e:
+                diagnostic["llm_manager"]["error"] = str(e)
+        
+        return diagnostic
     
     def _detect_visualization_type(self, query: str) -> Optional[str]:
         """Detecta se a query solicita algum tipo de visualização.
