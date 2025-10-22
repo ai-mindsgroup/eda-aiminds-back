@@ -35,8 +35,8 @@ class RAGAgent(BaseAgent):
                  embedding_provider: EmbeddingProvider = EmbeddingProvider.SENTENCE_TRANSFORMER,
                  chunk_size: int = 512,
                  chunk_overlap: int = 50,
-                 csv_chunk_size_rows: int = 20,
-                 csv_overlap_rows: int = 4):
+                 csv_chunk_size_rows: int = 2000,
+                 csv_overlap_rows: int = 100):
         """Inicializa o agente RAG.
         
         Args:

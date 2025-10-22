@@ -4,7 +4,6 @@ Envia uma sequência de queries e imprime respostas e metadados.
 """
 import asyncio
 from uuid import uuid4
-from src.agent.data_ingestor import DataIngestor
 from src.agent.orchestrator_agent import OrchestratorAgent
 
 async def run_simulation():
@@ -12,8 +11,6 @@ async def run_simulation():
     print(f"Sessão simulada: {session_id}")
 
     # Ingestão (igual ao que a interface faz)
-    ingestor = DataIngestor()
-    ingestor.ingest_csv('data/creditcard.csv')
 
     # Inicializar orchestrator
     orchestrator = OrchestratorAgent(enable_csv_agent=True, enable_rag_agent=True, enable_data_processor=True)

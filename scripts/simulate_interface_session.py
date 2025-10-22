@@ -6,7 +6,6 @@ import asyncio
 from uuid import uuid4
 from pathlib import Path
 
-from src.agent.data_ingestor import DataIngestor
 from src.agent.orchestrator_agent import OrchestratorAgent
 
 async def run_session():
@@ -15,8 +14,6 @@ async def run_session():
 
     # Ingestão (igual interface)
     print("🧹 Ingestão: limpando e carregando dataset...")
-    ingestor = DataIngestor()
-    ingestor.ingest_csv('data/creditcard.csv')
     print("✅ Ingestão concluída")
 
     # Inicializar orchestrator

@@ -4,7 +4,7 @@
 Este script inicia o Auto Ingest Service que:
 1. Monitora pasta do Google Drive
 2. Baixa novos arquivos CSV automaticamente
-3. Processa com DataIngestor (análise + embeddings)
+3. Processa com RAGAgent (análise + embeddings)
 4. Gerencia ciclo de vida dos arquivos (data -> processando -> processado)
 
 Uso:
@@ -151,6 +151,27 @@ def run_continuous():
 
 
 def main():
+    # Teste inline: valida ingestão e loga resultado
+    def test_ingest_flow():
+        try:
+            logger.info("[TESTE INLINE] Iniciando teste do fluxo de ingestão...")
+            from src.vectorstore.supabase_client import supabase
+            from src.embeddings.vector_store import VectorStore
+            from src.agent.data_ingestor import atomic_ingestion_and_query
+            import tempfile
+            import shutil
+            # Cria arquivo CSV temporário pequeno para teste
+            temp_dir = tempfile.mkdtemp()
+            temp_csv = Path(temp_dir) / "test_chunking.csv"
+            with open(temp_csv, "w", encoding="utf-8") as f:
+                f.write("col1,col2,col3\n1,2,3\n4,5,6\n7,8,9\n10,11,12\n")
+            vector_store = VectorStore()
+            atomic_ingestion_and_query(str(temp_csv), supabase, vector_store)
+            logger.info("[TESTE INLINE] Ingestão de teste concluída com sucesso.")
+            shutil.rmtree(temp_dir)
+        except Exception as e:
+            logger.error(f"[TESTE INLINE] Erro no teste de ingestão: {e}")
+
     """Função principal."""
     parser = argparse.ArgumentParser(
         description='Serviço de Ingestão Automática de CSV do Google Drive',
@@ -221,13 +242,12 @@ Google Drive Setup:
     
     # Executa serviço
     try:
+        test_ingest_flow()
         if args.once:
             exit_code = run_once()
         else:
             exit_code = run_continuous()
-        
         sys.exit(exit_code)
-        
     except KeyboardInterrupt:
         logger.info("\n👋 Encerrado pelo usuário")
         sys.exit(0)

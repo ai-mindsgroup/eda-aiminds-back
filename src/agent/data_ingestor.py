@@ -23,8 +23,8 @@ def atomic_ingestion_and_query(csv_path, supabase, vector_store):
     # Criar agente RAG
     rag_agent = RAGAgent(
         embedding_provider=EmbeddingProvider.SENTENCE_TRANSFORMER,
-        csv_chunk_size_rows=500,
-        csv_overlap_rows=50
+        csv_chunk_size_rows=2000,
+        csv_overlap_rows=100
     )
     
     # Gerar source_id único baseado no ingestion_id

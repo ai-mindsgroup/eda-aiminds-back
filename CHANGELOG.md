@@ -24,21 +24,11 @@ Histórico completo de alterações, melhorias e correções no sistema multiage
 **Documentação:** [`docs/changelog/2025-10-04_0320_llm-router-sistema-inteligente.md`](docs/changelog/2025-10-04_0320_llm-router-sistema-inteligente.md)
 
 Sistema de seleção automática de modelos LLM baseado na complexidade da query:
-- **4 níveis de complexidade**: SIMPLE → MEDIUM → COMPLEX → ADVANCED
-- **Modelos**: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-exp
-- **Economia estimada**: 60-70% nos custos de API
-- **Detecção**: Palavras-chave, tamanho do dataset, comprimento da query
 
 **Arquivos:**
-- `src/llm/llm_router.py` - Implementação completa
-- `src/llm/__init__.py` - Exports do módulo
-- `api_completa.py` - Integração no endpoint /chat
 
----
 
 ### 🔧 Correções
-
-#### ⏰ Timeout de 30s Resolvido
 **Data:** 2025-10-04 03:30  
 **Documentação:** 
 - Completa: [`docs/troubleshooting/2025-10-04_0330_correcao-timeout-30s.md`](docs/troubleshooting/2025-10-04_0330_correcao-timeout-30s.md)

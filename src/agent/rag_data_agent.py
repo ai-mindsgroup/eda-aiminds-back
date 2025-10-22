@@ -854,51 +854,27 @@ Os tipos comuns incluem:
 4. Explique brevemente o MOTIVO de cada classificação
 5. Se identificar tipos atípicos ou mistos, descreva-os
 
-**FORMATO OBRIGATÓRIO DA RESPOSTA:**
+**Formato da resposta:**
+- Use tom conversacional e didático
+- Estruture em seções por tipo (use emojis para clareza)
+- Para cada tipo, liste as colunas e explique resumidamente
+- Finalize com uma observação geral sobre o dataset
 
-VOCÊ DEVE SEGUIR EXATAMENTE ESTE FORMATO HUMANIZADO:
+**Exemplo de resposta humanizada e adaptativa:**
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Análise dos Tipos de Dados
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Olá! 👋 Analisando os dados fornecidos, identifiquei os seguintes tipos:
-
-**[EMOJI APROPRIADO] [NOME DO TIPO] ([X] colunas)**
-• **[Nome Coluna 1]**: [Breve explicação do tipo e significado contextual]
-• **[Nome Coluna 2]**: [Breve explicação do tipo e significado contextual]
-... (ou agrupamento se muitas colunas similares)
-
-**[EMOJI] [OUTRO TIPO] ([Y] colunas)**
-• **[Nome Coluna]**: [Explicação]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Observação Geral
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Comentário contextual sobre a natureza do dataset, padrões observados, ou sugestões de uso]
-
-**EXEMPLO CONCRETO PARA VOCÊ SEGUIR:**
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Análise dos Tipos de Dados
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Olá! 👋 Analisando esse dataset de transações financeiras, identifiquei os seguintes tipos:
+"Olá! 👋 Analisando esse dataset de transações financeiras, identifiquei os seguintes tipos de dados:
 
 **⏱️ Colunas Temporais (1 coluna)**
-• **Time**: Representa o momento da transação em segundos desde o início da coleta. Embora armazenado como número inteiro (int64), seu significado é claramente temporal - marca QUANDO cada transação ocorreu. Essencial para análises de série temporal e detecção de padrões ao longo do tempo.
+- **Time**: Representa o momento de cada transação em segundos desde o início da coleta. Embora seja numérico (int64), seu significado é claramente temporal, marcando quando cada evento ocorreu.
 
-**🏷️ Colunas Categóricas Binárias (1 coluna)**
-• **Class**: Variável binária (valores 0 ou 1) indicando a classificação da transação. Não é booleana (True/False) nem numérica contínua - é uma **categoria binomial** onde 0 = transação legítima e 1 = transação fraudulenta. É o rótulo-alvo para modelos de classificação.
+**🏷️ Colunas Categóricas (1 coluna)**
+- **Class**: Variável binária (0 ou 1) que indica a classe da transação. Apesar de ser numérica, funciona como uma categoria binomial, onde 0 = transação normal e 1 = transação fraudulenta. É o rótulo alvo para classificação.
 
 **💰 Colunas Numéricas Contínuas (29 colunas)**
-• **Amount**: Valor monetário da transação (provavelmente em euros ou dólares). Dados contínuos usados para análises quantitativas.
-• **V1 a V28**: Features numéricas geradas por PCA (Principal Component Analysis). Representam padrões latentes nos dados originais, mantidos anônimos por privacidade. São todas contínuas e adequadas para modelagem matemática.
+- **Amount**: Valor monetário da transação em unidade monetária não especificada
+- **V1 a V28**: Características numéricas resultantes de transformação PCA (Principal Component Analysis), representando padrões ocultos nos dados originais. Mantidas anônimas por questões de privacidade.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Observação Geral
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Este é um dataset clássico de detecção de fraude em cartões de crédito. A presença de features PCA indica proteção de dados sensíveis, enquanto mantém valor preditivo. A coluna temporal permite análises de padrões temporais de fraude. 🔍✨
+**Observação geral:** Este é um dataset típico de detecção de fraude, com features anonimizadas (V1-V28) para proteger dados sensíveis, uma marcação temporal e um rótulo binário de classificação. 🔍"
 
 ╔════════════════════════════════════════════════════════════════════════╗
 ║                    🚀 AGORA É SUA VEZ - ANALISE E RESPONDA!            ║
@@ -1143,182 +1119,6 @@ Analisando o dataset `{csv_path}` com {len(df.columns)} colunas e {len(df):,} li
             if len(colunas_chunks) < 5:
                 return True
         return False
-
-    def _handle_visualization_query(self, query: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Gera visualizações (histogramas, boxplots, etc) baseado na pergunta do usuário.
-        
-        Parâmetros:
-            query: Pergunta do usuário
-            context: Contexto contendo 'reconstructed_df' (DataFrame) e 'visualization_type'
-            
-        Retorna:
-            Dict com 'response', 'metadata' contendo 'visualization_success' e 'graficos_gerados'
-        """
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        from pathlib import Path
-        from datetime import datetime
-        
-        try:
-            df = context.get('reconstructed_df')
-            if df is None:
-                self.logger.error("DataFrame não fornecido no contexto")
-                return {
-                    'response': "Erro: dados não disponíveis para visualização.",
-                    'metadata': {'visualization_success': False}
-                }
-            
-            # Criar diretório de saída se não existir
-            output_dir = Path('outputs') / 'visualizations'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Timestamp para nomes únicos
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
-            # ═══════════════════════════════════════════════════════════
-            # DETECTAR TIPO DE VISUALIZAÇÃO PELA PERGUNTA
-            # ═══════════════════════════════════════════════════════════
-            query_lower = query.lower()
-            graficos_gerados = []
-            
-            # Detectar se pergunta sobre distribuição
-            if any(termo in query_lower for termo in ['distribuição', 'distribuicao', 'histograma', 'histogram']):
-                self.logger.info("📊 Gerando histogramas de distribuição...")
-                
-                # Selecionar colunas numéricas
-                numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-                
-                # Limitar a 9 colunas para não sobrecarregar (3x3 grid)
-                if len(numeric_cols) > 9:
-                    self.logger.warning(f"⚠️ Dataset tem {len(numeric_cols)} colunas numéricas. Exibindo apenas as 9 primeiras.")
-                    numeric_cols = numeric_cols[:9]
-                
-                # Criar subplots
-                n_cols = min(3, len(numeric_cols))
-                n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
-                
-                fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
-                fig.suptitle('Distribuição das Variáveis Numéricas', fontsize=16, fontweight='bold')
-                
-                # Flatten axes para iteração fácil
-                if n_rows * n_cols == 1:
-                    axes = [axes]
-                else:
-                    axes = axes.flatten() if n_rows > 1 else axes
-                
-                for idx, col in enumerate(numeric_cols):
-                    ax = axes[idx]
-                    
-                    # Histograma com KDE
-                    df[col].hist(bins=50, ax=ax, alpha=0.7, color='steelblue', edgecolor='black')
-                    ax.set_title(f'{col}', fontsize=12, fontweight='bold')
-                    ax.set_xlabel('Valor')
-                    ax.set_ylabel('Frequência')
-                    ax.grid(True, alpha=0.3)
-                
-                # Remover axes vazios
-                for idx in range(len(numeric_cols), len(axes)):
-                    fig.delaxes(axes[idx])
-                
-                plt.tight_layout()
-                
-                # Salvar figura
-                hist_path = output_dir / f'histograms_{timestamp}.png'
-                plt.savefig(hist_path, dpi=150, bbox_inches='tight')
-                plt.close()
-                
-                graficos_gerados.append(f"Histogramas: {hist_path}")
-                self.logger.info(f"✅ Histogramas salvos em: {hist_path}")
-            
-            # Detectar se pergunta sobre boxplot/outliers
-            if any(termo in query_lower for termo in ['boxplot', 'outlier', 'discrepante', 'dispersão', 'dispersao']):
-                self.logger.info("📊 Gerando boxplots...")
-                
-                numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
-                
-                if len(numeric_cols) > 9:
-                    numeric_cols = numeric_cols[:9]
-                
-                n_cols = min(3, len(numeric_cols))
-                n_rows = (len(numeric_cols) + n_cols - 1) // n_cols
-                
-                fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 5 * n_rows))
-                fig.suptitle('Boxplots das Variáveis Numéricas', fontsize=16, fontweight='bold')
-                
-                if n_rows * n_cols == 1:
-                    axes = [axes]
-                else:
-                    axes = axes.flatten() if n_rows > 1 else axes
-                
-                for idx, col in enumerate(numeric_cols):
-                    ax = axes[idx]
-                    df.boxplot(column=col, ax=ax, patch_artist=True,
-                              boxprops=dict(facecolor='lightblue', color='navy'),
-                              medianprops=dict(color='red', linewidth=2))
-                    ax.set_title(f'{col}', fontsize=12, fontweight='bold')
-                    ax.set_ylabel('Valor')
-                    ax.grid(True, alpha=0.3)
-                
-                for idx in range(len(numeric_cols), len(axes)):
-                    fig.delaxes(axes[idx])
-                
-                plt.tight_layout()
-                
-                box_path = output_dir / f'boxplots_{timestamp}.png'
-                plt.savefig(box_path, dpi=150, bbox_inches='tight')
-                plt.close()
-                
-                graficos_gerados.append(f"Boxplots: {box_path}")
-                self.logger.info(f"✅ Boxplots salvos em: {box_path}")
-            
-            # ═══════════════════════════════════════════════════════════
-            # GERAR RESPOSTA HUMANIZADA SOBRE AS VISUALIZAÇÕES
-            # ═══════════════════════════════════════════════════════════
-            if graficos_gerados:
-                resposta = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Visualizações Geradas com Sucesso!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Olá! 👋 Criei as visualizações solicitadas baseadas nos dados disponíveis:
-
-"""
-                for i, grafico in enumerate(graficos_gerados, 1):
-                    resposta += f"{i}. {grafico}\n"
-                
-                resposta += f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 Como Interpretar
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**Histogramas:** Mostram a frequência de cada valor na distribuição. Picos indicam valores mais comuns, caudas longas indicam presença de valores extremos.
-
-**Boxplots:** A caixa central representa 50% dos dados (entre Q1 e Q3), a linha vermelha é a mediana, e os pontos isolados são potenciais outliers.
-
-Os arquivos estão salvos em: `{output_dir}/`
-"""
-                
-                return {
-                    'response': resposta,
-                    'metadata': {
-                        'visualization_success': True,
-                        'graficos_gerados': graficos_gerados
-                    }
-                }
-            else:
-                self.logger.warning("⚠️ Nenhum gráfico foi gerado - tipo de visualização não detectado")
-                return {
-                    'response': "Não foi possível detectar o tipo de visualização solicitada. Tente perguntas como: 'Qual a distribuição das variáveis?' ou 'Mostre boxplots das features'.",
-                    'metadata': {'visualization_success': False}
-                }
-                
-        except Exception as e:
-            self.logger.error(f"❌ Erro ao gerar visualizações: {e}", exc_info=True)
-            return {
-                'response': f"Erro ao gerar visualizações: {str(e)}",
-                'metadata': {'visualization_success': False, 'error': str(e)}
-            }
 
     def reset_memory(self, session_id: str = None):
         """

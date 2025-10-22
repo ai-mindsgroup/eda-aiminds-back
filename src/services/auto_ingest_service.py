@@ -39,7 +39,6 @@ from src.integrations.google_drive_client import (
     GOOGLE_DRIVE_AVAILABLE
 )
 from src.data.csv_file_manager import CSVFileManager, CSVFileManagerError, create_csv_file_manager
-from src.agent.data_ingestor import DataIngestor
 from src.embeddings.generator import EmbeddingProvider
 from src.settings import (
     AUTO_INGEST_POLLING_INTERVAL,
@@ -75,7 +74,7 @@ class AutoIngestService:
         self,
         google_drive_client: Optional[GoogleDriveClient] = None,
         file_manager: Optional[CSVFileManager] = None,
-        data_ingestor: Optional[DataIngestor] = None,
+    # data_ingestor removido
         polling_interval: Optional[int] = None
     ):
         """Inicializa o serviço de ingestão automática.
@@ -95,8 +94,7 @@ class AutoIngestService:
         self.google_drive_processed_folder_id = None  # ID da pasta "processados" no Drive
         self.file_manager = file_manager or create_csv_file_manager()
         
-        # ✅ COMPATIBILIDADE: Usa DataIngestor (mesma lógica do interface_interativa.py)
-        self.data_ingestor = data_ingestor or DataIngestor()
+    # DataIngestor removido completamente
         
         # Estatísticas
         self.stats = {
@@ -112,7 +110,6 @@ class AutoIngestService:
         logger.info(f"  Polling interval: {self.polling_interval}s")
         logger.info(f"  Google Drive enabled: {GOOGLE_DRIVE_ENABLED}")
         logger.info(f"  Google Drive available: {GOOGLE_DRIVE_AVAILABLE}")
-        logger.info(f"  ✅ Usando DataIngestor (compatibilidade interface_interativa.py)")
         
         # Configura tratamento de sinais para shutdown gracioso
         self._setup_signal_handlers()
@@ -185,8 +182,10 @@ class AutoIngestService:
         Returns:
             True se processado com sucesso, False caso contrário
         """
+        import time
         try:
             logger.info(f"📄 Processando arquivo: {file_path.name}")
+            start_time = time.perf_counter()
             # 1. Move para pasta 'processando'
             logger.info("  → Movendo para pasta 'processando'...")
             processing_path = self.file_manager.move_to_processing(file_path)
@@ -196,16 +195,20 @@ class AutoIngestService:
             from src.embeddings.vector_store import VectorStore
             from src.agent.data_ingestor import atomic_ingestion_and_query
             vector_store = VectorStore()
+            chunk_start = time.perf_counter()
             atomic_ingestion_and_query(str(processing_path), supabase, vector_store)
-            logger.info("  ✅ Fluxo atômico de ingestão concluído com sucesso")
+            chunk_end = time.perf_counter()
+            logger.info(f"  ✅ Fluxo atômico de ingestão concluído em {chunk_end-chunk_start:.2f}s")
             # 3. Move para pasta 'processado'
             logger.info("  → Movendo para pasta 'processado'...")
             processed_path = self.file_manager.move_to_processed(processing_path)
             # 4. Atualiza estatísticas
             self.stats["total_files_processed"] += 1
             self.stats["last_success"] = datetime.now().isoformat()
+            total_time = time.perf_counter() - start_time
             logger.info(f"✅ Arquivo processado com sucesso: {file_path.name}")
             logger.info(f"   Localização final: {processed_path}")
+            logger.info(f"⏱️ Tempo total de processamento: {total_time:.2f}s")
             return True
         except Exception as e:
             logger.error(f"❌ Erro ao processar arquivo {file_path.name}: {e}")

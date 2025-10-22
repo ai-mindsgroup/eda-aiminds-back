@@ -122,18 +122,6 @@ def test_csv_validation():
         return False
 
 
-def test_ingestor_exists():
-    """Verifica se DataIngestor existe e está funcionando."""
-    print("\n🧪 Testando DataIngestor...")
-    
-    try:
-        from src.agent.data_ingestor import DataIngestor
-        
-        ingestor = DataIngestor()
-        print("✅ DataIngestor carregado com sucesso")
-        print(f"   - Supabase configurado: ✅")
-        
-        return True
     except Exception as e:
         print(f"❌ Erro ao carregar DataIngestor: {e}")
         return False
@@ -149,8 +137,7 @@ def main():
         ("Diretórios", test_directories),
         ("Listagem de Arquivos", test_file_listing),
         ("Configuração Google Drive", test_google_drive_config),
-        ("Validação CSV", test_csv_validation),
-        ("Data Ingestor", test_ingestor_exists)
+        ("Validação CSV", test_csv_validation)
     ]
     
     results = []
