@@ -9,9 +9,44 @@ Histórico completo de alterações, melhorias e correções no sistema multiage
 
 ## 📑 Índice Rápido
 
-- [Última Versão (2.0.1)](#version-201---2025-10-04)
+- [Última Versão (2.1.0)](#version-210---2025-10-22)
+- [Versão 2.0.1](#version-201---2025-10-04)
 - [Versão 2.0.0](#version-200---2025-10-03)
 - [Como Usar Este Changelog](#como-usar-este-changelog)
+
+---
+
+## [Version 2.1.0] - 2025-10-22
+
+### 🔥 Limpeza Profunda de Arquivos/Módulos Obsoletos
+**Data:** 2025-10-22  
+**Documentação:** [`docs/2025-10-22_limpeza_obsoletos.md`](docs/2025-10-22_limpeza_obsoletos.md)  
+**Resumo:** [`docs/documentacao_atual/chat_perplexity/2025-10-22-relatorio-limpeza-obsoletos.md`](docs/documentacao_atual/chat_perplexity/2025-10-22-relatorio-limpeza-obsoletos.md)
+
+**Arquivos Removidos:**
+- src/agent/rag_data_agent_v1_backup.py (backup obsoleto)
+- src/agent/rag_data_agent_v2.py (versão intermediária obsoleta)
+- src/agent/rag_data_agent_backup_20251018.py (backup obsoleto)
+- src/agent/rag_agent.py.backup_dual_chunking (backup obsoleto)
+- src/agent/grok_llm_agent.py (anterior à camada de abstração LangChain)
+- src/agent/google_llm_agent.py (anterior à camada de abstração LangChain)
+- src/agent/groq_llm_agent.py (anterior à camada de abstração LangChain)
+- src/agent/hybrid_query_processor.py (substituído por hybrid_query_processor_v2.py)
+- scripts/setup_and_run_interface_interativa.py (substituído por _v3.py)
+- scripts/setup_and_run_fastapi.py (substituído por _v3.py)
+
+**Arquivos Mantidos (Essenciais):**
+- src/agent/rag_data_agent.py (classe base para RAGDataAgentV4)
+- src/agent/rag_data_agent_v4.py (extensão V4 com melhorias)
+- src/agent/rag_agent.py (agente de ingestão RAG)
+- src/agent/hybrid_query_processor_v2.py (processador híbrido atual)
+
+**Justificativa:**
+- Não utilizados no pipeline principal
+- Risco de uso de código legado
+- Padronização da integração de LLMs via LangChain
+- Melhoria na segurança e manutenção
+- rag_data_agent.py mantido por ser classe base do V4
 
 ---
 
@@ -159,17 +194,10 @@ Estabelecida `api_completa.py` como API principal do projeto:
 
 ---
 
-#### 🎯 Sistema Genérico para Qualquer CSV
-**Data:** 2025-10-03  
-**Documentação:**
 - [`docs/changelog/2025-10-03_correcao-hard-coding-csv-generico.md`](docs/changelog/2025-10-03_correcao-hard-coding-csv-generico.md)
 - [`docs/changelog/2025-10-03_correcoes-sistema-generico-csv.md`](docs/changelog/2025-10-03_correcoes-sistema-generico-csv.md)
 
 Sistema agora suporta **qualquer tipo de CSV**, não apenas dados de fraude:
-
-**Antes:**
-- Hardcoded para dataset creditcard.csv
-- Apenas análise de fraude
 
 **Depois:**
 - Genérico para qualquer dataset
@@ -178,11 +206,12 @@ Sistema agora suporta **qualquer tipo de CSV**, não apenas dados de fraude:
 
 ---
 
-#### 📝 Relatórios de Compatibilidade
 **Data:** 2025-10-03  
-**Documentação:** [`docs/changelog/2025-10-03_relatorio-compatibilidade-api.md`](docs/changelog/2025-10-03_relatorio-compatibilidade-api.md)
 
 Relatório completo de compatibilidade entre api_simple.py e api_completa.py.
+ Removidos arquivos de agentes obsoletos e backups não utilizados (rag_agent.py.backup_dual_chunking, rag_data_agent_backup_20251018.py, rag_data_agent_v1_backup.py)
+ Atualizada documentação para refletir uso exclusivo do RAGAgent
+ Motivo: Organização, redução de riscos e alinhamento ao pipeline principal
 
 ---
 

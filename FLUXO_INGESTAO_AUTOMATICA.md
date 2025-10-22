@@ -25,7 +25,7 @@
            ▼
 ┌─────────────────────┐
 │  Processamento      │
-│  🔄 DataIngestor    │
+│  🔄 RAGAgent        │
 │                     │
 │  - Limpeza base     │
 │  - Análise EDA      │
@@ -59,7 +59,7 @@
 - 📁 Salva diretamente em: `data/processando/arquivo.csv`
 - ✅ Cria diretório automaticamente se não existir
 
-### **Passo 3: Processamento (DataIngestor)**
+### **Passo 3: Processamento (RAGAgent)**
 1. **Limpeza da Base Vetorial:**
    - 🧹 Remove embeddings antigos do mesmo arquivo
    - 🗑️ Limpa chunks anteriores
@@ -290,7 +290,7 @@ O serviço mantém estatísticas em tempo real:
 **Solução:** Verifique logs para identificar erro
 
 ### **Arquivo baixado mas não processado**
-**Causa:** Erro no DataIngestor ou Supabase
+**Causa:** Erro no pipeline de ingestão ou Supabase
 **Solução:** 
 1. Verifique conexão Supabase
 2. Verifique credenciais
