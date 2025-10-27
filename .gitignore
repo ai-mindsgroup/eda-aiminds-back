@@ -29,3 +29,14 @@ git-filter-repo.py
 # Logs do serviço de ingestão
 logs/auto_ingest.log
 logs/service-*.log
+
+# Cobertura e relatórios locais
+.coverage
+coverage.xml
+
+# Logs adicionais (rotações e genéricos)
+logs/*.log
+logs/*.log.*
+
+# Artefatos de testes
+tests/pytest.log
