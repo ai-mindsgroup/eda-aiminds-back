@@ -61,12 +61,34 @@ def limpar_tabela_embeddings(confirmar: bool = True) -> bool:
             print("\n❌ Operação cancelada pelo usuário.")
             return False
     
-    print("\n🔄 Deletando registros...")
+    print("\n🔄 Deletando registros em lotes...")
     
     try:
-        # Deletar todos os registros
-        # Supabase não permite DELETE sem condição, então usamos uma condição sempre verdadeira
-        response = supabase.table('embeddings').delete().neq('id', 0).execute()
+        # Deletar em lotes pequenos para evitar timeout
+        batch_size = 100
+        total_deletados = 0
+        
+        while True:
+            # Buscar IDs em lote pequeno
+            response = supabase.table('embeddings').select('id').limit(batch_size).execute()
+            
+            if not response.data or len(response.data) == 0:
+                break
+            
+            ids_to_delete = [row['id'] for row in response.data]
+            
+            # Deletar por ID específico em batch
+            for row_id in ids_to_delete:
+                try:
+                    supabase.table('embeddings').delete().eq('id', row_id).execute()
+                    total_deletados += 1
+                    if total_deletados % 50 == 0:
+                        print(f"  ⏳ Deletados {total_deletados}/{total_registros}...")
+                except Exception as e:
+                    logger.warning(f"Erro ao deletar {row_id}: {e}")
+            
+            if len(response.data) < batch_size:
+                break
         
         # Verificar se a deleção foi bem-sucedida
         registros_restantes = contar_registros()
