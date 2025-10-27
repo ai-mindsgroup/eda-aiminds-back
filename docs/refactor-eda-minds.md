@@ -4,6 +4,17 @@ Este é o ponto de verdade da documentação do backend EDA AI Minds. Centraliza
 
 Atualizado em: 2025-10-26 • Branch: `refactor/project-cleanup`
 
+### Navegação rápida
+
+- Documento único (este): `docs/refactor-eda-minds.md`
+- Guias operacionais essenciais:
+  - `docs/GUIA_INICIO_RAPIDO.md`
+  - `docs/AUTO_INGEST_SETUP.md`
+  - `docs/GUIA_TESTES_SANDBOX.md`
+  - `docs/security-sandbox-guide.md`
+- Arquitetura principal: `docs/ARCHITECTURE_FLOW.md`
+- Histórico consolidado: `docs/archive/historico/`
+
 ---
 
 ## 🎯 Objetivos desta consolidação
