@@ -14,10 +14,12 @@ import ast
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 from datetime import datetime
+import time
 
 from src.embeddings.chunker import TextChunk, ChunkMetadata
 from src.embeddings.generator import EmbeddingResult
 from src.vectorstore.supabase_client import supabase
+from src.settings import EMBEDDINGS_INSERT_BATCH_SIZE
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -144,20 +146,26 @@ class VectorStore:
     def store_embeddings(self, 
                         embedding_results: List[EmbeddingResult],
                         source_type: str = "text") -> List[str]:
-        """Armazena embeddings no banco de dados.
+        """Armazena embeddings no banco de dados com retry robusto e backoff exponencial.
+        
+        Implementa mecanismo resiliente para lidar com timeouts do Supabase (erro 57014):
+        - Retry com backoff exponencial (2^attempt segundos)
+        - Divisão recursiva de lotes ao detectar timeout
+        - Fallback para inserção individual após 3 tentativas falhadas
+        - Logging estruturado de todas as operações
         
         Args:
             embedding_results: Lista de resultados de embeddings
             source_type: Tipo da fonte (text, csv, document, etc.)
         
         Returns:
-            Lista de IDs dos embeddings inseridos
+            Lista de IDs dos embeddings inseridos com sucesso
         """
         if not embedding_results:
             self.logger.warning("Nenhum embedding para armazenar")
             return []
         
-        self.logger.info(f"Armazenando {len(embedding_results)} embeddings")
+        self.logger.info(f"🚀 Iniciando armazenamento de {len(embedding_results)} embeddings")
         
         # Validar dimensões antes de preparar dados para inserção
         for result in embedding_results:
@@ -204,54 +212,211 @@ class VectorStore:
             })
         
         total = len(insert_data)
-        batch_size = 50  # Batch pequeno para evitar timeout no Supabase
+        batch_size = EMBEDDINGS_INSERT_BATCH_SIZE  # Configurável via .env para evitar timeouts
         inserted_ids: List[str] = []
         total_batches = (total + batch_size - 1) // batch_size
         
-        try:
-            for batch_index in range(total_batches):
-                start = batch_index * batch_size
-                end = min(start + batch_size, total)
-                batch_payload = insert_data[start:end]
-                response = self.supabase.table('embeddings').insert(batch_payload).execute()
-
+        # Contadores para estatísticas
+        retry_stats = {
+            'total_retries': 0,
+            'splits_performed': 0,
+            'individual_fallbacks': 0,
+            'failed_embeddings': 0
+        }
+        
+        def _is_timeout_error(error: Exception) -> bool:
+            """Detecta se erro é timeout do PostgreSQL/Supabase."""
+            err_str = str(error)
+            return ('57014' in err_str) or ('statement timeout' in err_str.lower())
+        
+        def _insert_with_retry(
+            payload: List[Dict[str, Any]], 
+            batch_label: str,
+            depth: int = 0,
+            max_depth: int = 10
+        ) -> List[str]:
+            """Insere payload com retry exponencial e divisão recursiva.
+            
+            Args:
+                payload: Dados a inserir
+                batch_label: Identificação do lote para logging
+                depth: Profundidade da recursão (controla backoff)
+                max_depth: Profundidade máxima para evitar recursão infinita
+                
+            Returns:
+                Lista de IDs inseridos com sucesso
+            """
+            payload_size = len(payload)
+            
+            # Proteção contra recursão infinita
+            if depth > max_depth:
+                self.logger.error(
+                    f"⚠️ Profundidade máxima atingida ({max_depth}) para {batch_label}. "
+                    f"Pulando {payload_size} embeddings."
+                )
+                retry_stats['failed_embeddings'] += payload_size
+                return []
+            
+            # Tentativa de inserção direta
+            try:
+                self.logger.debug(f"📤 Tentando inserir {batch_label}: {payload_size} registros (depth={depth})")
+                response = self.supabase.table('embeddings').insert(payload).execute()
+                
+                # Verificar erro explícito
                 if getattr(response, 'error', None):
-                    self.logger.error(
-                        "Erro retornado pelo Supabase no batch %d/%d: %s",
-                        batch_index + 1,
-                        total_batches,
-                        response.error
-                    )
                     raise RuntimeError(response.error)
-
-                if response.data:
-                    current_ids = [row['id'] for row in response.data]
-                    inserted_ids.extend(current_ids)
+                
+                # Verificar resposta vazia
+                if not response.data:
+                    raise RuntimeError("Resposta vazia do Supabase")
+                
+                # Sucesso imediato
+                ids = [row['id'] for row in response.data]
+                self.logger.debug(f"✅ {batch_label} inserido com sucesso: {len(ids)} registros")
+                return ids
+                
+            except Exception as e:
+                # Detectar se é timeout
+                if not _is_timeout_error(e):
+                    # Erro não-timeout: propaga imediatamente
+                    self.logger.error(f"❌ Erro não-timeout em {batch_label}: {str(e)[:200]}")
+                    raise
+                
+                # TIMEOUT DETECTADO
+                retry_stats['total_retries'] += 1
+                self.logger.warning(
+                    f"⏱️ TIMEOUT detectado em {batch_label} "
+                    f"({payload_size} registros, depth={depth})"
+                )
+                
+                # Estratégia 1: Dividir lote ao meio se possível
+                if payload_size > 1:
+                    retry_stats['splits_performed'] += 1
+                    mid = payload_size // 2
+                    
                     self.logger.info(
-                        "✅ Batch %d/%d armazenado (%d registros)",
-                        batch_index + 1,
-                        total_batches,
-                        len(current_ids)
+                        f"🔀 Dividindo {batch_label}: {payload_size} → "
+                        f"{mid} + {payload_size - mid} registros"
                     )
-                else:
-                    self.logger.error(
-                        "Inserção falhou: resposta vazia para batch %d/%d (%d registros)",
-                        batch_index + 1,
-                        total_batches,
-                        len(batch_payload)
+                    
+                    # Recursão em ambas as metades
+                    left_label = f"{batch_label}.L"
+                    right_label = f"{batch_label}.R"
+                    
+                    left_ids = _insert_with_retry(payload[:mid], left_label, depth + 1, max_depth)
+                    right_ids = _insert_with_retry(payload[mid:], right_label, depth + 1, max_depth)
+                    
+                    return left_ids + right_ids
+                
+                # Estratégia 2: Lote unitário → Retry com backoff exponencial
+                retry_stats['individual_fallbacks'] += 1
+                max_attempts = 3
+                backoff_seconds = min(8.0, 0.5 * (2 ** depth))
+                
+                self.logger.info(
+                    f"🔄 Fallback individual para {batch_label}: "
+                    f"backoff inicial={backoff_seconds:.2f}s, max_attempts={max_attempts}"
+                )
+                
+                for attempt in range(1, max_attempts + 1):
+                    self.logger.debug(
+                        f"   Tentativa {attempt}/{max_attempts} após {backoff_seconds:.2f}s..."
                     )
-                    raise RuntimeError("Resposta vazia ao inserir embeddings")
-
-            self.logger.info("✅ %d embeddings armazenados com sucesso", len(inserted_ids))
+                    time.sleep(backoff_seconds)
+                    
+                    try:
+                        response = self.supabase.table('embeddings').insert(payload).execute()
+                        
+                        if getattr(response, 'error', None):
+                            raise RuntimeError(response.error)
+                        if not response.data:
+                            raise RuntimeError("Resposta vazia")
+                        
+                        # Sucesso no retry
+                        embedding_id = response.data[0]['id']
+                        self.logger.info(
+                            f"✅ {batch_label} inserido após {attempt} tentativas "
+                            f"(total backoff: {backoff_seconds * (2**(attempt-1)):.2f}s)"
+                        )
+                        return [embedding_id]
+                        
+                    except Exception as retry_error:
+                        if attempt < max_attempts:
+                            # Ainda há tentativas: aumenta backoff exponencialmente
+                            backoff_seconds = min(8.0, backoff_seconds * 2)
+                            self.logger.warning(
+                                f"   ⚠️ Tentativa {attempt} falhou: {str(retry_error)[:100]}"
+                            )
+                        else:
+                            # Última tentativa esgotada
+                            self.logger.error(
+                                f"   ❌ {batch_label} falhou após {max_attempts} tentativas: "
+                                f"{str(retry_error)[:200]}"
+                            )
+                            retry_stats['failed_embeddings'] += 1
+                            return []
+                
+                # Não deveria chegar aqui, mas garantir retorno vazio
+                return []
+        
+        # Processar batches com retry robusto
+        try:
+            start_time = time.time()
+            
+            for batch_index in range(total_batches):
+                start_idx = batch_index * batch_size
+                end_idx = min(start_idx + batch_size, total)
+                batch_payload = insert_data[start_idx:end_idx]
+                batch_label = f"Batch-{batch_index + 1}/{total_batches}"
+                
+                self.logger.info(
+                    f"📦 Processando {batch_label}: "
+                    f"{len(batch_payload)} embeddings (índices {start_idx}-{end_idx-1})"
+                )
+                
+                # Inserir com retry
+                ids = _insert_with_retry(batch_payload, batch_label, depth=0)
+                inserted_ids.extend(ids)
+                
+                self.logger.info(
+                    f"✅ {batch_label} concluído: {len(ids)}/{len(batch_payload)} inseridos "
+                    f"({len(inserted_ids)}/{total} total)"
+                )
+            
+            elapsed_time = time.time() - start_time
+            
+            # Relatório final
+            success_count = len(inserted_ids)
+            failed_count = total - success_count
+            success_rate = (success_count / total * 100) if total > 0 else 0
+            
+            self.logger.info(
+                f"\n{'='*70}\n"
+                f"📊 ARMAZENAMENTO CONCLUÍDO\n"
+                f"{'='*70}\n"
+                f"   Total embeddings: {total}\n"
+                f"   ✅ Sucesso: {success_count} ({success_rate:.1f}%)\n"
+                f"   ❌ Falhas: {failed_count}\n"
+                f"   🔄 Retries aplicados: {retry_stats['total_retries']}\n"
+                f"   🔀 Divisões de lote: {retry_stats['splits_performed']}\n"
+                f"   🔄 Fallbacks individuais: {retry_stats['individual_fallbacks']}\n"
+                f"   ⏱️ Tempo total: {elapsed_time:.2f}s\n"
+                f"   ⚡ Taxa: {total / elapsed_time:.2f} embeddings/s\n"
+                f"{'='*70}"
+            )
+            
+            if failed_count > 0:
+                self.logger.warning(
+                    f"⚠️ ATENÇÃO: {failed_count} embeddings não foram armazenados. "
+                    f"Considere aumentar EMBEDDINGS_INSERT_BATCH_SIZE ou verificar conectividade."
+                )
+            
             return inserted_ids
+            
         except Exception as e:
             error_details = getattr(e, 'args', None)
             self.logger.error(
-                "Erro ao armazenar embeddings (batch %d/%d): %s | detalhes: %s",
-                batch_index + 1 if 'batch_index' in locals() else 0,
-                total_batches,
-                str(e) or repr(e),
-                error_details
+                f"❌ Erro crítico no armazenamento: {str(e)[:200]} | detalhes: {error_details}"
             )
             raise
     

@@ -22,7 +22,7 @@ Referencias:
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class AnalysisType(Enum):
@@ -247,6 +247,104 @@ def get_configs_for_intent(intent: str) -> tuple[LLMOptimizedConfig, RAGOptimize
     )
     
     return get_llm_config(analysis_type), get_rag_config(analysis_type)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✅ FACTORY FUNCTIONS PARA CRIAÇÃO CENTRALIZADA DE LLMs
+# ═══════════════════════════════════════════════════════════════
+
+def create_llm_with_config(
+    provider: str = "groq",
+    analysis_type: AnalysisType = AnalysisType.GENERAL_EDA,
+    model: Optional[str] = None
+):
+    """
+    Factory function para criar LLM com configurações otimizadas.
+    
+    ✅ USO OBRIGATÓRIO: Todas as partes do sistema devem usar esta função
+    para garantir consistência de parâmetros.
+    
+    Args:
+        provider: Provedor LLM ("groq", "google", "openai")
+        analysis_type: Tipo de análise para otimizar configurações
+        model: Modelo específico (opcional, usa padrão do provedor)
+    
+    Returns:
+        Instância de LLM configurada
+        
+    Raises:
+        ImportError: Se biblioteca do provedor não estiver instalada
+        ValueError: Se API key não estiver configurada
+    
+    Exemplo:
+        >>> llm = create_llm_with_config("groq", AnalysisType.STATISTICAL)
+        >>> response = llm.invoke("Analyze this data...")
+    """
+    from src.settings import GROQ_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY
+    
+    # Obter configurações otimizadas
+    config = get_llm_config(analysis_type)
+    
+    # Criar LLM baseado no provedor
+    if provider.lower() == "groq":
+        if not GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY não configurada")
+        
+        try:
+            from langchain_groq import ChatGroq
+        except ImportError:
+            raise ImportError("langchain-groq não instalado. Execute: pip install langchain-groq")
+        
+        return ChatGroq(
+            model=model or "llama-3.3-70b-versatile",
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            top_p=config.top_p,
+            # Nota: Groq pode não suportar todos os parâmetros
+            groq_api_key=GROQ_API_KEY,
+            max_retries=3,
+            request_timeout=30
+        )
+    
+    elif provider.lower() == "google":
+        if not GOOGLE_API_KEY:
+            raise ValueError("GOOGLE_API_KEY não configurada")
+        
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except ImportError:
+            raise ImportError("langchain-google-genai não instalado")
+        
+        return ChatGoogleGenerativeAI(
+            model=model or "gemini-1.5-flash",
+            temperature=config.temperature,
+            max_output_tokens=config.max_tokens,
+            top_p=config.top_p,
+            top_k=config.top_k,
+            google_api_key=GOOGLE_API_KEY
+        )
+    
+    elif provider.lower() == "openai":
+        if not OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY não configurada")
+        
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError("langchain-openai não instalado")
+        
+        return ChatOpenAI(
+            model=model or "gpt-4o-mini",
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            top_p=config.top_p,
+            presence_penalty=config.presence_penalty,
+            frequency_penalty=config.frequency_penalty,
+            openai_api_key=OPENAI_API_KEY
+        )
+    
+    else:
+        raise ValueError(f"Provedor '{provider}' não suportado. Use: groq, google, openai")
 
 
 # ═══════════════════════════════════════════════════════════════

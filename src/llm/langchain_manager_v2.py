@@ -132,22 +132,24 @@ class LangChainManagerV2:
         )
     
     def _initialize_providers(self) -> None:
-        """Inicializa LLMs LangChain para cada provedor disponível."""
+        """
+        Inicializa LLMs LangChain para cada provedor disponível.
+        
+        ✅ REFATORADO (2025-10-23): Agora usa configurações centralizadas
+        via create_llm_with_config() para garantir consistência.
+        """
+        from src.llm.optimized_config import create_llm_with_config, AnalysisType
         
         # Groq
         if GROQ_API_KEY:
             try:
-                self._llms[LLMProvider.GROQ] = ChatGroq(
-                    groq_api_key=GROQ_API_KEY,
-                    model_name="llama-3.3-70b-versatile",
-                    temperature=0.3,
-                    max_tokens=2000,
-                    max_retries=3,
-                    request_timeout=30
+                self._llms[LLMProvider.GROQ] = create_llm_with_config(
+                    provider="groq",
+                    analysis_type=AnalysisType.GENERAL_EDA
                 )
                 self._provider_status[LLMProvider.GROQ] = {
                     "available": True,
-                    "message": "ChatGroq inicializado",
+                    "message": "ChatGroq inicializado com configurações otimizadas",
                     "model": "llama-3.3-70b-versatile"
                 }
                 self.logger.info("✅ GROQ: ChatGroq inicializado")
@@ -161,18 +163,14 @@ class LangChainManagerV2:
         # Google Gemini
         if GOOGLE_API_KEY:
             try:
-                self._llms[LLMProvider.GOOGLE] = ChatGoogleGenerativeAI(
-                    google_api_key=GOOGLE_API_KEY,
-                    model="gemini-2.0-flash-exp",
-                    temperature=0.3,
-                    max_tokens=2000,
-                    max_retries=3,
-                    request_timeout=30
+                self._llms[LLMProvider.GOOGLE] = create_llm_with_config(
+                    provider="google",
+                    analysis_type=AnalysisType.GENERAL_EDA
                 )
                 self._provider_status[LLMProvider.GOOGLE] = {
                     "available": True,
-                    "message": "ChatGoogleGenerativeAI inicializado",
-                    "model": "gemini-2.0-flash-exp"
+                    "message": "ChatGoogleGenerativeAI inicializado com configurações otimizadas",
+                    "model": "gemini-1.5-flash"
                 }
                 self.logger.info("✅ GOOGLE: ChatGoogleGenerativeAI inicializado")
             except Exception as e:
@@ -185,17 +183,13 @@ class LangChainManagerV2:
         # OpenAI
         if OPENAI_API_KEY:
             try:
-                self._llms[LLMProvider.OPENAI] = ChatOpenAI(
-                    openai_api_key=OPENAI_API_KEY,
-                    model_name="gpt-4o-mini",
-                    temperature=0.3,
-                    max_tokens=2000,
-                    max_retries=3,
-                    request_timeout=30
+                self._llms[LLMProvider.OPENAI] = create_llm_with_config(
+                    provider="openai",
+                    analysis_type=AnalysisType.GENERAL_EDA
                 )
                 self._provider_status[LLMProvider.OPENAI] = {
                     "available": True,
-                    "message": "ChatOpenAI inicializado",
+                    "message": "ChatOpenAI inicializado com configurações otimizadas",
                     "model": "gpt-4o-mini"
                 }
                 self.logger.info("✅ OPENAI: ChatOpenAI inicializado")

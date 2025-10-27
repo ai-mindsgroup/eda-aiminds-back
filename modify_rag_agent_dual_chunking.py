@@ -1,11 +1,19 @@
 """Script para modificar RAGAgent.ingest_csv_data() para ingestão DUAL (metadata + ROW + COLUMN)."""
 
 import sys
+from pathlib import Path
 
 def modify_rag_agent_dual_chunking():
     """Modifica o método ingest_csv_data() para suportar chunking duplo."""
     
-    file_path = r"c:\workstashion\eda-aiminds-i2a2-rb\src\agent\rag_agent.py"
+    # Caminho relativo à raiz do projeto
+    project_root = Path(__file__).resolve().parent
+    file_path = project_root / "src" / "agent" / "rag_agent.py"
+    
+    # Validar existência
+    if not file_path.exists():
+        print(f"❌ Arquivo não encontrado: {file_path}")
+        sys.exit(1)
     
     # Ler arquivo
     with open(file_path, 'r', encoding='utf-8') as f:

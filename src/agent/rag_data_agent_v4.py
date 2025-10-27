@@ -83,56 +83,50 @@ class RAGDataAgentV4(RAGDataAgent):
         """
         Inicializa LLM dando prioridade ao GROQ (mais rápido e barato).
         
+        ✅ REFATORADO (2025-10-23): Agora usa configurações centralizadas
+        via create_llm_with_config() para garantir consistência.
+        
         Ordem de fallback:
-        1. GROQ (llama-3.1-8b-instant) - super rápido
+        1. GROQ (llama-3.3-70b-versatile) - super rápido
         2. Google Gemini (gemini-1.5-flash) - bom custo-benefício
         3. OpenAI (gpt-4o-mini) - fallback final
         """
+        from src.llm.optimized_config import create_llm_with_config, AnalysisType
+        from src.settings import GROQ_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY
+        
         try:
-            # 1️⃣ PRIORIDADE: GROQ
-            from src.settings import GROQ_API_KEY
+            # 1️⃣ PRIORIDADE: GROQ com configurações otimizadas
             if GROQ_API_KEY:
                 try:
-                    from langchain_groq import ChatGroq
-                    self.llm = ChatGroq(
-                        model="llama-3.1-8b-instant",
-                        temperature=0.3,
-                        max_tokens=2048,
-                        groq_api_key=GROQ_API_KEY
+                    self.llm = create_llm_with_config(
+                        provider="groq",
+                        analysis_type=AnalysisType.GENERAL_EDA
                     )
-                    logger.info("✅ LLM V4.0: GROQ (llama-3.1-8b-instant) - SUPER RÁPIDO")
+                    logger.info("✅ LLM V4.0: GROQ (llama-3.3-70b-versatile) - CONFIGURAÇÃO CENTRALIZADA")
                     return
-                except ImportError:
-                    logger.warning("⚠️ langchain-groq não instalado, tentando próximo provedor...")
+                except Exception as e:
+                    logger.warning(f"⚠️ GROQ falhou: {e}, tentando próximo provedor...")
             
-            # 2️⃣ Fallback: Google Gemini
-            from src.settings import GOOGLE_API_KEY
+            # 2️⃣ Fallback: Google Gemini com configurações otimizadas
             if GOOGLE_API_KEY:
                 try:
-                    from langchain_google_genai import ChatGoogleGenerativeAI
-                    self.llm = ChatGoogleGenerativeAI(
-                        model="gemini-1.5-flash",
-                        temperature=0.3,
-                        max_tokens=2048,
-                        google_api_key=GOOGLE_API_KEY
+                    self.llm = create_llm_with_config(
+                        provider="google",
+                        analysis_type=AnalysisType.GENERAL_EDA
                     )
-                    logger.info("✅ LLM V4.0: Google Gemini (gemini-1.5-flash)")
+                    logger.info("✅ LLM V4.0: Google Gemini (gemini-1.5-flash) - CONFIGURAÇÃO CENTRALIZADA")
                     return
                 except Exception as e:
                     logger.warning(f"⚠️ Google Gemini falhou: {e}")
             
-            # 3️⃣ Fallback final: OpenAI
-            from src.settings import OPENAI_API_KEY
+            # 3️⃣ Fallback final: OpenAI com configurações otimizadas
             if OPENAI_API_KEY:
                 try:
-                    from langchain_openai import ChatOpenAI
-                    self.llm = ChatOpenAI(
-                        model="gpt-4o-mini",
-                        temperature=0.3,
-                        max_tokens=2048,
-                        openai_api_key=OPENAI_API_KEY
+                    self.llm = create_llm_with_config(
+                        provider="openai",
+                        analysis_type=AnalysisType.GENERAL_EDA
                     )
-                    logger.info("✅ LLM V4.0: OpenAI (gpt-4o-mini)")
+                    logger.info("✅ LLM V4.0: OpenAI (gpt-4o-mini) - CONFIGURAÇÃO CENTRALIZADA")
                     return
                 except Exception as e:
                     logger.warning(f"⚠️ OpenAI falhou: {e}")

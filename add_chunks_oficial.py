@@ -1,19 +1,47 @@
 """
-Script simplificado: usa o método OFICIAL store_embeddings
-que já sabe lidar com result.chunk_content corretamente
+Script genérico para adicionar chunks analíticos de qualquer CSV.
+
+Uso:
+    python add_chunks_oficial.py <nome_arquivo.csv>
+
+Exemplo:
+    python add_chunks_oficial.py creditcard.csv
+    python add_chunks_oficial.py vendas.csv
 """
+import sys
+from pathlib import Path
 from src.agent.rag_agent import RAGAgent
 from src.embeddings.generator import EmbeddingGenerator
 from src.embeddings.vector_store import VectorStore
+from src.settings import EDA_DATA_DIR_PROCESSADO
 import pandas as pd
 
-print("🚀 Adicionando 6 chunks analíticos...")
+# Validar argumentos CLI
+if len(sys.argv) < 2:
+    print("❌ Uso: python add_chunks_oficial.py <nome_arquivo.csv>")
+    print("\nExemplo:")
+    print("  python add_chunks_oficial.py creditcard.csv")
+    sys.exit(1)
+
+csv_filename = sys.argv[1]
+csv_path = EDA_DATA_DIR_PROCESSADO / csv_filename
+
+# Validar existência do arquivo
+if not csv_path.exists():
+    print(f"❌ Arquivo não encontrado: {csv_path}")
+    print(f"\nVerifique se o arquivo está em: {EDA_DATA_DIR_PROCESSADO}")
+    sys.exit(1)
+
+print(f"🚀 Adicionando chunks analíticos de: {csv_filename}")
 
 # 1. Gerar chunks
 agent = RAGAgent('rag_agent')
-df = pd.read_csv('data/creditcard.csv')
+df = pd.read_csv(csv_path)
 csv_text = df.to_csv(index=False)
-chunks = agent._generate_metadata_chunks(csv_text, 'creditcard_full')
+
+# Gerar source_id baseado no nome do arquivo (sem extensão)
+source_id = csv_filename.replace('.csv', '')
+chunks = agent._generate_metadata_chunks(csv_text, source_id)
 print(f"✅ {len(chunks)} chunks gerados")
 
 # 2. Gerar embeddings
@@ -36,5 +64,7 @@ for i, result in enumerate(results, 1):
         print(f"  ❌ Erro: {str(e)[:100]}")
 
 print(f"\n{'='*60}")
-print(f"✅ CONCLUÍDO: {success}/{len(results)} chunks!")
+print(f"✅ CONCLUÍDO: {success}/{len(results)} chunks armazenados!")
+print(f"   Dataset: {csv_filename}")
+print(f"   Source ID: {source_id}")
 print(f"{'='*60}")

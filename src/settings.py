@@ -38,6 +38,9 @@ if missing:
 
 HISTOGRAMS_DIR: str = os.getenv("HISTOGRAMS_DIR", "static/histogramas")
 
+# Controle de batch para inserção de embeddings (mitiga timeouts no Supabase)
+EMBEDDINGS_INSERT_BATCH_SIZE: int = int(os.getenv("EMBEDDINGS_INSERT_BATCH_SIZE", "20"))
+
 # ========================================================================
 # CONFIGURAÇÕES DA API
 # ========================================================================
@@ -85,6 +88,13 @@ GOOGLE_DRIVE_POST_PROCESS_ACTION: str = os.getenv("GOOGLE_DRIVE_POST_PROCESS_ACT
 # Configurações de polling
 AUTO_INGEST_POLLING_INTERVAL: int = int(os.getenv("AUTO_INGEST_POLLING_INTERVAL", "300"))
 AUTO_INGEST_FILE_PATTERN: str = os.getenv("AUTO_INGEST_FILE_PATTERN", r".*\.csv$")
+
+# ========================================================================
+# CONFIGURAÇÕES DE EMBEDDINGS / VETOR STORE
+# ========================================================================
+
+# Tamanho do batch para inserção no Supabase (evitar timeouts)
+EMBEDDINGS_INSERT_BATCH_SIZE: int = int(os.getenv("EMBEDDINGS_INSERT_BATCH_SIZE", "20"))
 
 # ========================================================================
 # CONFIGURAÇÕES DE BANCO (Postgres/Supabase)

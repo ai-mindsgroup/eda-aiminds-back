@@ -48,10 +48,17 @@ class TemporalDetectionConfig:
     conversion_threshold: float = 0.80
     min_unique_ratio: float = 0.01
     numeric_sequence_threshold: float = 0.95
+    # Parâmetros contextualizados para nomes temporais em colunas numéricas
+    context_unique_ratio_threshold: float = 0.30  # >= 30% valores únicos → provável temporal
+    low_cardinality_threshold: float = 0.10       # < 10% valores únicos → improvável temporal
     enable_aggressive_detection: bool = False
     excluded_patterns: Set[str] = field(default_factory=lambda: {
         "id", "class", "label", "target", "amount", "value", "v1", "v2", "v3"
     })
+    # LLM fallback opcional para casos ambíguos
+    use_llm_fallback: bool = False
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 256
 
 
 @dataclass
@@ -229,6 +236,9 @@ class TemporalColumnDetector:
         # Regras:
         # - Não aplicar COMMON_NAME para colunas string/objeto (exigem conversão válida)
         # - Evitar detectar nomes que contenham 'unix' via COMMON_NAME (reservado para sequência numérica)
+        # - ✅ CORREÇÃO (2025-10-23): Para colunas numéricas com nomes temporais, verificar contexto
+        #   * Se alta cardinalidade (>30% valores únicos) + nome temporal → PROVÁVEL elapsed time/segundos
+        #   * Se baixa cardinalidade (<10% valores únicos) + nome temporal → IMPROVÁVEL temporal
         if self._matches_common_name(col):
             col_lower = col.lower()
             if 'unix' in col_lower:
@@ -244,7 +254,91 @@ class TemporalColumnDetector:
                     detected=False,
                     metadata={'reason': 'common_name_requires_conversion_for_strings'}
                 )
-            # Para dtypes não-string (ex: numéricos), aceitar COMMON_NAME
+            
+            # ✅ ANÁLISE CONTEXTUAL para numéricos com nomes temporais
+            if pd.api.types.is_numeric_dtype(df[col]) and not pd.api.types.is_datetime64_any_dtype(df[col]):
+                unique_count = df[col].nunique(dropna=True)
+                total_count = len(df[col].dropna())
+                unique_ratio = unique_count / total_count if total_count > 0 else 0
+                
+                # Heurística: Alta cardinalidade indica elapsed time/seconds (ex: Time no creditcard)
+                # Baixa cardinalidade indica ID ou categórico disfarçado
+                if unique_ratio >= self.config.context_unique_ratio_threshold:
+                    self.logger.info({
+                        'event': 'numeric_temporal_detected_by_context',
+                        'column': col,
+                        'dtype': str(df[col].dtype),
+                        'unique_ratio': unique_ratio,
+                        'reason': 'High cardinality + temporal name suggests elapsed time/seconds'
+                    })
+                    return DetectionResult(
+                        column_name=col,
+                        detected=True,
+                        method=DetectionMethod.COMMON_NAME,
+                        confidence=0.75,  # Confiança média-alta (contexto inferido)
+                        metadata={
+                            'matched_pattern': col_lower,
+                            'dtype': str(df[col].dtype),
+                            'unique_ratio': unique_ratio,
+                            'interpretation': 'elapsed_time_seconds'
+                        }
+                    )
+                else:
+                    # Faixa baixa ou ambígua: decidir por thresholds ou LLM fallback
+                    if unique_ratio < self.config.low_cardinality_threshold:
+                        # Baixa cardinalidade: provavelmente não temporal
+                        self.logger.warning({
+                            'event': 'temporal_name_rejected_low_cardinality',
+                            'column': col,
+                            'dtype': str(df[col].dtype),
+                            'unique_ratio': unique_ratio,
+                            'reason': 'Low cardinality suggests non-temporal despite name'
+                        })
+                        return DetectionResult(
+                            column_name=col,
+                            detected=False,
+                            metadata={
+                                'reason': 'temporal_name_but_low_cardinality',
+                                'unique_ratio': unique_ratio
+                            }
+                        )
+                    # Zona cinza: tentar LLM fallback se habilitado
+                    if self.config.use_llm_fallback:
+                        llm_vote = self._llm_assess_temporal(col, df[col])
+                        if llm_vote.get('decide') is True:
+                            return DetectionResult(
+                                column_name=col,
+                                detected=True,
+                                method=DetectionMethod.COMMON_NAME,
+                                confidence=llm_vote.get('confidence', 0.7),
+                                metadata={
+                                    'matched_pattern': col_lower,
+                                    'dtype': str(df[col].dtype),
+                                    'unique_ratio': unique_ratio,
+                                    'llm_reason': llm_vote.get('reason', 'llm_fallback')
+                                }
+                            )
+                        elif llm_vote.get('decide') is False:
+                            return DetectionResult(
+                                column_name=col,
+                                detected=False,
+                                metadata={
+                                    'reason': 'llm_rejected_temporal',
+                                    'unique_ratio': unique_ratio,
+                                    'llm_reason': llm_vote.get('reason', 'llm_fallback')
+                                }
+                            )
+                        # Se LLM não decidir, cair para não detectar para segurança
+                    return DetectionResult(
+                        column_name=col,
+                        detected=False,
+                        metadata={
+                            'reason': 'ambiguous_temporal_name_without_llm',
+                            'unique_ratio': unique_ratio
+                        }
+                    )
+            
+            # Para dtypes válidos (datetime, timedelta), aceitar COMMON_NAME
             return DetectionResult(
                 column_name=col,
                 detected=True,
@@ -259,6 +353,43 @@ class TemporalColumnDetector:
             detected=False,
             metadata={'reason': 'no_match'}
         )
+
+    def _llm_assess_temporal(self, col_name: str, series: pd.Series) -> Dict:
+        """Consulta opcional ao LLM Manager para decidir casos ambíguos.
+
+        Retorna um dicionário com chaves:
+        - decide: True/False se conseguiu decidir; ausente se não aplicável
+        - confidence: 0.0-1.0
+        - reason: string curta explicando a decisão
+        """
+        try:
+            # Import tardio para não criar dependência dura
+            from src.llm.manager import get_llm_manager, LLMConfig
+            llm = get_llm_manager()
+
+            # Amostra pequena e segura da coluna
+            sample = series.dropna().astype(str).head(10).tolist()
+            prompt = (
+                "Você é um assistente de dados. Dada uma coluna de um DataFrame e seu nome, "
+                "decida se a coluna representa TEMPO (data/hora, timestamp, elapsed time).\n"
+                f"Nome da coluna: {col_name}\n"
+                f"Amostra de valores: {sample}\n"
+                "Responda apenas com uma das opções: 'temporal', 'nao_temporal' e uma razão breve."
+            )
+            cfg = LLMConfig(temperature=self.config.llm_temperature, max_tokens=self.config.llm_max_tokens)
+            resp = llm.chat(prompt, cfg)
+            if not resp.success:
+                return {}
+            text = (resp.content or '').lower()
+            if 'temporal' in text and 'nao_temporal' not in text:
+                return {'decide': True, 'confidence': 0.7, 'reason': text[:200]}
+            if 'nao_temporal' in text or 'não_temporal' in text or 'nao temporal' in text:
+                return {'decide': False, 'confidence': 0.7, 'reason': text[:200]}
+            return {}
+        except Exception as e:
+            # Falha no LLM: não decide
+            self.logger.debug(f"LLM fallback indisponível: {e}")
+            return {}
     
     def _should_exclude(self, col: str) -> bool:
         """Verifica se a coluna deve ser excluída da detecção."""

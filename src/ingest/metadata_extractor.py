@@ -28,6 +28,12 @@ def detect_semantic_type(column_name: str, series: pd.Series) -> str:
     """
     Detecta o tipo semântico de uma coluna de forma inteligente.
     
+    ✅ MELHORIAS V2.0 (2025-10-23):
+    - Validação combinada: dtype + nome + análise estatística de valores
+    - Detecção de categóricos numéricos (ex: Class=0/1, Status=1/2/3)
+    - Não assume tipo global do dataset pela primeira coluna
+    - Prioriza dtype real sobre inferências por nome
+    
     Analisa tanto o nome da coluna quanto os valores para determinar
     o tipo semântico mais apropriado.
     
@@ -39,8 +45,9 @@ def detect_semantic_type(column_name: str, series: pd.Series) -> str:
         Tipo semântico identificado:
         - "temporal": Dados de data/hora/timestamp
         - "categorical_binary": Categórico com exatamente 2 valores únicos
+        - "categorical_numeric": Numérico com baixa cardinalidade (categoria disfarçada)
         - "categorical": Categórico com múltiplos valores
-        - "numeric": Numérico (int, float)
+        - "numeric": Numérico contínuo (int, float)
         - "text": Texto livre
         - "unknown": Não foi possível determinar
     """
@@ -48,55 +55,101 @@ def detect_semantic_type(column_name: str, series: pd.Series) -> str:
         # Normalizar nome da coluna
         col_lower = column_name.lower()
         
-        # 1. Verificar indicadores temporais no nome
-        temporal_keywords = [
-            "time", "date", "timestamp", "datetime", "created", "updated",
-            "modified", "year", "month", "day", "hour", "minute", "second",
-            "data", "hora", "tempo", "dia", "mes", "ano"
-        ]
+        # ═══════════════════════════════════════════════════════════════
+        # FASE 1: ANÁLISE DE DTYPE (PRIORIDADE MÁXIMA)
+        # ═══════════════════════════════════════════════════════════════
         
-        if any(keyword in col_lower for keyword in temporal_keywords):
-            return "temporal"
-        
-        # 2. Verificar se é datetime pelo dtype
+        # 1.1 Verificar se é datetime pelo dtype (NATIVO)
         if pd.api.types.is_datetime64_any_dtype(series):
             return "temporal"
         
-        # 3. Tentar converter para datetime (sample para performance)
-        if pd.api.types.is_object_dtype(series):
-            sample = series.dropna().head(100)
-            if len(sample) > 0:
-                try:
-                    pd.to_datetime(sample, errors='raise')
-                    return "temporal"
-                except (ValueError, TypeError):
-                    pass
-        
-        # 4. Verificar categórico binário
-        unique_count = series.nunique(dropna=True)
-        if unique_count == 2:
-            return "categorical_binary"
-        
-        # 5. Verificar numérico
-        if pd.api.types.is_numeric_dtype(series):
-            # Verificar se é ID (muitos valores únicos relativos ao total)
-            if unique_count / len(series.dropna()) > 0.95:
-                return "numeric_id"
-            return "numeric"
-        
-        # 6. Verificar categórico (baixa cardinalidade)
-        if pd.api.types.is_object_dtype(series) or pd.api.types.is_categorical_dtype(series):
-            # Considerar categórico se < 50% de valores únicos ou < 100 categorias
-            ratio = unique_count / len(series.dropna()) if len(series.dropna()) > 0 else 0
-            if ratio < 0.5 or unique_count < 100:
-                return "categorical"
-            else:
-                # Alta cardinalidade = texto livre
-                return "text"
-        
-        # 7. Boolean
+        # 1.2 Boolean nativo
         if pd.api.types.is_bool_dtype(series):
             return "categorical_binary"
+        
+        # 1.3 Categorical nativo
+        if pd.api.types.is_categorical_dtype(series):
+            unique_count = series.nunique(dropna=True)
+            return "categorical_binary" if unique_count == 2 else "categorical"
+        
+        # ═══════════════════════════════════════════════════════════════
+        # FASE 2: ANÁLISE DE VALORES ÚNICOS E CARDINALIDADE
+        # ═══════════════════════════════════════════════════════════════
+        
+        unique_count = series.nunique(dropna=True)
+        total_count = len(series.dropna())
+        unique_ratio = unique_count / total_count if total_count > 0 else 0
+        
+        # ═══════════════════════════════════════════════════════════════
+        # FASE 3: DETECÇÃO DE TIPOS NUMÉRICOS (CRÍTICO)
+        # ═══════════════════════════════════════════════════════════════
+        
+        if pd.api.types.is_numeric_dtype(series):
+            # ✅ CORREÇÃO CRÍTICA: Detectar categóricos numéricos
+            # Exemplos: Class (0,1), Status (1,2,3), Rating (1-5)
+            
+            # 3.1 Binário numérico (ex: Class=0/1, Gender=0/1)
+            if unique_count == 2:
+                return "categorical_binary"
+            
+            # 3.2 Categórico numérico com baixa cardinalidade
+            # Regras: <= 10 valores únicos OU < 5% de cardinalidade
+            categorical_keywords = ['class', 'type', 'status', 'category', 'rating', 
+                                   'level', 'grade', 'rank', 'label', 'flag']
+            
+            is_low_cardinality = unique_count <= 10 or unique_ratio < 0.05
+            has_categorical_name = any(keyword in col_lower for keyword in categorical_keywords)
+            
+            if is_low_cardinality and (has_categorical_name or unique_count <= 5):
+                logger.info(f"Coluna '{column_name}' detectada como categorical_numeric: "
+                           f"{unique_count} valores únicos, ratio={unique_ratio:.2%}")
+                return "categorical_numeric"
+            
+            # 3.3 ID numérico (alta cardinalidade)
+            id_keywords = ['id', 'code', 'key', 'number', 'num']
+            if unique_ratio > 0.95 or any(keyword in col_lower for keyword in id_keywords):
+                return "numeric_id"
+            
+            # 3.4 Numérico contínuo (padrão para int/float)
+            return "numeric"
+        
+        # ═══════════════════════════════════════════════════════════════
+        # FASE 4: ANÁLISE DE TIPOS STRING/OBJECT
+        # ═══════════════════════════════════════════════════════════════
+        
+        if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):
+            # 4.1 Tentar converter para datetime (sample para performance)
+            # ✅ IMPORTANTE: Só tentar se nome sugerir temporal
+            temporal_keywords = [
+                "time", "date", "timestamp", "datetime", "created", "updated",
+                "modified", "year", "month", "day", "hour", "minute", "second",
+                "data", "hora", "tempo", "dia", "mes", "ano"
+            ]
+            
+            if any(keyword in col_lower for keyword in temporal_keywords):
+                sample = series.dropna().head(100)
+                if len(sample) > 0:
+                    try:
+                        pd.to_datetime(sample, errors='raise')
+                        return "temporal"
+                    except (ValueError, TypeError):
+                        pass  # Não é temporal, continuar análise
+            
+            # 4.2 Categórico binário
+            if unique_count == 2:
+                return "categorical_binary"
+            
+            # 4.3 Categórico (baixa/média cardinalidade)
+            # Considerar categórico se < 50% de valores únicos ou < 100 categorias
+            if unique_ratio < 0.5 or unique_count < 100:
+                return "categorical"
+            
+            # 4.4 Texto livre (alta cardinalidade)
+            return "text"
+        
+        # ═══════════════════════════════════════════════════════════════
+        # FASE 5: FALLBACK - TIPO DESCONHECIDO
+        # ═══════════════════════════════════════════════════════════════
         
         return "unknown"
         

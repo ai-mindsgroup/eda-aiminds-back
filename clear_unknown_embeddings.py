@@ -41,8 +41,10 @@ def clear_unknown_embeddings():
             supabase.table('embeddings').delete().eq('id', embedding_id).execute()
         
         logger.info(f"✅ {len(ids_to_delete)} embeddings removidos com sucesso!")
-        logger.info("\n📌 Próximo passo: Execute a ingestão novamente com:")
-        logger.info("   python -c \"from src.agent.rag_agent import RAGAgent; agent = RAGAgent(); agent.ingest_csv_data('data/processado/creditcard.csv', 'creditcard_7e30850a')\"")
+        logger.info("\n📌 Próximo passo: Execute a reingestão com:")
+        logger.info("   python reingest_csv.py <SEU_ARQUIVO.csv>")
+        logger.info("\nExemplo:")
+        logger.info("   python reingest_csv.py creditcard.csv")
     
     except Exception as e:
         logger.error(f"❌ Erro ao limpar embeddings: {e}")
