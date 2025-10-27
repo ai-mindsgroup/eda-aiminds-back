@@ -1,0 +1,7 @@
+{
+  "os": "Windows-2022Server-10.0.20348-SP0",
+  "system": "Windows",
+  "release": "2022Server",
+  "version": "10.0.20348",
+  "python": "3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)]"
+}

@@ -1,0 +1,58 @@
+
+tests/tests_prompt_4/test_csv_encodings.py::test_dataloader_detects_and_reads_multiple_encodings[utf-8] 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:06 [    INFO] DataLoader inicializado por: test_system
+2025-10-27 05:17:06 [    INFO] \u2705 DataLoader: Acesso autorizado para agente: test_system\n2025-10-27 05:17:06 [ WARNING] \U0001f6a8 ACESSO CSV AUTORIZADO por test_system: C:\\Users\\a.gil\\AppData\\Local\\Temp\\2\\pytest-of-a.gil\\pytest-21\\test_dataloader_detects_and_re0\\sample_utf8.csv (0.0MB)\n2025-10-27 05:17:07 [    INFO] Encoding detectado: utf-8 (confianτa: 0.99)
+2025-10-27 05:17:07 [    INFO] \u2705 Arquivo carregado: 4 linhas, 2 colunas\nPASSED                                                                   [ 14%]
+tests/tests_prompt_4/test_csv_encodings.py::test_dataloader_detects_and_reads_multiple_encodings[latin-1] 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:07 [    INFO] DataLoader inicializado por: test_system
+2025-10-27 05:17:07 [    INFO] \u2705 DataLoader: Acesso autorizado para agente: test_system\n2025-10-27 05:17:07 [ WARNING] \U0001f6a8 ACESSO CSV AUTORIZADO por test_system: C:\\Users\\a.gil\\AppData\\Local\\Temp\\2\\pytest-of-a.gil\\pytest-21\\test_dataloader_detects_and_re1\\sample_latin1.csv (0.0MB)\n2025-10-27 05:17:07 [    INFO] Encoding detectado: ISO-8859-1 (confianτa: 0.73)
+2025-10-27 05:17:07 [    INFO] \u2705 Arquivo carregado: 4 linhas, 2 colunas\nPASSED                                                                   [ 28%]
+tests/tests_prompt_4/test_csv_encodings.py::test_dataloader_detects_and_reads_multiple_encodings[cp1252] 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:07 [    INFO] DataLoader inicializado por: test_system
+2025-10-27 05:17:07 [    INFO] \u2705 DataLoader: Acesso autorizado para agente: test_system\n2025-10-27 05:17:07 [ WARNING] \U0001f6a8 ACESSO CSV AUTORIZADO por test_system: C:\\Users\\a.gil\\AppData\\Local\\Temp\\2\\pytest-of-a.gil\\pytest-21\\test_dataloader_detects_and_re2\\sample_cp1252.csv (0.0MB)\n2025-10-27 05:17:07 [    INFO] Encoding detectado: ISO-8859-1 (confianτa: 0.73)
+2025-10-27 05:17:07 [    INFO] \u2705 Arquivo carregado: 4 linhas, 2 colunas\nPASSED                                                                   [ 42%]
+tests/tests_prompt_4/test_csv_encodings.py::test_dataloader_detects_and_reads_multiple_encodings[utf-16] 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:07 [    INFO] DataLoader inicializado por: test_system
+2025-10-27 05:17:07 [    INFO] \u2705 DataLoader: Acesso autorizado para agente: test_system\n2025-10-27 05:17:07 [ WARNING] \U0001f6a8 ACESSO CSV AUTORIZADO por test_system: C:\\Users\\a.gil\\AppData\\Local\\Temp\\2\\pytest-of-a.gil\\pytest-21\\test_dataloader_detects_and_re3\\sample_utf16.csv (0.0MB)\n2025-10-27 05:17:07 [    INFO] Encoding detectado: UTF-16 (confianτa: 1.00)
+2025-10-27 05:17:07 [    INFO] \u2705 Arquivo carregado: 4 linhas, 2 colunas\nPASSED                                                                   [ 57%]
+tests/tests_prompt_4/test_csv_encodings.py::test_dataloader_handles_relative_paths 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:07 [    INFO] DataLoader inicializado por: test_system
+2025-10-27 05:17:07 [    INFO] \u2705 DataLoader: Acesso autorizado para agente: test_system\n2025-10-27 05:17:07 [ WARNING] \U0001f6a8 ACESSO CSV AUTORIZADO por test_system: C:\\Users\\a.gil\\AppData\\Local\\Temp\\2\\pytest-of-a.gil\\pytest-21\\test_dataloader_handles_relati0\\sub\\folder\\relativo.csv (0.0MB)\n2025-10-27 05:17:07 [    INFO] Encoding detectado: ascii (confianτa: 1.00)
+2025-10-27 05:17:07 [    INFO] \u2705 Arquivo carregado: 2 linhas, 2 colunas\nPASSED                                                                   [ 71%]
+tests/tests_prompt_4/test_llm_agent_responses.py::test_rag_agent_process_query_hybrid_with_mock_llm 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:17:08 [    INFO] M≤dulo de mem≤ria carregado - versπo 1.0.0
+2025-10-27 05:18:34 [    INFO] SupabaseMemoryManager inicializado para agente: rag_agent
+2025-10-27 05:18:34 [    INFO] Mem≤ria LangChain+Supabase habilitada para agente rag_agent
+2025-10-27 05:18:34 [    INFO] Agente rag_agent inicializado: Agente RAG para consultas contextualizadas com busca vetorial
+2025-10-27 05:18:34 [    INFO] Carregando modelo Sentence Transformer: all-MiniLM-L6-v2
+2025-10-27 05:18:34 [    INFO] Use pytorch device_name: cpu
+2025-10-27 05:18:34 [    INFO] Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+2025-10-27 05:18:38 [    INFO] Sentence Transformer carregado com sucesso
+2025-10-27 05:18:40 [    INFO] Conexπo com vector store estabelecida
+2025-10-27 05:18:40 [    INFO] Agente RAG inicializado com sucesso e sistema de mem≤ria
+2025-10-27 05:18:40 [    INFO] \u2705 GROQ: Groq dispon\xedvel\n2025-10-27 05:18:40 [ WARNING] \u26a0\ufe0f GOOGLE: Biblioteca google-generativeai n\xe3o instalada\n2025-10-27 05:18:44 [ WARNING] \u26a0\ufe0f OPENAI: API key n\xe3o configurada\n2025-10-27 05:18:44 [    INFO] \u2705 LLM Manager inicializado com provedor ativo: groq\n2025-10-27 05:18:44 [    INFO] SupabaseMemoryManager inicializado para agente: hybrid_processor
+2025-10-27 05:18:44 [    INFO] \U0001f680 HybridQueryProcessorV2 inicializado\n2025-10-27 05:18:44 [    INFO] \u2705 Hybrid Query Processor V2 inicializado (Etapa 2)\n2025-10-27 05:18:44 [    INFO] \U0001f3af ETAPA 2: Processando query h\xedbrida: Quais colunas existem?...\nPASSED                                                                   [ 85%]
+tests/tests_prompt_4/test_supabase_embeddings.py::test_store_and_retrieve_embeddings_supabase 
+-------------------------------- live log call --------------------------------
+2025-10-27 05:18:45 [    INFO] Conexπo com vector store estabelecida
+2025-10-27 05:18:45 [    INFO] \U0001f680 Iniciando armazenamento de 2 embeddings\n2025-10-27 05:18:45 [    INFO] \U0001f4e6 Processando Batch-1/1: 2 embeddings (\xedndices 0-1)\n2025-10-27 05:18:46 [    INFO] \u2705 Batch-1/1 conclu\xeddo: 2/2 inseridos (2/2 total)\n2025-10-27 05:18:46 [    INFO] \n======================================================================\n\U0001f4ca ARMAZENAMENTO CONCLU\xcdDO\n======================================================================\n   Total embeddings: 2\n   \u2705 Sucesso: 2 (100.0%)\n   \u274c Falhas: 0\n   \U0001f504 Retries aplicados: 0\n   \U0001f500 Divis\xf5es de lote: 0\n   \U0001f504 Fallbacks individuais: 0\n   \u23f1\ufe0f Tempo total: 0.81s\n   \u26a1 Taxa: 2.48 embeddings/s\n======================================================================\n2025-10-27 05:18:48 [    INFO] Encontrados 0 resultados ap≤s aplicar filtros {'source': 'tests_prompt_4_supabase_ef3caff3'}
+2025-10-27 05:18:49 [    INFO] Removidos 2 embeddings da fonte: tests_prompt_4_supabase_ef3caff3
+PASSED                                                                   [100%]
+
+============================== warnings summary ===============================
+tests/tests_prompt_4/test_llm_agent_responses.py::test_rag_agent_process_query_hybrid_with_mock_llm
+  C:\Users\a.gil\AppData\Roaming\Python\Python312\site-packages\supabase\_sync\client.py:303: DeprecationWarning: The 'timeout' parameter is deprecated. Please configure it in the http client instead.
+    return SyncPostgrestClient(
+
+tests/tests_prompt_4/test_llm_agent_responses.py::test_rag_agent_process_query_hybrid_with_mock_llm
+  C:\Users\a.gil\AppData\Roaming\Python\Python312\site-packages\supabase\_sync\client.py:303: DeprecationWarning: The 'verify' parameter is deprecated. Please configure it in the http client instead.
+    return SyncPostgrestClient(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 7 passed, 2 warnings in 119.67s (0:01:59) ==================

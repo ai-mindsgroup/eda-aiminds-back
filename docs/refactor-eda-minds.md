@@ -280,3 +280,54 @@ FAQ (curto)
 - [x] Próximas manutenções listadas
 
 Assinado: Equipe EDA AI Minds • Data: 2025-10-26
+
+---
+
+## 🔎 Validação cruzada e governança contínua (Etapa 6)
+
+Objetivo: finalizar auditoria garantindo aderência técnica e prevenindo regressões entre Windows e Linux.
+
+Evidências coletadas (Windows):
+
+- Ambiente: `reports/validation/windows_env_info.json`
+- Execução de testes (sem coverage gating): `reports/validation/windows_tests_prompt4.txt`
+  - Resultado: 7 passed, 2 warnings em ~120s
+  - Destaques de integração:
+    - DataLoader: detecção de encodings (utf-8, latin-1/CP1252, utf-16) e paths relativos
+    - RAG Agent (LLM mock + Supabase Memory): inicialização completa e resposta híbrida
+    - Vector Store + Supabase: insert 2/2, remoção por fonte, sem retries
+
+Como executar sem coverage gating (ambiente local):
+
+- Windows (PowerShell): `python -m pytest tests/tests_prompt_4 -o "addopts="`
+- Linux/macOS (bash/zsh): `python -m pytest tests/tests_prompt_4 -o addopts=`
+
+Observação: o arquivo `pytest.ini` define addopts de coverage para `src/security`. Ao usar `-o addopts=`, a suíte roda sem coletar cobertura, focando validações funcionais da ingestão/RAG.
+
+Checklist de conformidade (executar a cada auditoria):
+
+- [ ] Windows: suíte `tests/tests_prompt_4` passa sem falhas (sem coverage gating)
+- [ ] Linux: suíte `tests/tests_prompt_4` passa sem falhas (sem coverage gating)
+- [ ] Supabase: CRUD + RPC `match_embeddings` executados sem erros e sem retries inesperados
+- [ ] DataLoader: encodings e paths relativos validados em amostras reais
+- [ ] LLM Manager: fallback ativo quando chaves/SDKs ausentes; provedor selecionado logado
+- [ ] Logs estruturados: sem segredos; alertas de depreciação acompanhados
+- [ ] Coverage de segurança (src/security): verificado separadamente via pipeline dedicado
+
+Métricas mínimas de sanidade (comparação Windows x Linux):
+
+- Tempo total da suíte: Windows ~2 min; Linux esperado: ~1-2 min (varia por hardware)
+- Inserção de embeddings: 100% sucesso em lotes pequenos de teste; 0 retries
+- Warnings: depreciações de supabase/_sync aceitas e monitoradas
+
+Plano para execução em Linux/WSL:
+
+1. Ativar venv e instalar deps conforme `requirements.txt`
+2. Exportar variáveis essenciais (SUPABASE_URL/KEY) para testes de integração
+3. Rodar: `python -m pytest tests/tests_prompt_4 -o addopts=`
+4. Salvar evidências (logs) em `reports/validation/linux_tests_prompt4.txt`
+5. Registrar `uname -a` e versão do Python em `reports/validation/linux_env_info.json`
+
+Decisão de governança:
+
+- Manter dois estágios de validação: (1) funcional sem coverage para ingestão/RAG; (2) coverage de segurança isolado para `src/security` via pipeline. Isso evita falsos negativos e preserva foco por domínio.
