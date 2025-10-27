@@ -1,5 +1,7 @@
 # 🎯 EDA AI Minds Backend - Sistema Multiagente
 
+> Documento de referência único: veja `docs/refactor-eda-minds.md` para arquitetura, governança, operação e evidências atualizadas.
+
 <div align="center">
 
 ![Status](https://img.shields.io/badge/Status-Em_Desenvolviment.venv\Scripts\python.exe scripts\run_utils_simple.py tests     # Testa funcionamento
