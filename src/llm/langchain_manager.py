@@ -77,6 +77,12 @@ class LLMConfig:
 
 
 class LangChainLLMManager:
+    def get_llm(self):
+        """
+        Retorna o client LLM padrão do provider ativo para uso direto (ex: IntentClassifier).
+        """
+        config = LLMConfig()
+        return self._get_client(self.active_provider, config)
     """Gerenciador LLM usando LangChain como backend principal.
     
     Integração incremental mantendo fallback para sistema legado.

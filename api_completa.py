@@ -284,32 +284,73 @@ def analyze_csv_data(df: pd.DataFrame, file_info: dict, message: str) -> str:
         
         analysis.append("")
         
-        # Resposta contextual à pergunta
-        message_lower = message.lower()
-        if 'fraude' in message_lower or 'fraud' in message_lower:
-            analysis.append("🎯 **Resposta à sua pergunta sobre fraude:**")
-            if fraud_col is not None:
-                analysis.append(f"   Os dados mostram {fraud_count:,} casos de fraude em {len(df):,} transações.")
-                analysis.append(f"   Isso representa uma taxa de {fraud_rate:.2f}% de fraude no dataset.")
-            else:
-                analysis.append("   Este dataset não parece conter uma coluna específica de fraude.")
-        
-        elif 'estatística' in message_lower or 'média' in message_lower or 'resumo' in message_lower:
+
+        # === NOVO: Resposta contextual guiada por intenção semântica ===
+        # Usa o IntentClassifier para determinar o tipo de análise a ser respondida
+        from src.analysis.intent_classifier import IntentClassifier
+        from src.llm.langchain_manager import get_langchain_llm_manager
+        llm_manager = get_langchain_llm_manager()
+        llm = llm_manager.get_llm()
+        intent_classifier = IntentClassifier(llm, logger=logger)
+        intent_result = intent_classifier.classify(message)
+
+        # Fallback para baixa confiança: re-prompt ou resposta genérica
+        if intent_result.confidence < 0.5:
+            analysis.append("⚠️ **Atenção:** Não foi possível identificar com confiança a intenção da sua pergunta. Por favor, reformule ou seja mais específico.")
+            analysis.append(f"(Raciocínio LLM: {intent_result.reasoning})")
+            return "\n".join(analysis)
+
+        # Responde conforme a intenção principal detectada
+        if intent_result.primary_intent.value == "statistical":
             analysis.append("🎯 **Estatísticas principais:**")
             for col in numeric_cols[:2]:
                 mean_val = df[col].mean()
                 median_val = df[col].median()
                 analysis.append(f"   • {col}: Média {mean_val:.2f}, Mediana {median_val:.2f}")
-        
-        elif 'colunas' in message_lower or 'variáveis' in message_lower:
-            analysis.append("🎯 **Informações sobre colunas:**")
-            analysis.append(f"   Total de {len(df.columns)} colunas:")
-            for i, col in enumerate(df.columns[:10]):  # Primeiras 10 colunas
-                dtype = str(df[col].dtype)
-                analysis.append(f"   {i+1}. {col} ({dtype})")
-            if len(df.columns) > 10:
-                analysis.append(f"   ... e mais {len(df.columns) - 10} colunas")
-        
+        elif intent_result.primary_intent.value == "frequency":
+            analysis.append("🎯 **Distribuição de frequência:**")
+            for col in numeric_cols[:2]:
+                freq = df[col].value_counts().head(3)
+                analysis.append(f"   • {col}: Valores mais frequentes: {freq.to_dict()}")
+        elif intent_result.primary_intent.value == "clustering":
+            analysis.append("🎯 **Sugestão de análise de agrupamentos (clustering):**")
+            analysis.append("   Recomenda-se aplicar KMeans ou DBSCAN para identificar grupos nos dados.")
+        elif intent_result.primary_intent.value == "correlation":
+            analysis.append("🎯 **Correlação entre variáveis:**")
+            if len(numeric_cols) > 1:
+                corr = df[numeric_cols].corr().round(2)
+                analysis.append(str(corr))
+            else:
+                analysis.append("   Não há colunas numéricas suficientes para calcular correlação.")
+        elif intent_result.primary_intent.value == "outliers":
+            analysis.append("🎯 **Detecção de outliers:**")
+            for col in numeric_cols[:2]:
+                Q1 = df[col].quantile(0.25)
+                Q3 = df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower = Q1 - 1.5 * IQR
+                upper = Q3 + 1.5 * IQR
+                outliers = df[(df[col] < lower) | (df[col] > upper)]
+                analysis.append(f"   • {col}: {len(outliers)} outliers detectados")
+        elif intent_result.primary_intent.value == "comparison":
+            analysis.append("🎯 **Comparação entre grupos/períodos:**")
+            analysis.append("   Para comparação, especifique os grupos ou períodos de interesse.")
+        elif intent_result.primary_intent.value == "visualization":
+            analysis.append("🎯 **Sugestão de visualização:**")
+            analysis.append("   Recomenda-se gerar histogramas, boxplots ou scatter plots para explorar os dados.")
+        elif intent_result.primary_intent.value == "general":
+            analysis.append("🎯 **Resumo geral dos dados:**")
+            analysis.append(f"   O dataset possui {rows:,} linhas e {cols} colunas.")
+        else:
+            analysis.append(f"⚠️ Intenção detectada: {intent_result.primary_intent.value}. Ainda não implementado para resposta automática.")
+
+        # Adiciona raciocínio e confiança ao final para auditoria
+        analysis.append("")
+        analysis.append(f"🔎 Intenção detectada: {intent_result.primary_intent.value} (confiança: {intent_result.confidence:.2f})")
+        if intent_result.secondary_intents:
+            analysis.append(f"   Intenções secundárias: {[i.value for i in intent_result.secondary_intents]}")
+        analysis.append(f"   Raciocínio LLM: {intent_result.reasoning}")
+
         return "\n".join(analysis)
         
     except Exception as e:
@@ -369,34 +410,31 @@ async def chat_with_ai(request: ChatRequest):
     try:
         start_time = datetime.now()
         session_id = request.session_id or "default"
-        
-        # 🧠 ROTEAMENTO INTELIGENTE DE LLM
-        llm_config = None
-        llm_model_used = None
-        complexity_detected = None
-        
-        if LLM_ROUTER_AVAILABLE:
-            try:
-                # Usa LangChainLLMManager para gerenciar LLMs
-                llm_manager = get_langchain_llm_manager()
-                llm_model_used = llm_manager.active_provider.value
-                logger.info(f"🧠 LLM Manager: {llm_model_used} ativo")
-            except Exception as e:
-                logger.warning(f"⚠️ Erro ao inicializar LLM Manager: {e}")
-                llm_model_used = "fallback"
-        
-        # 🎯 ANÁLISE COM SISTEMA MULTIAGENTE
-        # SEMPRE usa o orquestrador que consulta a base de dados (Supabase/embeddings)
-        # NÃO carrega arquivo CSV - apenas consulta vetores
-        
+
+        # === Classificação semântica de intenção com embeddings ===
+        # Usa LLM via LangChain para identificar a intenção da pergunta
+        from src.analysis.intent_classifier import IntentClassifier
+        from src.llm.langchain_manager import get_langchain_llm_manager
+        llm_manager = get_langchain_llm_manager()
+        llm = llm_manager.get_llm()  # Obtém instância LLM do LangChain
+        intent_classifier = IntentClassifier(llm, logger=logger)
+        intent_result = intent_classifier.classify(request.message)
+        # Exemplo: intent_result.primary_intent.value -> "statistical", "clustering", etc.
+
+        # Registra intenção detectada para logging e auditoria
+        logger.info(f"🔎 Intenção detectada: {intent_result.primary_intent.value} (confiança: {intent_result.confidence:.2f})")
+        if intent_result.secondary_intents:
+            logger.info(f"   Intenções secundárias: {[i.value for i in intent_result.secondary_intents]}")
+        logger.info(f"   Raciocínio LLM: {intent_result.reasoning}")
+
+        # === Fluxo multiagente permanece, mas agora orientado pela intenção ===
         if not MULTIAGENT_AVAILABLE:
             raise HTTPException(
                 status_code=503,
                 detail="Sistema multiagente não disponível. Verifique configurações."
             )
-        
+
         logger.info(f"💬 Processando pergunta: {request.message[:100]}...")
-        
         # Carrega orquestrador dinamicamente se necessário
         if orchestrator is None and ORCHESTRATOR_AVAILABLE:
             try:
@@ -420,11 +458,18 @@ async def chat_with_ai(request: ChatRequest):
         
         logger.info("🧠 Enviando query para o orquestrador...")
         try:
-            # 🧠 Orquestrador consulta base de dados (embeddings) via RAG
-            # Usar método assíncrono com memória persistente (igual interface_interativa.py)
+            # O contexto agora inclui a intenção detectada
             result = await orchestrator.process_with_persistent_memory(
                 query=request.message,
-                context={},
+                context={
+                    "primary_intent": intent_result.primary_intent.value,
+                    "secondary_intents": [i.value for i in intent_result.secondary_intents],
+                    "intent_confidence": intent_result.confidence,
+                    "intent_reasoning": intent_result.reasoning,
+                    "requires_code_execution": intent_result.requires_code_execution,
+                    "requires_historical_context": intent_result.requires_historical_context,
+                    "suggested_modules": intent_result.suggested_modules
+                },
                 session_id=session_id
             )
             logger.info(f"✅ Orquestrador retornou resposta: {result.get('metadata', {}).get('agent_used', 'unknown')}")
@@ -433,20 +478,23 @@ async def chat_with_ai(request: ChatRequest):
             import traceback
             logger.error(f"Stack trace: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Erro ao processar: {str(e)}")
-        
+
         # Extrai informações do resultado (compatível com interface_interativa.py)
         response_text = result.get('content', result.get('response', 'Desculpe, não consegui processar sua solicitação.'))
         metadata = result.get('metadata', {})
         agent_used = metadata.get('agent_used', 'orchestrator')
-        analysis_type = metadata.get('analysis_type')
-        confidence = metadata.get('confidence')
-        
+        # Integra a intenção detectada ao metadata da resposta
+        analysis_type = intent_result.primary_intent.value
+        confidence = intent_result.confidence
+        llm_model_used = llm_manager.active_provider.value if hasattr(llm_manager, 'active_provider') else None
+        complexity_detected = None  # Não mais usado, mas mantido para compatibilidade
+
         processing_time = (datetime.now() - start_time).total_seconds()
-        
+
         logger.info(f"Chat processado em {processing_time:.2f}s por {agent_used}")
         if llm_model_used:
             logger.info(f"   LLM: {llm_model_used}")
-        
+
         return ChatResponse(
             response=response_text,
             session_id=session_id,
@@ -457,7 +505,7 @@ async def chat_with_ai(request: ChatRequest):
             llm_model=llm_model_used,
             complexity_level=complexity_detected
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

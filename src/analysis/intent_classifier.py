@@ -62,6 +62,51 @@ class IntentClassificationResult:
 
 
 class IntentClassifier:
+    def _extract_json_objects(self, text: str) -> list:
+        """
+        Extrai todos os objetos JSON válidos de um texto, ignorando trechos não estruturados.
+        Retorna uma lista de dicts.
+        Implementação iterativa baseada em contagem de chaves para suportar JSONs aninhados.
+        """
+        import json
+        json_objects = []
+        brace_stack = []
+        start_idx = None
+        for idx, char in enumerate(text):
+            if char == '{':
+                if not brace_stack:
+                    start_idx = idx
+                brace_stack.append('{')
+            elif char == '}':
+                if brace_stack:
+                    brace_stack.pop()
+                    if not brace_stack and start_idx is not None:
+                        candidate = text[start_idx:idx+1]
+                        try:
+                            obj = json.loads(candidate)
+                            json_objects.append(obj)
+                        except Exception:
+                            pass
+                        start_idx = None
+        return json_objects
+
+    def _is_valid_classification(self, obj: dict) -> bool:
+        """
+        Valida se o objeto extraído tem os campos esperados para classificação.
+        """
+        required = ["primary_intent", "secondary_intents", "confidence"]
+        return all(k in obj for k in required)
+
+    def _adjusted_prompt(self, query: str, context: Optional[dict] = None) -> tuple:
+        """
+        Gera prompt ajustado para re-prompt em caso de erro de formato.
+        """
+        base = self._system_prompt
+        extra = "\n\nATENÇÃO: Responda apenas com UM ÚNICO bloco JSON válido, sem explicações, sem markdown, sem texto extra."
+        user_prompt = f"Pergunta do usuário: {query}"
+        if context:
+            user_prompt += f"\n\nContexto adicional: {json.dumps(context, ensure_ascii=False)}"
+        return base + extra, user_prompt
     """
     Classificador inteligente de intenção usando LLM.
     
@@ -280,7 +325,7 @@ Resposta:
 Agora classifique a pergunta do usuário de forma inteligente e semântica.
 """
     
-    def classify(self, query: str, context: Optional[Dict[str, Any]] = None) -> IntentClassificationResult:
+    def classify(self, query: str, context: Optional[Dict[str, Any]] = None, max_retries: int = 2) -> IntentClassificationResult:
         """
         Classifica intenção da query usando LLM.
         
@@ -291,99 +336,67 @@ Agora classifique a pergunta do usuário de forma inteligente e semântica.
         Returns:
             Resultado da classificação com intenção, confiança e raciocínio
         """
-        try:
-            # Preparar prompt
-            from langchain.schema import HumanMessage, SystemMessage
-            
-            user_prompt = f"Pergunta do usuário: {query}"
-            
-            if context:
-                user_prompt += f"\n\nContexto adicional: {json.dumps(context, ensure_ascii=False)}"
-            
-            messages = [
-                SystemMessage(content=self._system_prompt),
-                HumanMessage(content=user_prompt)
-            ]
-            
-            # Invocar LLM
-            self.logger.info(f"Classificando intenção da query: {query[:80]}...")
-            response = self.llm.invoke(messages)
-            
-            # Parse JSON
-            response_text = response.content.strip()
-            
-            # Remover markdown code blocks se presentes
-            if response_text.startswith("```json"):
-                response_text = response_text.replace("```json", "").replace("```", "").strip()
-            elif response_text.startswith("```"):
-                response_text = response_text.replace("```", "").strip()
-            
-            classification = json.loads(response_text)
-            
-            # Construir resultado
-            result = IntentClassificationResult(
-                primary_intent=AnalysisIntent[classification["primary_intent"]],
-                secondary_intents=[
-                    AnalysisIntent[intent] for intent in classification.get("secondary_intents", [])
-                ],
-                confidence=classification.get("confidence", 0.0),
-                requires_code_execution=classification.get("requires_code_execution", False),
-                requires_historical_context=classification.get("requires_historical_context", False),
-                suggested_modules=classification.get("suggested_modules", []),
-                reasoning=classification.get("reasoning", ""),
-                metadata={
-                    "query": query,
-                    "timestamp": datetime.now().isoformat(),
-                    "llm_response": response_text
-                }
-            )
-            
-            self.logger.info(
-                f"✅ Intenção classificada: {result.primary_intent.value} "
-                f"(confiança: {result.confidence:.2f})"
-            )
-            
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Erro ao classificar intenção: {e}", exc_info=True)
-            
-            # Fallback: classificação genérica
-            return IntentClassificationResult(
-                primary_intent=AnalysisIntent.GENERAL,
-                confidence=0.0,
-                reasoning=f"Erro na classificação: {str(e)}. Usando fallback genérico.",
-                metadata={"error": str(e)}
-            )
-    
-    def explain_classification(self, result: IntentClassificationResult) -> str:
-        """
-        Gera explicação humanizada da classificação.
-        
-        Args:
-            result: Resultado da classificação
-            
-        Returns:
-            Explicação formatada em texto
-        """
-        explanation = f"## Classificação de Intenção\n\n"
-        explanation += f"**Intenção Principal:** {result.primary_intent.value}\n"
-        explanation += f"**Confiança:** {result.confidence:.1%}\n\n"
-        
-        if result.secondary_intents:
-            intents_str = ", ".join([i.value for i in result.secondary_intents])
-            explanation += f"**Intenções Secundárias:** {intents_str}\n\n"
-        
-        explanation += f"**Raciocínio:** {result.reasoning}\n\n"
-        
-        if result.requires_code_execution:
-            explanation += "⚠️ Esta análise requer execução de código Python.\n"
-        
-        if result.requires_historical_context:
-            explanation += "📜 Esta análise requer consulta ao histórico de conversa.\n"
-        
-        if result.suggested_modules:
-            modules_str = ", ".join(result.suggested_modules)
-            explanation += f"\n**Módulos Sugeridos:** {modules_str}\n"
-        
-        return explanation
+        # Fluxo principal corrigido, sem código morto ou docstring aberta
+        from langchain.schema import HumanMessage, SystemMessage
+        attempt = 0
+        last_error = None
+        prompt = self._system_prompt
+        user_prompt = f"Pergunta do usuário: {query}"
+        if context:
+            user_prompt += f"\n\nContexto adicional: {json.dumps(context, ensure_ascii=False)}"
+        while attempt <= max_retries:
+            try:
+                messages = [
+                    SystemMessage(content=prompt),
+                    HumanMessage(content=user_prompt)
+                ]
+                self.logger.info(f"Classificando intenção da query: {query[:80]}... (tentativa {attempt+1})")
+                response = self.llm.invoke(messages)
+                response_text = response.content.strip()
+                # Remover markdown code blocks se presentes
+                if response_text.startswith("```json"):
+                    response_text = response_text.replace("```json", "").replace("```", "").strip()
+                elif response_text.startswith("```"):
+                    response_text = response_text.replace("```", "").strip()
+                # Tentar extrair múltiplos JSONs
+                json_objs = self._extract_json_objects(response_text)
+                valid_objs = [obj for obj in json_objs if self._is_valid_classification(obj)]
+                if valid_objs:
+                    classification = valid_objs[0]  # Pega o primeiro válido
+                    result = IntentClassificationResult(
+                        primary_intent=AnalysisIntent[classification["primary_intent"]],
+                        secondary_intents=[
+                            AnalysisIntent[intent] for intent in classification.get("secondary_intents", [])
+                        ],
+                        confidence=classification.get("confidence", 0.0),
+                        requires_code_execution=classification.get("requires_code_execution", False),
+                        requires_historical_context=classification.get("requires_historical_context", False),
+                        suggested_modules=classification.get("suggested_modules", []),
+                        reasoning=classification.get("reasoning", ""),
+                        metadata={
+                            "query": query,
+                            "timestamp": datetime.now().isoformat(),
+                            "llm_response": response_text
+                        }
+                    )
+                    self.logger.info(
+                        f"✅ Intenção classificada: {result.primary_intent.value} "
+                        f"(confiança: {result.confidence:.2f})"
+                    )
+                    return result
+                else:
+                    raise ValueError("Nenhum JSON válido encontrado na resposta do LLM.")
+            except Exception as e:
+                last_error = str(e)
+                self.logger.error(f"Erro ao classificar intenção: {e}", exc_info=True)
+                # Ajusta prompt para re-prompt se não for a última tentativa
+                if attempt < max_retries:
+                    prompt, user_prompt = self._adjusted_prompt(query, context)
+                attempt += 1
+        # Fallback: classificação genérica
+        return IntentClassificationResult(
+            primary_intent=AnalysisIntent.GENERAL,
+            confidence=0.0,
+            reasoning=f"Erro na classificação: {last_error}. Usando fallback genérico.",
+            metadata={"error": last_error}
+        )

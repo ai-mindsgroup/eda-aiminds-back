@@ -94,7 +94,8 @@ AUTO_INGEST_FILE_PATTERN: str = os.getenv("AUTO_INGEST_FILE_PATTERN", r".*\.csv$
 # ========================================================================
 
 # Tamanho do batch para inserção no Supabase (evitar timeouts)
-EMBEDDINGS_INSERT_BATCH_SIZE: int = int(os.getenv("EMBEDDINGS_INSERT_BATCH_SIZE", "20"))
+# EMBEDDINGS_INSERT_BATCH_SIZE: int = int(os.getenv("EMBEDDINGS_INSERT_BATCH_SIZE", "20"))
+EMBEDDINGS_INSERT_BATCH_SIZE: int = int(os.getenv("EMBEDDINGS_INSERT_BATCH_SIZE", "15"))
 
 # ========================================================================
 # CONFIGURAÇÕES DE BANCO (Postgres/Supabase)
