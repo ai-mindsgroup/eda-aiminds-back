@@ -3,7 +3,7 @@
 
 import pytest
 from src.agent.memory_cleaner import clean_all_agent_memory
-from src.agent.rag_data_agent import RAGDataAgent
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 
 @pytest.fixture
 def setup_agent():

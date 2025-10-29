@@ -42,7 +42,7 @@ except Exception as e:
 
 try:
     print("\n3. Importando rag_data_agent...")
-    from src.agent.rag_data_agent import RAGDataAgent
+    from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
     print("   ✅ rag_data_agent OK")
 except Exception as e:
     print(f"   ❌ Erro: {e}")

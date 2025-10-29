@@ -1,3 +1,7 @@
+# ============================================================================
+# SANDBOXING E EXECUÇÃO SEGURA
+# ============================================================================
+RestrictedPython==6.3.0
 google-auth
 google-auth-oauthlib
 google-auth-httplib2

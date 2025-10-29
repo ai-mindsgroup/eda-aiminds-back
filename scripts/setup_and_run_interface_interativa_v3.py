@@ -218,7 +218,7 @@ except Exception as e:
 
 # 8. VALIDAÇÃO CRÍTICA: Detectar limitação de colunas no RAGDataAgent
 try:
-    from src.agent.rag_data_agent import RAGDataAgent
+    from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
     import inspect
     
     # Verificar se analyze_csv_v2 usa TemporalColumnDetector (limitação!)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 import hashlib
+import os
 from typing import List, Dict, Any, Optional, Union, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -20,12 +21,9 @@ try:
 except ImportError:  # pragma: no cover - dependência opcional
     GROQ_AVAILABLE = False
 
-# OpenAI importação condicional - apenas quando necessário
-try:
-    # Import dinâmico apenas quando provedor é selecionado
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+# Flags de disponibilidade; valores padrão (ajustadas em tempo de execução por instância)
+OPENAI_AVAILABLE = False  # Mantida por compatibilidade; ajustada quando possível
+HAS_ANY_LLM_PROVIDER = False  # Mantida por compatibilidade; ajustada quando possível
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -79,10 +77,15 @@ class EmbeddingGenerator:
             provider: Provedor de embeddings a utilizar
             model: Nome específico do modelo (opcional)
         """
+        # Configuração base
         self.provider = provider
         self.logger = logger
         self._client = None
         self._llm_manager = None
+        self._available_providers: List[str] = []
+        self._has_any_llm_provider: bool = False
+        self._strict_mode: bool = str(os.getenv("EMBEDDINGS_STRICT_MODE", "false")).lower() == "true"
+        self._force_mock: bool = str(os.getenv("EMBEDDINGS_FORCE_MOCK", "false")).lower() == "true"
         
         # Configurar modelo padrão baseado no provider
         if model:
@@ -90,7 +93,47 @@ class EmbeddingGenerator:
         else:
             self.model = self._get_default_model(provider)
         
+        # Detectar provedores disponíveis (lazy, por instância)
+        self._detect_providers()
+        # Inicializar cliente com regras de fallback e flags
         self._initialize_client()
+
+    def _detect_providers(self) -> None:
+        """Detecta provedores disponíveis via LLMManager de forma genérica e leve.
+
+        Estratégia:
+        - Se LLMManager expõe list_providers(): usa diretamente.
+        - Caso contrário, tenta detectar um provedor ativo (ex.: atributo/propriedade).
+        - Evita checagens rígidas por nome de provider específico.
+        - Ajusta flags de módulo para retrocompatibilidade (quando possível).
+        """
+        try:
+            mgr = LLMManager()
+            providers: List[str] = []
+            if hasattr(mgr, "list_providers") and callable(getattr(mgr, "list_providers")):
+                try:
+                    providers = mgr.list_providers() or []
+                except Exception:
+                    providers = []
+            elif hasattr(mgr, "active_provider"):
+                ap = getattr(mgr, "active_provider")
+                if isinstance(ap, str) and ap:
+                    providers = [ap]
+            else:
+                # Como fallback mínimo, se o LLMManager inicializou, considerar um provedor genérico disponível
+                providers = ["generic"]
+
+            self._available_providers = providers
+            self._has_any_llm_provider = len(providers) > 0
+
+            # Ajustar flags globais para compatibilidade com código legado
+            global HAS_ANY_LLM_PROVIDER, OPENAI_AVAILABLE
+            HAS_ANY_LLM_PROVIDER = self._has_any_llm_provider
+            OPENAI_AVAILABLE = OPENAI_AVAILABLE or ("openai" in providers)
+        except Exception:
+            self._available_providers = []
+            self._has_any_llm_provider = False
+            # Não alterar flags globais em caso de falha aqui
     
     def _get_default_model(self, provider: EmbeddingProvider) -> str:
         """Retorna modelo padrão para cada provider."""
@@ -107,8 +150,26 @@ class EmbeddingGenerator:
     def _initialize_client(self) -> None:
         """Inicializa o cliente do provedor escolhido."""
         try:
+            # Forçar mock por configuração
+            if self._force_mock:
+                self.logger.warning("EMBEDDINGS_FORCE_MOCK=TRUE — forçando provider MOCK")
+                self.provider = EmbeddingProvider.MOCK
+                self._initialize_mock()
+                return
+
             if self.provider in [EmbeddingProvider.LLM_MANAGER, EmbeddingProvider.OPENAI, EmbeddingProvider.GROQ]:
-                self._initialize_llm_manager()
+                # Condicionar à disponibilidade real via LLMManager (lazy, por instância)
+                if not self._has_any_llm_provider:
+                    msg = "Nenhum provedor LLM disponível via LLMManager"
+                    if self._strict_mode:
+                        self.logger.error(msg + "; STRICT_MODE ativo — abortando")
+                        raise RuntimeError("Sem provedores LLM disponíveis e STRICT_MODE habilitado")
+                    else:
+                        self.logger.warning(msg + "; usando MOCK para embeddings")
+                        self.provider = EmbeddingProvider.MOCK
+                        self._initialize_mock()
+                else:
+                    self._initialize_llm_manager()
             elif self.provider == EmbeddingProvider.SENTENCE_TRANSFORMER:
                 self._initialize_sentence_transformer()
             elif self.provider == EmbeddingProvider.MOCK:
@@ -127,25 +188,21 @@ class EmbeddingGenerator:
         try:
             self._llm_manager = LLMManager()
             self._client = self._llm_manager
-            self.logger.info(f"LLM Manager genérico inicializado para embeddings")
+            self.logger.info("LLM Manager genérico inicializado para embeddings")
         except Exception as e:
-            raise RuntimeError(f"Falha ao inicializar LLM Manager: {str(e)}")
-            self.logger.error(f"Falha ao inicializar {self.provider}: {str(e)}")
-            # Não fazer fallback automático - forçar correção da configuração
-            raise RuntimeError(f"Provider {self.provider.value} falhou na inicialização: {str(e)}")
+            self.logger.error(f"Falha ao inicializar LLM Manager: {e}")
+            raise RuntimeError(f"Falha ao inicializar LLM Manager: {e}")
     
     def _initialize_openai(self) -> None:
         """Inicializa cliente OpenAI via LLM Manager."""
         try:
             self._llm_manager = LLMManager()
-            if not self._llm_manager.is_provider_available('openai'):
-                raise ValueError("Provedor OpenAI não disponível no LLM Manager")
             
             # Usar o LLM Manager para embeddings
             self._client = self._llm_manager
-            self.logger.info(f"OpenAI embeddings via LLM Manager inicializado com modelo: {self.model}")
+            self.logger.info(f"Embeddings via LLM Manager inicializado (OpenAI compatível) com modelo: {self.model}")
         except Exception as e:
-            raise RuntimeError(f"Falha ao inicializar OpenAI via LLM Manager: {str(e)}")
+            raise RuntimeError(f"Falha ao inicializar provider via LLM Manager: {str(e)}")
     
     def _initialize_sentence_transformer(self) -> None:
         """Inicializa Sentence Transformers."""
@@ -160,14 +217,12 @@ class EmbeddingGenerator:
         """Inicializa cliente Groq via LLM Manager."""
         try:
             self._llm_manager = LLMManager()
-            if not self._llm_manager.is_provider_available('groq'):
-                raise ValueError("Provedor Groq não disponível no LLM Manager")
             
             # Usar o LLM Manager para embeddings
             self._client = self._llm_manager
-            self.logger.info(f"Groq embeddings via LLM Manager inicializado com modelo: {self.model}")
+            self.logger.info(f"Embeddings via LLM Manager inicializado (Groq compatível) com modelo: {self.model}")
         except Exception as e:
-            raise RuntimeError(f"Falha ao inicializar Groq via LLM Manager: {str(e)}")
+            raise RuntimeError(f"Falha ao inicializar provider via LLM Manager: {str(e)}")
 
     def _initialize_mock(self) -> None:
         """Inicializa provider mock para desenvolvimento."""
@@ -213,9 +268,51 @@ class EmbeddingGenerator:
         except Exception as e:
             self.logger.error(f"Erro ao gerar embedding: {str(e)}")
             raise
+
+    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+        """Gera embeddings para uma lista de textos (API de conveniência).
+
+        Compatível com testes e cenários simples onde não há metadados de chunk.
+        Usa internamente `generate_embeddings_batch` criando TextChunks temporários.
+        Retorna apenas os vetores de embeddings para compatibilidade com testes existentes.
+        """
+        if not texts:
+            return []
+        from src.embeddings.chunker import ChunkMetadata, ChunkStrategy
+        temp_chunks: List[TextChunk] = []
+        for i, t in enumerate(texts):
+            meta = ChunkMetadata(
+                source="direct_api",
+                chunk_index=i,
+                strategy=ChunkStrategy.FIXED_SIZE,
+                char_count=len(t or ""),
+                word_count=len((t or "").split()),
+                start_position=0,
+                end_position=len(t or "")
+            )
+            temp_chunks.append(TextChunk(content=t, metadata=meta))
+
+        results = self.generate_embeddings_batch(temp_chunks)
+        return [r.embedding for r in results]
     
     def _generate_llm_manager_embedding(self, text: str) -> List[float]:
-        """Gera embedding usando LLM Manager genérico (funciona com qualquer LLM)."""
+        """Gera embedding usando LLM Manager genérico (funciona com qualquer LLM).
+
+        Esta implementação usa o LLM para gerar uma análise semântica do texto e,
+        a partir da resposta, constrói um embedding determinístico via numpy com
+        semente derivada de um hash (MD5) do texto + resposta. Isso funciona como
+        fallback/reprodução em ambientes sem suporte direto a embeddings e é
+        intencionalmente determinístico — útil para testes e cenários mock.
+
+        Se o LLM falhar ou não estiver disponível, o método executa fallback
+        chamando `_generate_mock_embedding`, que produz um vetor pseudo-aleatório
+        com semente baseada no conteúdo (ou uma implementação controlada).
+        
+        Observação: Em ambientes de produção, o uso de mocks pode ser desabilitado
+        definindo a variável de ambiente EMBEDDINGS_STRICT_MODE=true. Também é
+        possível forçar o uso de mocks com EMBEDDINGS_FORCE_MOCK=true para cenários
+        de desenvolvimento.
+        """
         try:
             # Estratégia: usar o LLM para análise semântica e gerar embedding baseado na resposta
             prompt = f"Analyze this text semantically and extract key concepts: {text[:200]}"

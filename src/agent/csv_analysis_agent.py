@@ -3,10 +3,10 @@
 
 ESTE ARQUIVO ESTÁ OBSOLETO E SERÁ REMOVIDO EM VERSÕES FUTURAS.
 
-Use src/agent/rag_data_agent.py ao invés deste arquivo.
+Use src/agent/rag_data_agent_v4.py ao invés deste arquivo.
 
 MOTIVO DA DEPRECAÇÃO:
-- rag_data_agent.py implementa busca vetorial PURA sem keywords hardcoded
+- rag_data_agent_v4.py implementa busca vetorial PURA sem keywords hardcoded
 - csv_analysis_agent.py viola princípios RAG com detecção por palavras-chave
 - Sistema deve ser 100% genérico e agnóstico ao dataset
 
@@ -1213,7 +1213,7 @@ As medidas de tendência central são estatísticas que descrevem o valor centra
             # Configurar estilo dos gráficos
             sns.set_style("whitegrid")
             
-            # **CORREÇÃO**: Usar DataFrame passado no contexto (já carregado pelo rag_data_agent)
+            # **CORREÇÃO**: Usar DataFrame passado no contexto (já carregado pelo rag_data_agent_v4)
             df = None
             if context and 'reconstructed_df' in context:
                 df = context['reconstructed_df']

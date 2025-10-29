@@ -24,7 +24,7 @@ import os
 # Adicionar src ao path para imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from src.agent.rag_data_agent import RAGDataAgent
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 from src.security.sandbox import execute_in_sandbox
 
 
@@ -46,9 +46,10 @@ def sample_dataframe():
 def mock_rag_agent():
     """Cria instância mockada do RAGDataAgent."""
     # Mock dependencies para evitar conexões reais
-    with patch('src.agent.rag_data_agent.supabase'), \
-         patch('src.agent.rag_data_agent.EmbeddingGenerator'), \
-         patch('src.agent.rag_data_agent.get_logger') as mock_logger:
+    # Patches removidos pois rag_data_agent.py foi descontinuado
+    with patch('src.agent.rag_data_agent_v4.supabase'), \
+        patch('src.agent.rag_data_agent_v4.EmbeddingGenerator'), \
+        patch('src.agent.rag_data_agent_v4.get_logger') as mock_logger:
         
         mock_logger.return_value = Mock()
         agent = RAGDataAgent(name="TestAgent")

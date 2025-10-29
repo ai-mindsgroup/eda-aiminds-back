@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.agent.base_agent import BaseAgent, AgentError
-from src.agent.rag_data_agent import RAGDataAgent  # Agente RAG puro sem keywords hardcoded
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent  # Agente RAG puro sem keywords hardcoded
 from src.data.data_processor import DataProcessor
 
 # Import condicional do RAGAgent (pode falhar se Supabase não configurado)
@@ -971,7 +971,8 @@ class OrchestratorAgent(BaseAgent):
         if result.get("metadata") and not result["metadata"].get("error"):
             self.current_data_context.update(result["metadata"])
 
-        return self._enhance_response(result, ["rag_data_agent"])
+        # Retornar resposta enriquecida para o agente CSV
+        return self._enhance_response(result, ["csv"])
 
     async def _handle_rag_search_async(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if "rag" not in self.agents:

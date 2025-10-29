@@ -2,7 +2,7 @@
 # Garante que agentes não misturam dados de datasets diferentes
 
 import pytest
-from src.agent.rag_data_agent import RAGDataAgent
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 
 def test_source_id_isolation():
     agent1 = RAGDataAgent()

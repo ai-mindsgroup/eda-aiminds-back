@@ -5,7 +5,7 @@ Carrega dados do CSV na tabela embeddings para testes.
 import sys
 sys.path.insert(0, '.')
 
-from src.agent.rag_data_agent import RAGDataAgent
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 from pathlib import Path
 
 print("="*80)

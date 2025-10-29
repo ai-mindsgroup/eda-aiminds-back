@@ -11,7 +11,7 @@ from pathlib import Path
 root_dir = Path(__file__).parent
 sys.path.insert(0, str(root_dir))
 
-from src.agent.rag_data_agent import RAGDataAgent
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)

@@ -1,3 +1,5 @@
+from src.analysis.code_executor import CodeExecutor
+from src.analysis.output_formatter import OutputFormatter
 """
 Orquestrador de Análises - Coordenação Modular e Inteligente
 
@@ -15,11 +17,13 @@ import pandas as pd
 import logging
 from datetime import datetime
 
+
 from src.analysis.intent_classifier import IntentClassifier, AnalysisIntent, IntentClassificationResult
 from src.analysis.statistical_analyzer import StatisticalAnalyzer, StatisticalAnalysisResult
 from src.analysis.frequency_analyzer import FrequencyAnalyzer, FrequencyAnalysisResult
 from src.analysis.temporal_analyzer import TemporalAnalyzer, TemporalAnalysisResult
 from src.analysis.clustering_analyzer import ClusteringAnalyzer, ClusteringAnalysisResult
+from src.analysis.code_generator import CodeGenerator
 
 
 @dataclass
@@ -75,6 +79,62 @@ class OrchestrationResult:
 
 
 class AnalysisOrchestrator:
+
+    def run_modular_pipeline(self, query: str, df, context: dict = None, output_type: str = 'auto') -> dict:
+        """
+        Pipeline modular: intenção → geração de código → execução segura → formatação do output.
+        Args:
+            query: Pergunta do usuário
+            df: DataFrame de entrada
+            context: Contexto adicional (ex: nome do arquivo)
+            output_type: 'auto', 'text', 'markdown', 'plot'
+        Returns:
+            dict: {
+                'intent': intenção detectada,
+                'code': código Python gerado,
+                'exec_result': resultado da execução segura,
+                'output': saída formatada
+            }
+        """
+        # 1. Classificação de intenção
+        intent_result = self.intent_classifier.classify(query, context)
+        intent_dict = intent_result.__dict__ if hasattr(intent_result, '__dict__') else dict(intent_result)
+        # 2. Geração de código
+        code = self.code_generator.generate_code(intent_dict, {**(context or {}), 'nome_arquivo': context.get('nome_arquivo', 'dados.csv') if context else 'dados.csv'})
+        # 3. Execução segura
+        exec_result = self.code_executor.execute_code(code, {'df': df})
+        # 4. Formatação do output
+        output = self.output_formatter.format_output(exec_result.get('result'), output_type=output_type)
+        return {
+            'intent': intent_dict,
+            'code': code,
+            'exec_result': exec_result,
+            'output': output
+        }
+
+    def exemplo_pipeline_modular(self):
+        """
+        Exemplo didático de uso do pipeline modularizado.
+        """
+        import pandas as pd
+        df = pd.DataFrame({'idade': [20, 30, 40]})
+        query = 'Qual a frequência de cada idade?'
+        context = {'nome_arquivo': 'dados.csv'}
+        resultado = self.run_modular_pipeline(query, df, context, output_type='markdown')
+        print('Intenção:', resultado['intent'])
+        print('Código gerado:', resultado['code'])
+        print('Resultado execução:', resultado['exec_result'])
+        print('Output formatado:', resultado['output'])
+
+    # Exemplo de uso do CodeGenerator integrado ao orquestrador
+    def exemplo_uso_code_generator(self):
+        """
+        Exemplo didático de como gerar código Python a partir de uma intenção analítica.
+        """
+        intent = {"tipo": "frequencia_coluna", "coluna": "idade"}
+        context = {"nome_arquivo": "dados.csv"}
+        codigo = self.generate_python_code(intent, context)
+        print("Código gerado:\n", codigo)
     """
     Orquestrador inteligente de análises modulares.
     
@@ -107,6 +167,22 @@ class AnalysisOrchestrator:
         self.frequency_analyzer = FrequencyAnalyzer(logger)
         self.temporal_analyzer = TemporalAnalyzer(logger)
         self.clustering_analyzer = ClusteringAnalyzer(logger)
+
+        # Inicializar gerador de código
+        self.code_generator = CodeGenerator()
+        # Inicializar executor e formatador
+        self.code_executor = CodeExecutor()
+        self.output_formatter = OutputFormatter()
+    def generate_python_code(self, intent: dict, context: dict) -> str:
+        """
+        Gera código Python (Pandas/Matplotlib) a partir da intenção e contexto usando o módulo CodeGenerator.
+        Args:
+            intent (dict): Intenção analítica detectada.
+            context (dict): Contexto adicional (ex: nome do arquivo).
+        Returns:
+            str: Código Python gerado.
+        """
+        return self.code_generator.generate_code(intent, context)
         
         # Mapeamento de intenções para analisadores
         self._intent_to_analyzer = {
@@ -350,7 +426,7 @@ Sintetize essas interpretações de forma coerente e contextual.
         """
         🔥 V3.0: Orquestração direta baseada em dict de intenções.
         
-        Usado para integração com rag_data_agent.py que já possui
+    Usado para integração com rag_data_agent_v4.py (agente principal)
         classificação de intenção prévia.
         
         Args:

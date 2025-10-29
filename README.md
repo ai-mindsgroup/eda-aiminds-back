@@ -103,6 +103,16 @@
 - ✅ **Pandas**: Manipulação eficiente de dados tabulares
 - ✅ **Matplotlib/Seaborn**: Geração de visualizações
 
+### 🔄 Sistema de Embeddings Refatorado (v2.3.0)
+- ✅ **Detecção Lazy de Provedores**: LLM providers detectados dinamicamente no `__init__`
+- ✅ **Fallback Inteligente**: Uso automático de MOCK quando sem credenciais LLM
+- ✅ **Flags de Controle**: 
+  - `EMBEDDINGS_STRICT_MODE=true` - Aborta sem LLM (produção)
+  - `EMBEDDINGS_FORCE_MOCK=true` - Força MOCK (desenvolvimento)
+- ✅ **API Plural**: `generate_embeddings(texts: List[str])` para batch processing
+- ✅ **Compatibilidade Universal**: Funciona com qualquer provider via LLM Manager
+- 📚 **Documentação**: [`docs/steps/prompts_correcao_embeddings_generator.md`](docs/steps/prompts_correcao_embeddings_generator.md)
+
 
 ## Contexto Auditoria e Diagnóstico do Sistema Multiagente EDA AI Minds:
 

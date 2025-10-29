@@ -21,6 +21,7 @@ from src.data.data_loader import DataLoader, DataLoaderError
 from src.data.data_validator import DataValidator, DataValidationError
 # Removido: agente obsoleto csv_analysis_agent.py
 from src.utils.logging_config import get_logger
+from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 
 
 class UnauthorizedCSVAccessError(Exception):
@@ -52,7 +53,6 @@ class DataProcessor:
         # Componentes principais (com caller_agent)
         self.loader = DataLoader(caller_agent=self.caller_agent)
         self.validator = DataValidator()
-        from src.agent.rag_data_agent import RAGDataAgent
         self.analyzer = RAGDataAgent()
 
         # Configurações

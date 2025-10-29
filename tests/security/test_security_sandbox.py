@@ -210,8 +210,9 @@ class TestIntegrationWithRAGAgent:
     def test_rag_agent_uses_secure_repl(self):
         """✅ Teste 13: RAGDataAgent deve usar PythonREPLTool com sandbox."""
         try:
-            from agent.rag_data_agent import RAGDataAgent
-            from embeddings.generator import EmbeddingGenerator
+            # (Atualizado: usar agente V4 e import explícito do pacote src)
+            from src.embeddings.generator import EmbeddingGenerator
+            from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
             
             # Verificar se RAGAgent não usa exec() direto
             import inspect
@@ -221,7 +222,7 @@ class TestIntegrationWithRAGAgent:
             assert "exec(" not in source or "PythonREPLTool" in source
             print("✅ Teste 13 PASSOU: RAGAgent usa PythonREPLTool (não exec direto)")
         except ImportError:
-            pytest.skip("RAGDataAgent não disponível")
+            pytest.skip("Dependências do RAGDataAgent não disponíveis")
 
 
 def test_summary():
