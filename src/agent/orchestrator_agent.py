@@ -798,7 +798,6 @@ class OrchestratorAgent(BaseAgent):
         general_score = sum(1 for kw in general_keywords if kw in query_lower)
         
         # PRIORIDADE: Se há visualização detectada, sempre usar CSV_ANALYSIS
-        # porque apenas o EmbeddingsAnalysisAgent tem o método _handle_visualization_query
         if viz_type and has_supabase_data:
             self.logger.info("🎨 Redirecionando para CSV analysis (visualização solicitada)")
             return QueryType.CSV_ANALYSIS
@@ -859,7 +858,7 @@ class OrchestratorAgent(BaseAgent):
             )
         
         # Log da decisão de delegação
-        self.logger.info("📊 Delegando para agente CSV (EmbeddingsAnalysisAgent)")
+        self.logger.info("📊 Delegando para agente CSV")
         self.logger.info(f"🔍 Query: '{query[:80]}...'")
         
         # Preparar contexto para o agente CSV
@@ -870,9 +869,11 @@ class OrchestratorAgent(BaseAgent):
             csv_context.update(self.current_data_context)
             self.logger.debug(f"📦 Contexto de dados atual: {list(self.current_data_context.keys())}")
         
-        # Executar processamento no agente especializado (síncrono)
+        # Executar processamento no agente especializado
         try:
-            result = self.agents["csv"].process(query, csv_context)
+            # RAGDataAgentV4 usa query_v4() com session_id
+            session_id = csv_context.get('session_id') or self._current_session_id
+            result = self.agents["csv"].query_v4(query, session_id=session_id)
         except Exception as e:
             self.logger.error(f"❌ Erro ao executar agente CSV: {e}")
             return self._build_response(
@@ -953,11 +954,11 @@ class OrchestratorAgent(BaseAgent):
             self.logger.info(f"📊 Flag de visualização setada: {viz_type}")
 
         try:
-            # RAGDataAgent.process() é async e requer session_id opcional
+            # RAGDataAgentV4 usa query_v4() em vez de process()
             session_id = csv_context.get('session_id') or self._current_session_id
-            result = await self.agents["csv"].process(query, csv_context, session_id=session_id)
+            result = self.agents["csv"].query_v4(query, session_id=session_id)
         except Exception as e:
-            self.logger.error(f"❌ Erro ao executar agente CSV (async): {e}", exc_info=True)
+            self.logger.error(f"❌ Erro ao executar agente CSV: {e}", exc_info=True)
             return self._build_response(
                 f"❌ Erro ao executar agente CSV: {str(e)}",
                 metadata={"error": True, "agents_used": []}
@@ -1214,7 +1215,8 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             if "csv" in self.agents:
                 try:
                     load_query = f"carregar e analisar estrutura básica"
-                    csv_result = self.agents["csv"].process(load_query, context)
+                    session_id = context.get('session_id') or self._current_session_id
+                    csv_result = self.agents["csv"].query_v4(load_query, session_id=session_id)
                     
                     if csv_result and not csv_result.get("metadata", {}).get("error", False):
                         # Extrair informações do CSV e atualizar contexto
@@ -1365,7 +1367,8 @@ Sua pergunta requer análise de dados específicos, mas não há nenhuma base de
             
             # Primeiro: análise CSV se há dados
             if "csv" in self.agents and self.current_data_context:
-                csv_result = self.agents["csv"].process(query, context)
+                session_id = context.get('session_id') or self._current_session_id
+                csv_result = self.agents["csv"].query_v4(query, session_id=session_id)
                 results.append(("csv", csv_result))
                 agents_used.append("embeddings_analyzer")  # Nome correto do agente
             

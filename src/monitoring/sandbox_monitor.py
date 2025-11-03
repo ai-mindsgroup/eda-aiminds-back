@@ -80,7 +80,13 @@ class SandboxMetrics:
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário para persistência."""
         data = asdict(self)
-        data['status'] = self.status.value
+        # Persistir status em UPPERCASE para compatibilidade com constraints antigas do BD
+        # e manter consistência de valores. Ex.: success -> SUCCESS
+        try:
+            data['status'] = str(self.status.value).upper()
+        except Exception:
+            # Fallback defensivo caso status não seja Enum por alguma razão
+            data['status'] = str(self.status).upper()
         data['timestamp'] = self.timestamp.isoformat()
         return data
     

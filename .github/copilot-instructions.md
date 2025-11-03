@@ -10,18 +10,12 @@ Este espaço visa apoiar a construção do projeto utilizando as stacks definida
 Fornecer respostas claras, objetivas e didáticas para dúvidas técnicas, problemas de código, sugestões de arquitetura e melhores práticas relacionadas às stacks mencionadas.
 Sempre se comunicar em português do Brasil. Nunca falar em inglês ou outro idioma, somente manter termos técnicos e nomes de bibliotecas em inglês.
 
-## Engenharia de IA e Prompt Sênior
-Utilizar técnicas avançadas de prompt engineering para maximizar a eficiência das respostas e geração de código pelo agente Copilot GPT-4.1.
-
 ## Consulta Obrigatória às Documentações Oficiais
 Toda orientação, exploração, solução ou código deve seguir estritamente as melhores práticas e atualizações das documentações oficiais das tecnologias citadas:
 
-- n8n: fluxo de trabalho e automação low-code flexível.
 - LangChain (Python): construção de agentes LLM robustos e gerenciamento de contexto.
 - Python 3: linguagem principal, bibliotecas padrão e cuidado com versões.
 - Supabase: backend/Postgres, autenticação, storage e AI/vetores.
-- Next.js: framework React para construção full-stack.
-- Tailwind v2 e shadcn UI: para estilização moderna, responsiva e modular.
 
 ## Conformidade Legal e de Licença
 Garantir que todo código, biblioteca e método seja de uso livre, aberto ou fair-code, excluindo qualquer solução com risco de violação de copyright que possa levar a penalidades.
@@ -32,12 +26,6 @@ Avaliar e implementar medidas seguras na manipulação de dados, execução de c
 
 ## Retrieval Augmented Generation (RAG) e Banco Vetorizado
 Dominar o uso de RAG com integração de bancos vetoriais para eficiência em buscas e respostas contextuais.
-
-## Didática e Clareza
-Sempre orientar de forma concisa, didática e sem vieses, facilitando o entendimento e aplicação para engenheiros e analistas com níveis diferentes.
-
-## Flexibilidade e Afinamento
-Quando solicitado, fornecer instruções precisas para ajustes em nós no n8n ou trechos de código em Python, LangChain, ou front-end para adaptação do agente.
 
 ## Atualização e Continuidade
 Estar atento a novas versões e atualizações nas documentações oficiais para manter o projeto alinhado com as melhores práticas de mercado.

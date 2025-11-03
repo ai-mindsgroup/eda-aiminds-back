@@ -6,7 +6,6 @@ Agentes de resposta devem consultar exclusivamente a tabela embeddings do Supaba
 Este módulo fornece uma interface simples e poderosa que integra:
 - DataLoader: carregamento de múltiplas fontes (RESTRITO)
 - DataValidator: validação e limpeza (RESTRITO)
-- EmbeddingsAnalysisAgent: análise via embeddings (PERMITIDO)
 - Suporte a diferentes formatos e fontes de dados (RESTRITO)
 """
 from __future__ import annotations
@@ -19,7 +18,6 @@ import pandas as pd
 
 from src.data.data_loader import DataLoader, DataLoaderError  
 from src.data.data_validator import DataValidator, DataValidationError
-# Removido: agente obsoleto csv_analysis_agent.py
 from src.utils.logging_config import get_logger
 from src.agent.rag_data_agent_v4 import RAGDataAgentV4 as RAGDataAgent
 
@@ -84,8 +82,6 @@ class DataProcessor:
                     return 'ingestion_agent'
                 elif 'orchestrator_agent' in filename:
                     return 'orchestrator_agent'
-                elif 'csv_analysis_agent' in filename or 'embeddings_analysis_agent' in filename:
-                    return 'analysis_agent'
                 elif 'rag_agent' in filename:
                     return 'rag_agent'
                     
@@ -427,10 +423,9 @@ class DataProcessor:
                 self.logger.warning(f"Falha na limpeza automática: {str(e)}")
                 result['cleaning'] = {"error": str(e)}
         
-        # Conectar com EmbeddingsAnalysisAgent
+        # Preparar para ingestão de embeddings
         try:
             # ⚠️ CONFORMIDADE: Este processador é restrito ao agente de ingestão
-            # O agente de embeddings será usado apenas se autorizado
             if self.caller_agent == 'ingestion_agent':
                 # Dados devem ser enviados para indexação na tabela embeddings
                 # Aqui seria o local para iniciar processo de vetorização
@@ -439,7 +434,7 @@ class DataProcessor:
             else:
                 # Outros agentes devem usar apenas embeddings
                 result['embeddings_ready'] = False
-                result['note'] = "Use EmbeddingsAnalysisAgent.load_from_embeddings() para consultas"
+                result['note'] = "Consulte a tabela embeddings via RAGDataAgent"
             
         except Exception as e:
             self.logger.warning(f"Falha ao preparar dados para embeddings: {str(e)}")

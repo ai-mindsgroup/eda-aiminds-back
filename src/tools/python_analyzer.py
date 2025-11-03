@@ -5,6 +5,8 @@ sobre acesso direto a arquivos CSV para agentes de resposta.
 
 Esta ferramenta permite que agentes executem código Python real para
 calcular estatísticas precisas dos dados armazenados no Supabase.
+
+🛡️ SEGURANÇA (2025-10-31): Integrado com sandbox seguro para execução de código.
 """
 from __future__ import annotations
 import sys
@@ -28,6 +30,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from src.utils.logging_config import get_logger
+
+# 🛡️ SANDBOX SEGURO - Implementado 2025-10-31
+from src.security.sandbox import execute_in_sandbox
 
 # Import do cliente Supabase para recuperação de dados
 try:
@@ -88,8 +93,6 @@ class PythonDataAnalyzer:
                     return 'ingestion_agent'
                 elif 'orchestrator_agent' in filename:
                     return 'orchestrator_agent'
-                elif 'csv_analysis_agent' in filename or 'embeddings_analysis_agent' in filename:
-                    return 'analysis_agent'
                 elif 'rag_agent' in filename:
                     return 'rag_agent'
                 elif 'test_' in filename or '_test' in filename:
@@ -590,7 +593,10 @@ class PythonDataAnalyzer:
             return {"error": error_msg}
     
     def execute_safe_python(self, code: str, context: Dict[str, Any] = None) -> PythonAnalysisResult:
-        """Executa código Python de forma segura.
+        """
+        Executa código Python de forma SEGURA usando sandbox.
+        
+        🛡️ SEGURANÇA: Substituído exec() direto por execute_in_sandbox() - 2025-10-31
         
         Args:
             code: Código Python para executar
@@ -602,44 +608,60 @@ class PythonDataAnalyzer:
         import time
         start_time = time.time()
         
-        # Capturar output
-        old_stdout = sys.stdout
-        sys.stdout = captured_output = io.StringIO()
-        
         try:
-            # Preparar namespace seguro
-            local_vars = self.safe_globals.copy()
+            # 🛡️ EXECUTAR NO SANDBOX SEGURO
+            self.logger.info(f"🛡️ Executando código via sandbox seguro (caller: {self.caller_agent})")
+            
+            # Preparar contexto customizado
+            custom_globals = {}
             if context:
-                local_vars.update(context)
+                custom_globals.update(context)
             
-            # Executar código
-            exec(code, {"__builtins__": {}}, local_vars)
+            # Executar no sandbox com monitoramento ativo
+            sandbox_result = execute_in_sandbox(
+                code=code,
+                custom_globals=custom_globals,
+                enable_monitoring=True,  # ✅ Popula sandbox_metrics
+                timeout_seconds=10,
+                memory_limit_mb=200
+            )
             
-            # Capturar resultado
-            output = captured_output.getvalue()
             execution_time = time.time() - start_time
             
-            return PythonAnalysisResult(
-                success=True,
-                result=local_vars.get('result'),
-                output=output,
-                execution_time=execution_time
-            )
+            if sandbox_result['success']:
+                self.logger.info(f"✅ Código executado com sucesso via sandbox (tempo: {execution_time:.3f}s)")
+                
+                return PythonAnalysisResult(
+                    success=True,
+                    result=sandbox_result.get('result'),
+                    output=sandbox_result.get('logs', ''),
+                    execution_time=execution_time
+                )
+            else:
+                # Falha na execução
+                error_msg = sandbox_result.get('error', 'Erro desconhecido')
+                self.logger.error(f"❌ Erro na execução do código via sandbox: {error_msg}")
+                
+                return PythonAnalysisResult(
+                    success=False,
+                    result=None,
+                    output=sandbox_result.get('logs', ''),
+                    error=error_msg,
+                    execution_time=execution_time
+                )
             
         except Exception as e:
             execution_time = time.time() - start_time
-            error_msg = f"Erro na execução: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"❌ Erro crítico no execute_safe_python: {str(e)}\n{traceback.format_exc()}"
+            self.logger.error(error_msg)
             
             return PythonAnalysisResult(
                 success=False,
                 result=None,
-                output=captured_output.getvalue(),
+                output="",
                 error=error_msg,
                 execution_time=execution_time
             )
-        
-        finally:
-            sys.stdout = old_stdout
     
     def calculate_clustering_analysis(self, n_clusters: int = 3) -> Dict[str, Any]:
         """

@@ -92,7 +92,6 @@
 ### 🤖 Agentes Inteligentes
 - ✅ **OrchestratorAgent**: Coordenador central do sistema multiagente (refatorado 05/10)
 - ✅ **RAGDataAgent**: Novo agente com busca vetorial pura via match_embeddings()
-- ✅ **CSVAnalysisAgent**: ⚠️ DEPRECATED - mantido para compatibilidade
 - ✅ **RAGAgent**: Busca semântica com embeddings vetoriais (requer Supabase)
 - ✅ **BaseAgent**: Framework base para criação de novos agentes
 - ✅ **Sistema de Logging**: Monitoramento centralizado e estruturado

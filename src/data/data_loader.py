@@ -79,8 +79,6 @@ class DataLoader:
                     return 'data_processor'  # DataProcessor pode ser chamado por vários agentes
                 elif 'orchestrator_agent' in filename:
                     return 'orchestrator_agent'
-                elif 'csv_analysis_agent' in filename or 'embeddings_analysis_agent' in filename:
-                    return 'analysis_agent'
                 elif 'rag_agent' in filename:
                     return 'rag_agent'
                 elif 'test_' in filename or '_test' in filename:

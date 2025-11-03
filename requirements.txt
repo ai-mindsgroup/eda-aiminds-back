@@ -1,7 +1,7 @@
 # ============================================================================
 # SANDBOXING E EXECUÇÃO SEGURA
 # ============================================================================
-RestrictedPython==6.3.0
+RestrictedPython==8.1  # Compatível com Python 3.12
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
